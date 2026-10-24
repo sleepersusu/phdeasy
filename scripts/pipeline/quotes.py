@@ -25,8 +25,13 @@ def section_at(text, loc):
 
 
 def _norm(s):
-    s = re.sub(r"\[[,\s\d–-]*\]", " ", s or "")  # XML 去掉交互參照後留下的 [] 與 [1,2]
-    return normalize_for_match(s)
+    s = re.sub(r"[\[\]]", " ", s or "")  # 參考文獻方括號只拿掉括號本身（引句可能在 [15, 16] 中間切斷）
+    s = normalize_for_match(s)
+    s = re.sub(r"(?<=[a-z])- (?=[a-z])", "", s)  # 斷行連字號被抄成「computa- tional」
+    s = re.sub(r"(?<=[a-z])-$", "", s)  # 引句停在行尾連字號
+    s = re.sub(r"\s+([.,;:)])", r"\1", s)  # XML 去掉交互參照後標點前多出的空白
+    s = re.sub(r"([.,;:])(?:\s*[.,;:])+", r"\1", s)  # "[,]." 這類殘留的連續標點
+    return s
 
 
 def check_quote(text, quote, loc):

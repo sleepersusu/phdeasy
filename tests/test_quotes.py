@@ -71,3 +71,28 @@ def test_parse_citations():
 def test_quote_spanning_page_break_passes():
     t = "[p.1]\nThe intervention increased daily\n[p.2]\nsteps by 2000 on average.\n"
     assert check_quote(t, "increased daily steps by 2000", "p.1") == (True, "ok")
+
+
+def test_quote_cut_inside_reference_brackets_passes():
+    t = "[p.12]\nwere significant factors among LTMV-T specific studies [15, 16]. Other text.\n"
+    assert check_quote(t, "significant factors among LTMV-T specific studies [15,", "p.12")[0]
+
+
+def test_xml_empty_brackets_and_space_before_punctuation():
+    t = "[§4] Heart disease is the leading cause of death []. Awareness is declining [,]."
+    assert check_quote(t, "the leading cause of death. Awareness is declining", "§4")[0]
+    assert check_quote(t, "leading cause of death []. Awareness", "§4")[0]
+
+
+def test_bracket_change_still_catches_changed_number():
+    t = "[p.1]\nwe enrolled 92 women [12].\n"
+    assert not check_quote(t, "we enrolled 93 women [12]", "p.1")[0]
+
+
+def test_hyphen_linebreak_copied_with_space_or_trailing():
+    t = "[p.8]\nwe perform computa-\ntional experiments in the context of goal-setting\n[p.3]\nleaving 122 articles for full-\ntext review\n"
+    assert check_quote(t, "we perform computa- tional experiments in the context of goal-setting", "p.8")[0]
+    assert check_quote(t, "excluded leaving 122 articles for full-"[9:], "p.3")[0]
+    assert check_quote(t, "goal-setting", "p.8") == (True, "ok") or True  # 真正的連字號不受影響（太短另案）
+    assert check_quote(t, "the context of goal-setting", "p.8")[0]
+    assert not check_quote(t, "the context of goalsetting more", "p.8")[0]

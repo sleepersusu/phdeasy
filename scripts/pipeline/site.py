@@ -29,6 +29,10 @@ SECTIONS = [
 ]
 STAGE_LABELS = {"setup": "找文章與全文", "stop1": "停 1 確認", "ingest": "轉成文字", "network": "合作與領域", "grants": "研究計畫",
                 "cards": "文章解析卡", "profile": "總覽撰寫", "verify": "獨立驗收", "stop2": "停 2 呈現"}
+DESIGN_LABELS = {"rct": "隨機對照試驗", "pilot-rct": "先導隨機對照試驗", "quasi-experimental": "準實驗", "single-arm": "單組介入", "cohort": "世代研究",
+                 "cross-sectional": "橫斷研究", "case-control": "病例對照", "qualitative": "質性研究", "mixed-methods": "混合方法",
+                 "systematic-review": "系統性回顧", "scoping-review": "範疇回顧", "meta-analysis": "統合分析", "secondary-analysis": "次級資料分析",
+                 "protocol": "研究計畫書", "modeling": "模型研究", "machine-learning": "機器學習", "text-mining": "文字探勘", "other": "其他"}
 INFO_KINDS = {"year_mismatch", "author_not_linked", "owner_decision", "possible_author_split"}
 
 
@@ -55,8 +59,17 @@ def _card(run, wid, kind, source_type):
         elif key == "limitations":
             fields.append({"key": key, "label": label, "state": v.get("status", "ok"),
                            "author_stated": v.get("author_stated") or [], "inferred": v.get("inferred") or []})
+        elif key in ("gap", "solves", "findings"):
+            fields.append({"key": key, "label": label, "state": v.get("status", "ok"), "claims": v.get("claims") or []})
         else:
-            fields.append({"key": key, "label": label, "state": v.get("status", "ok"), "text": v.get("text"), "citations": v.get("citations") or []})
+            facts = {}
+            if key == "design" and v.get("type"):
+                facts["設計類型"] = f"{DESIGN_LABELS.get(v['type'], v['type'])}（{v['type']}）"
+            if key == "sample":
+                for k, lab in (("population", "對象"), ("n_enrolled", "納入人數"), ("n_analyzed", "分析人數"), ("country", "國家"), ("setting", "場域"), ("period", "期間")):
+                    if v.get(k) not in (None, ""):
+                        facts[lab] = v[k]
+            fields.append({"key": key, "label": label, "state": v.get("status", "ok"), "text": v.get("text"), "citations": v.get("citations") or [], "facts": facts})
     note = "由「文章解析卡（cards）」階段產生，尚未執行" if c is None else None
     if kind == "short":
         note = (note + "；" if note else "") + "短卡：會議摘要或社論只填大意"

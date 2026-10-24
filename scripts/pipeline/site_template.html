@@ -232,12 +232,15 @@ function cardHtml(w){
   const val = f => {
     if (f.state === "pending") return pill("y", "尚未產生");
     if (f.state === "not_in_source") return `<span class="muted">來源未提及</span>`;
+    if (f.state === "not_applicable") return `<span class="muted">短卡不適用（會議摘要、社論等）</span>`;
     const head = f.state === "unresolved" ? pill("y", "? 判不出來") + " " : "";
     if (f.key === "limitations"){
-      const part = (t, xs, cls) => xs.length ? `<div><strong>${t}</strong> ${cls}<ul>${xs.map(x => `<li>${esc(x.text)}${cites(x.citations)}</li>`).join("")}</ul></div>` : "";
+      const part = (t, xs, cls) => xs.length ? `<div><strong>${t}</strong> ${cls}<ul>${xs.map(x => `<li>${esc(x.text)}${x.basis ? `<div class="small muted">推論依據：${esc(x.basis)}</div>` : ""}${cites(x.citations)}</li>`).join("")}</ul></div>` : "";
       return head + (part("作者自述", f.author_stated, "") + part("推論", f.inferred, pill("y", "非作者原話")) || `<span class="muted">來源未提及</span>`);
     }
-    return head + `<div>${esc(f.text || "")}</div>${cites(f.citations)}`;
+    if (f.claims) return head + (f.claims.length ? `<ol>${f.claims.map(x => `<li>${esc(x.text)}${cites(x.citations)}</li>`).join("")}</ol>` : `<span class="muted">來源未提及</span>`);
+    const facts = f.facts && Object.keys(f.facts).length ? `<div class="row small" style="margin-bottom:6px">${Object.entries(f.facts).map(([k, v]) => `<span class="pill o">${esc(k)}：${esc(v)}</span>`).join("")}</div>` : "";
+    return head + facts + `<div>${esc(f.text || "")}</div>${cites(f.citations)}`;
   };
   return `${c.pending_note ? `<p class="small">${pill("y", "注意")} ${esc(c.pending_note)}</p>` : ""}
     <dl class="card">${c.fields.map(f => `<dt>${esc(f.label)}</dt><dd>${val(f)}</dd>`).join("")}</dl>`;

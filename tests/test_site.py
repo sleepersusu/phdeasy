@@ -110,3 +110,20 @@ def test_work_exception_states(tmp_path):
     assert sorted(e["state"] for e in w1["exceptions"]) == ["info", "open"]
     w2 = next(w for w in d["works"] if w["id"] == "W2")
     assert [e["state"] for e in w2["exceptions"]] == ["resolved"]
+
+
+def test_claim_fields_and_fixed_facts_shown(tmp_path):
+    run = make_run(tmp_path)
+    c = run / "work" / "cards" / "W1"
+    c.mkdir(parents=True)
+    (c / "card.json").write_text(json.dumps({"id": "W1", "basis": "fulltext", "fields": {
+        "design": {"status": "ok", "type": "quasi-experimental", "text": "準實驗", "citations": []},
+        "sample": {"status": "ok", "text": "92 位", "n_enrolled": 92, "n_analyzed": 85, "country": "United States", "citations": []},
+        "findings": {"status": "ok", "claims": [{"text": "知識提升", "citations": [{"quote": "Knowledge scores increased", "loc": "p.3"}]}]},
+        "gap": {"status": "not_in_source", "claims": []}}}))
+    d = build_site_data(run)
+    f = {x["key"]: x for x in next(w for w in d["works"] if w["id"] == "W1")["card"]["fields"]}
+    assert f["findings"]["claims"][0]["text"] == "知識提升"
+    assert f["design"]["facts"]["設計類型"] == "準實驗（quasi-experimental）"
+    assert f["sample"]["facts"]["納入人數"] == 92 and f["sample"]["facts"]["分析人數"] == 85
+    assert f["gap"]["state"] == "not_in_source"

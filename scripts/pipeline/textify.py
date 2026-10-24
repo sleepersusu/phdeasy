@@ -13,13 +13,18 @@ SKIP_TAGS = {"ref-list", "xref", "label", "object-id"}
 BLOCK_TAGS = {"p", "title", "caption", "award-group", "funding-statement"}
 
 
+def clean_pdf_text(s):
+    """部分 PDF 字型把負號編成控制字元 \x02（例：W4392799619），還原成負號。"""
+    return re.sub(r"\x02(?=[\d.])", "−", s)
+
+
 def pdf_to_marked(path):
     import pymupdf
 
     parts = []
     with pymupdf.open(path) as doc:
         for i, page in enumerate(doc, 1):
-            parts.append(f"[p.{i}]\n{page.get_text().strip()}\n")
+            parts.append(f"[p.{i}]\n{clean_pdf_text(page.get_text()).strip()}\n")
         n = len(doc)
     return "\n".join(parts), n
 

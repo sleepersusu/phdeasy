@@ -101,3 +101,9 @@ def test_supplement_first_page_detected():
     assert looks_like_supplement("[p.1]\nMultimedia Appendix 2. Interview guide\n...")
     assert looks_like_supplement("[p.1]\nSupplementary Material\nTable S1 ...")
     assert not looks_like_supplement("[p.1]\nJMIR Cancer\nFeasibility and Acceptability of a Physical Activity Tracker\nAbstract\nBackground: ... CONSORT diagram in Figure 1")
+
+
+def test_pdf_control_char_minus_restored():
+    from pipeline.textify import clean_pdf_text
+    assert clean_pdf_text("β = \x020.02 (95% CI \x020.04 to \x020.01)") == "β = −0.02 (95% CI −0.04 to −0.01)"
+    assert clean_pdf_text("plain text") == "plain text"

@@ -22,7 +22,7 @@ from pipeline.state import append_progress, load_state, set_stage
 from pipeline.textify import abstract_to_marked, has_text, looks_like_supplement, pdf_to_marked, title_matches, units, xml_to_marked
 
 
-RULES_VERSION = 2  # 驗證規則改了就加一，舊結果會重驗（2：加入附錄／檢核表偵測）
+RULES_VERSION = 3  # 驗證規則改了就加一，舊結果會重驗（2：附錄／檢核表偵測；3：還原 \x02 負號）
 
 
 def needs_redo(prev, src_hash, text_exists):

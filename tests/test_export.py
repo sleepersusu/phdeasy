@@ -32,3 +32,23 @@ def test_unpaired_preprints_reports_best_match():
     out = unpaired_preprints(works)
     assert out[0]["id"] == "P" and out[0]["best_match"] == "A"
     assert 0 < out[0]["score"] < 1
+
+
+def test_render_paper_md_has_all_fields_and_citations():
+    from pipeline.export import render_paper_md, paper_md_name
+    w = {"id": "W1", "title": "Study A", "year": 2024, "venue": "J A", "doi": "10.1/a", "type": "article",
+         "authors": [{"name": "Ann Lee"}, {"name": "Yoshimi Fukuoka"}], "target_position": "last", "target_corresponding": True}
+    card = {"basis": "fulltext", "fields": {
+        "summary": {"status": "ok", "text": "大意", "citations": [{"quote": "We enrolled 92 women", "loc": "p.2"}]},
+        "design": {"status": "ok", "type": "rct", "text": "隨機", "citations": []},
+        "sample": {"status": "unresolved", "text": "出處核對未通過", "citations": []},
+        "gap": {"status": "not_in_source", "claims": []},
+        "solves": {"status": "ok", "claims": [{"text": "問題", "citations": [{"quote": "aim of this study was", "loc": "p.1"}]}]},
+        "findings": {"status": "ok", "claims": [{"text": "結果", "citations": []}]},
+        "limitations": {"status": "ok", "author_stated": [{"text": "小樣本", "citations": []}], "inferred": [{"text": "無對照", "basis": "單組", "citations": []}]}}}
+    md = render_paper_md(w, card)
+    for label in ["大意", "研究設計", "研究樣本", "研究缺口", "解決什麼", "發現", "研究限制"]:
+        assert f"## {label}" in md
+    assert '"We enrolled 92 women" [W1, p.2]' in md
+    assert "來源未提及" in md and "判不出來" in md and "推論（非作者原話）" in md
+    assert paper_md_name(w) == "2024_Lee_Study-A_W1.md"

@@ -49,3 +49,55 @@ def unpaired_preprints(works):
         out.append({"id": w["id"], "title": w["title"], "best_match": best["id"] if best else None,
                     "best_title": best["title"] if best else None, "score": round(_similar(best["title"], w["title"]), 2) if best else 0})
     return out
+
+
+LABELS = [("summary", "大意"), ("design", "研究設計"), ("sample", "研究樣本"), ("gap", "研究缺口"), ("solves", "解決什麼"), ("findings", "發現"), ("limitations", "研究限制")]
+STATE_TEXT = {"not_in_source": "來源未提及", "not_applicable": "短卡不適用", "unresolved": "判不出來（見例外紀錄）"}
+ROLE = {"first": "第一作者", "middle": "中間作者", "last": "最後作者"}
+
+
+def paper_md_name(w):
+    from .fetch import pdf_relpath
+
+    base = pdf_relpath(w, "md").rsplit("/", 1)[-1]  # <id>_<姓>_<短標題>.md
+    wid, rest = base.split("_", 1)
+    return f"{w['year']}_{rest[:-3]}_{wid}.md"
+
+
+def render_paper_md(w, card):
+    cite = lambda cs: "".join(f'\n  > "{c["quote"]}" [{w["id"]}, {c["loc"]}]' for c in cs or [])
+    L = [f"# {w['title']}", "",
+         f"- {w['year']}｜{w.get('venue') or '期刊來源未提及'}｜DOI {w.get('doi') or '無'}｜文章 id {w['id']}",
+         f"- 作者：{'、'.join(a.get('name') or '' for a in w.get('authors') or [])}",
+         f"- 教授角色：{ROLE.get(w.get('target_position'), '作者序不明')}{'＋通訊作者' if w.get('target_corresponding') else ''}",
+         f"- 解析依據：{'全文' if card.get('basis') == 'fulltext' else '只有摘要'}", ""]
+    f = card.get("fields") or {}
+    for key, label in LABELS:
+        v = f.get(key) or {"status": "not_in_source"}
+        L.append(f"## {label}")
+        L.append("")
+        st = v.get("status")
+        if st in ("not_in_source", "not_applicable") or (st == "unresolved" and not v.get("text") and not v.get("claims")):
+            L += [STATE_TEXT[st], ""]
+            continue
+        if st == "unresolved":
+            L.append(f"**{STATE_TEXT['unresolved']}**")
+        if key == "limitations":
+            for x in v.get("author_stated") or []:
+                L.append(f"- 作者自述：{x['text']}{cite(x.get('citations'))}")
+            for x in v.get("inferred") or []:
+                L.append(f"- 推論（非作者原話）：{x['text']}（依據：{x.get('basis') or '未寫'}）{cite(x.get('citations'))}")
+        elif "claims" in v:
+            for x in v.get("claims") or []:
+                L.append(f"- {x['text']}{cite(x.get('citations'))}")
+        else:
+            extra = []
+            if key == "design" and v.get("type"):
+                extra.append(f"設計類型：{v['type']}")
+            if key == "sample":
+                extra += [f"{lab}：{v[k]}" for k, lab in (("population", "對象"), ("n_enrolled", "納入"), ("n_analyzed", "分析"), ("country", "國家"), ("setting", "場域"), ("period", "期間")) if v.get(k) not in (None, "")]
+            if extra:
+                L.append("（" + "；".join(str(e) for e in extra) + "）")
+            L.append(f"{v.get('text') or ''}{cite(v.get('citations'))}")
+        L.append("")
+    return "\n".join(L)
