@@ -8,7 +8,7 @@ from .cards import numbers_in
 REF_PATH = re.compile(r"([A-Za-z_]+)|\[(\d+)\]")
 
 
-def build_facts(professor, works, net, cards, grants):
+def build_facts(professor, works, net, cards, grants, fulltext_ok=None):
     design, countries = Counter(), Counter()
     for c in cards.values():
         f = c.get("fields") or {}
@@ -24,7 +24,8 @@ def build_facts(professor, works, net, cards, grants):
     return {
         "professor": professor.get("name"),
         "n_works": len(works),
-        "n_full": sum(w.get("kind") == "full" for w in works),
+        "n_full_cards": sum(w.get("kind") == "full" for w in works),  # 完整解析卡篇數（不是有全文的篇數）
+        "n_fulltext": fulltext_ok,  # 取得免費全文的篇數
         "years": net.get("years") or {},
         "by_year": by_year,
         "roles": net.get("roles") or {},

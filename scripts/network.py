@@ -13,7 +13,7 @@ from pathlib import Path
 
 from pipeline.index import load_index
 from pipeline.exceptions import add_exception
-from pipeline.network import author_lists_md, coauthor_stats, compare_counts, possible_splits, role_summary, topic_counts, year_counts
+from pipeline.network import author_lists_md, coauthor_stats, competition_ranks, compare_counts, possible_splits, role_summary, topic_counts, year_counts
 from pipeline.state import load_state
 
 TOP = 10
@@ -59,7 +59,12 @@ def build(run):
            (w.get("topic") or {}).get("name") or "", (w.get("topic") or {}).get("field") or "", w["title"]] for w in sorted(works, key=lambda w: (w["year"], w["id"]))])
     _csv(d / "coauthors.csv", ["rank", "author_id", "name", "linked", "merged_names", "n_works", "as_first", "as_last", "as_corresponding", "years", "top_institution", "works"],
          [[i, s["key"], s["name"], s["linked"], "; ".join(s["merged_names"]), s["n"], s["as_first"], s["as_last"], s["as_corresponding"],
-           " ".join(f"{y}:{c}" for y, c in s["years"].items()), s["institutions"][0][0] if s["institutions"] else "", " ".join(s["works"])] for i, s in enumerate(stats, 1)])
+           " ".join(f"{y}:{c}" for y, c in s["years"].items()), s["institutions"][0][0] if s["institutions"] else "", " ".join(s["works"])]
+          for i, s in zip(competition_ranks([s["n"] for s in stats]), stats)])
+    for s in stats:
+        if s["merged_names"]:
+            add_exception(run, "merge:" + s["key"], "network", "name_merge",
+                          f"{s['name']}（{s['key']}）併入沒有作者 id 的寫法：{'、'.join(s['merged_names'])}（姓氏＋名首字母唯一對應、ORCID 不衝突）")
     _csv(d / "topics.csv", ["level", "name", "n_works"], [[lvl, n, c] for lvl, items in net["topics"].items() for n, c in items])
 
     top = stats[:TOP]

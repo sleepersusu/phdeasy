@@ -36,7 +36,9 @@ def facts(run):
     st, works, cards, grants, net = _load(run)
     pd = run / "work" / "profile"
     pd.mkdir(parents=True, exist_ok=True)
-    f = build_facts(st["professor"], works, net, cards, grants)
+    with open(run / "pdfs" / "index.csv", newline="") as fh:
+        ok = sum(r["status"] == "ok" for r in csv.DictReader(fh))
+    f = build_facts(st["professor"], works, net, cards, grants, fulltext_ok=ok)
     (pd / "facts.json").write_text(json.dumps(f, ensure_ascii=False, indent=2))
     papers = run / "out" / "papers"
     papers.mkdir(parents=True, exist_ok=True)

@@ -68,3 +68,9 @@ def test_number_backed_by_card_ref_passes():
 def test_render_profile_md_lists_refs():
     md = render_profile_md({"name": "Y F"}, facts(), GOOD)
     assert "## 研究主線" in md and "〔W1、W2、fact:design_types〕" in md
+
+
+def test_facts_distinguish_full_cards_from_fulltext():
+    f = build_facts({"name": "Y F"}, WORKS, NET, CARDS, GRANTS, fulltext_ok=1)
+    assert f["n_full_cards"] == 2 and f["n_fulltext"] == 1
+    assert "n_full" not in f

@@ -91,6 +91,14 @@ def r_pmc_oa(w):
     return urls
 
 
+def r_ncbi_efetch(w):
+    """NCBI E-utilities 取 PMC 全文 JATS XML（Europe PMC 回 403/500 時的備援；含 NIH 作者稿）。"""
+    pmc = w.get("pmcid") or _pmcid(w)
+    if not pmc:
+        return []
+    return [f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pmc&id={pmc.replace('PMC', '')}"]
+
+
 def r_s2(w):
     if not w.get("doi"):
         return []
@@ -189,6 +197,7 @@ def main():
         ("unpaywall", r_unpaywall),
         ("europepmc", r_europepmc),
         ("pmc_oa", r_pmc_oa),
+        ("ncbi_efetch", r_ncbi_efetch),
         ("semantic_scholar", r_s2),
         ("preprints", r_preprints),
         ("core", r_core),

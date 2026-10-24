@@ -224,3 +224,9 @@ def test_nih_center_grant_takes_parent_title_and_pi():
     assert p["title"] == "UCSF Specialized Center of Research on Sex Differences"
     assert p["pi_names"][0] == "Wendy Katzman"
     assert p["total_award"] == 100  # 子計畫金額已含在母計畫內，不重複加
+
+
+def test_funder_key_folds_ligatures():
+    from pipeline.grants import funder_key
+    assert funder_key("UCSF Diabetes Family Fund for Innovative Patient Care Education and Scientiﬁc Discovery Award") == \
+        funder_key("UCSF Diabetes Family Fund for Innovative Patient Care Education and Scientific Discovery Award")

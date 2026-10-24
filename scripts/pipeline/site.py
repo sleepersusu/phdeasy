@@ -19,6 +19,7 @@ CARD_FIELDS = [
 ]
 SECTIONS = [
     ("overview", "總覽"),
+    ("profile", "教授總覽"),
     ("decisions", "待你決定"),
     ("coauthors", "合作者"),
     ("topics", "研究領域"),
@@ -33,7 +34,7 @@ DESIGN_LABELS = {"rct": "隨機對照試驗", "pilot-rct": "先導隨機對照�
                  "cross-sectional": "橫斷研究", "case-control": "病例對照", "qualitative": "質性研究", "mixed-methods": "混合方法",
                  "systematic-review": "系統性回顧", "scoping-review": "範疇回顧", "meta-analysis": "統合分析", "secondary-analysis": "次級資料分析",
                  "protocol": "研究計畫書", "modeling": "模型研究", "machine-learning": "機器學習", "text-mining": "文字探勘", "other": "其他"}
-INFO_KINDS = {"year_mismatch", "author_not_linked", "owner_decision", "possible_author_split"}
+INFO_KINDS = {"year_mismatch", "author_not_linked", "owner_decision", "possible_author_split", "name_merge"}
 
 
 def _j(p, default=None):
@@ -159,6 +160,7 @@ def build_site_data(run):
         "roles": net.get("roles") or {}, "years": net.get("years") or {}, "topics": net.get("topics") or {},
         "coauthors": net.get("coauthors") or [], "possible_splits": net.get("possible_splits") or [],
         "grants": grants, "grants_reviewed": grants_reviewed,
+        "profile": (_j(wd / "profile" / "final.json") or {}).get("sections", []),
         "works": wlist, "exceptions": ex_list, "decisions": decisions,
         "files": [
             {"label": "停 1 報告", "href": "../../stop1-report.md"}, {"label": "規格（protocol）", "href": "../../protocol.md"},

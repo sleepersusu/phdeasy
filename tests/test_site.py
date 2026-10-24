@@ -127,3 +127,19 @@ def test_claim_fields_and_fixed_facts_shown(tmp_path):
     assert f["design"]["facts"]["設計類型"] == "準實驗（quasi-experimental）"
     assert f["sample"]["facts"]["納入人數"] == 92 and f["sample"]["facts"]["分析人數"] == 85
     assert f["gap"]["state"] == "not_in_source"
+
+
+def test_profile_narrative_included_when_present(tmp_path):
+    run = make_run(tmp_path)
+    (run / "work" / "profile").mkdir()
+    (run / "work" / "profile" / "final.json").write_text(json.dumps({"sections": [
+        {"key": "focus", "title": "研究主線", "claims": [{"text": "以行動健康介入為主", "refs": ["W1", "fact:design_types"]}]}]}))
+    d = build_site_data(run)
+    assert d["profile"][0]["title"] == "研究主線"
+    assert d["profile"][0]["claims"][0]["refs"] == ["W1", "fact:design_types"]
+    html = render_html(d)
+    assert 'id="profile"' in html
+
+
+def test_profile_missing_is_empty_list(tmp_path):
+    assert build_site_data(make_run(tmp_path))["profile"] == []

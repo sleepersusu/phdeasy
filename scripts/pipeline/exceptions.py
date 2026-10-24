@@ -5,7 +5,7 @@ from pathlib import Path
 from .state import load_state, set_stage, _write
 
 # 只是註記、不影響產出品質的例外，不算進熔斷比例
-INFO_KINDS = {"year_mismatch", "author_not_linked", "owner_decision", "possible_author_split"}
+INFO_KINDS = {"year_mismatch", "author_not_linked", "owner_decision", "possible_author_split", "name_merge"}
 
 
 def add_exception(run, work_id, stage, kind, detail):

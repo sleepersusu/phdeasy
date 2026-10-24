@@ -31,7 +31,10 @@ def normalize_award(x):
 
 
 def funder_key(name):
-    return "FUNDER:" + " ".join(re.sub(r"[^\w]+", " ", (name or "").lower()).split())
+    import unicodedata
+
+    name = unicodedata.normalize("NFKC", name or "")  # ﬁ 連字 → fi
+    return "FUNDER:" + " ".join(re.sub(r"[^\w]+", " ", name.lower()).split())
 
 
 def nih_core(x):

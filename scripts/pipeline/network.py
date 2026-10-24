@@ -18,17 +18,23 @@ def _sig(name):
 def _name_links(works, target_id, surname):
     """沒 id 的作者：姓氏＋名字首字母只對得上唯一一位有 id 的作者時，回傳 {名字: 該 id}。"""
     by_sig = defaultdict(set)
+    orcid_of = {}
     for w in works:
         for a in w.get("authors") or []:
             if a.get("id") and a["id"] != target_id:
                 by_sig[_sig(a.get("name"))].add(a["id"])
+                if a.get("orcid"):
+                    orcid_of[a["id"]] = a["orcid"]
     links = {}
     for w in works:
         for a in w.get("authors") or []:
             if not a.get("id") and not _is_target(a, target_id, surname):
                 ids = by_sig.get(_sig(a.get("name")), set())
                 if len(ids) == 1:
-                    links[_norm_name(a.get("name"))] = next(iter(ids))
+                    aid = next(iter(ids))
+                    if a.get("orcid") and orcid_of.get(aid) and a["orcid"] != orcid_of[aid]:
+                        continue  # ORCID 不同，不是同一人
+                    links[_norm_name(a.get("name"))] = aid
     return links
 
 
@@ -168,3 +174,11 @@ def possible_splits(stats):
             out.append({"keys": [m["key"] for m in members], "names": [m["name"] for m in members],
                         "counts": [m["n"] for m in members], "combined_n_max": sum(m["n"] for m in members)})
     return sorted(out, key=lambda g: -g["combined_n_max"])
+
+
+def competition_ranks(ns):
+    """同分同名次（1, 2, 3, 3, 3, 6）。"""
+    out = []
+    for i, n in enumerate(ns):
+        out.append(out[-1] if i and n == ns[i - 1] else i + 1)
+    return out

@@ -109,3 +109,12 @@ def test_no_free_fulltext_without_trying_all_sources_caught(tmp_path):
     run = make(tmp_path)
     (run / "pdfs" / "index.csv").write_text("id,year,kind,status,source,ext,path,sha256,url,tried,title\nW1,2024,full,no_free_fulltext,,,,,,openalex:none,Study\n")
     assert not results(run)["fulltext_tried_all"]["pass"]
+
+
+def test_no_free_fulltext_with_server_errors_is_inconclusive(tmp_path):
+    run = make(tmp_path)
+    chain = "zotero:none; openalex:none; landing:none; unpaywall:skipped(x); europepmc:http_500,http_403; pmc_oa:none; ncbi_efetch:none; semantic_scholar:none; preprints:none; core:skipped(x); inbox:none"
+    (run / "pdfs" / "index.csv").write_text(f'id,year,kind,status,source,ext,path,sha256,url,tried,title\nW1,2024,full,no_free_fulltext,,,,,,"{chain}",Study\n')
+    r = results(run)
+    assert r["fulltext_tried_all"]["pass"]
+    assert not r["fulltext_conclusive"]["pass"]

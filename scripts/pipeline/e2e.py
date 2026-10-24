@@ -11,7 +11,7 @@ from .grants import check_mention
 from .profile import fact_lookup
 from .state import load_state
 
-CHAIN_REQUIRED = ["zotero", "openalex", "landing", "unpaywall", "europepmc", "pmc_oa", "semantic_scholar", "preprints", "core", "inbox"]
+CHAIN_REQUIRED = ["zotero", "openalex", "landing", "unpaywall", "europepmc", "pmc_oa", "ncbi_efetch", "semantic_scholar", "preprints", "core", "inbox"]
 
 
 def _j(p, d=None):
@@ -127,7 +127,14 @@ def check_index(run, works):
             tried = {t.split(":")[0] for t in (r.get("tried") or "").split("; ") if t}
             if not set(CHAIN_REQUIRED) <= tried:
                 lazy.append(f"{r['id']} 缺 {sorted(set(CHAIN_REQUIRED) - tried)}")
+    inconclusive = []
+    for r in rows.values():
+        if r["status"] == "no_free_fulltext":
+            errs = [t for t in (r.get("tried") or "").split("; ") if re.search(r"http_5\d\d|timeout|conn_error|error", t)]
+            if errs:
+                inconclusive.append(f"{r['id']}（{'；'.join(errs)}）")
     return [
+        _r("fulltext_conclusive", not inconclusive, "無免費全文的判定沒有受伺服器錯誤影響" if not inconclusive else "伺服器錯誤導致無法確定：" + "；".join(inconclusive[:4])),
         _r("fulltext_status", not missing, f"{len(rows)} 篇都有全文狀態" if not missing else f"沒有狀態：{missing}"),
         _r("fulltext_tried_all", not lazy, "無免費全文者都試過全文找尋鏈所有來源" if not lazy else "; ".join(lazy[:4])),
     ]

@@ -8,6 +8,7 @@ SOURCES = [
     "unpaywall",
     "europepmc",
     "pmc_oa",
+    "ncbi_efetch",
     "semantic_scholar",
     "preprints",
     "core",

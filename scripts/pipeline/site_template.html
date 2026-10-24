@@ -154,6 +154,14 @@ function overview(){
     <h3>流水線進度</h3><div class="stages">${st}</div>`;
 }
 
+function profile(){
+  const el = body("profile");
+  if (!D.profile.length){ el.innerHTML = `<div class="empty">總覽敘述尚未產生，由「總覽撰寫」階段產生。</div>`; return; }
+  const ref = r => /^W\d+$/.test(r) ? `<a href="#paper-${r}">${r}</a>` : `<span class="muted">${esc(r)}</span>`;
+  el.innerHTML = `<p class="muted">每句後面是出處：文章 id 可點開看解析，fact: 是腳本算出的數字。每句都經過出處核對與推翻者檢查。</p>` +
+    D.profile.map(s => `<h3>${esc(s.title)}</h3><ul>${s.claims.map(c => `<li>${esc(c.text)} <span class="small">〔${(c.refs || []).map(ref).join("、")}〕</span></li>`).join("")}</ul>`).join("");
+}
+
 function decisions(){
   const el = body("decisions");
   if (!D.decisions.length){ el.innerHTML = `<div class="empty">目前沒有需要你決定的事。</div>`; return; }
@@ -345,7 +353,7 @@ document.addEventListener("click", ev => {
   ev.preventDefault(); openPaper(a.getAttribute("href").slice(7));
 });
 
-header(); overview(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
+header(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
 openFromHash();
 window.addEventListener("hashchange", openFromHash);
 </script>

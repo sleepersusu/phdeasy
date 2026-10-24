@@ -147,3 +147,17 @@ def test_possible_splits_flags_same_name_different_ids():
     assert all("name:x" not in k for k in keys)  # 沒 id 的不在這裡處理
     g = next(g for g in groups if "A1" in g["keys"])
     assert g["combined_n_max"] == 7
+
+
+def test_name_merge_blocked_when_orcids_differ():
+    works = [
+        {"id": "W1", "year": 2022, "kind": "full", "authors": [{**au("A1", "Li Zhang"), "orcid": "https://orcid.org/0000-0001"}, au(T, "Y Fukuoka")], "topic": {}},
+        {"id": "W2", "year": 2022, "kind": "full", "authors": [{**au(None, "Li Zhang"), "orcid": "https://orcid.org/0000-0009"}, au(T, "Y Fukuoka")], "topic": {}},
+    ]
+    stats = coauthor_stats(works, T, "Fukuoka")
+    assert any(s["key"] == "name:li zhang" for s in stats)
+
+
+def test_competition_rank_for_ties():
+    from pipeline.network import competition_ranks
+    assert competition_ranks([10, 9, 4, 4, 4, 3]) == [1, 2, 3, 3, 3, 6]
