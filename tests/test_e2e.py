@@ -118,3 +118,9 @@ def test_no_free_fulltext_with_server_errors_is_inconclusive(tmp_path):
     r = results(run)
     assert r["fulltext_tried_all"]["pass"]
     assert not r["fulltext_conclusive"]["pass"]
+
+
+def test_stale_fulltext_count_in_state_caught(tmp_path):
+    run = make(tmp_path)
+    set_stage(run, "verify", fulltext_ok=0)
+    assert not results(run)["state_consistent"]["pass"]

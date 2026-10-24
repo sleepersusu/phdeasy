@@ -158,6 +158,12 @@ def check_state(run, works):
     probs = []
     if st.get("works_total") not in (None, len(works)):
         probs.append(f"works_total={st.get('works_total')} 但文章 {len(works)}")
+    idx = run / "pdfs" / "index.csv"
+    if idx.exists() and st.get("fulltext_ok") is not None:
+        with open(idx, newline="") as f:
+            ok = sum(r["status"] == "ok" for r in csv.DictReader(f))
+        if st["fulltext_ok"] != ok:
+            probs.append(f"fulltext_ok={st['fulltext_ok']} 但 index.csv 有全文 {ok}")
     if st.get("circuit", {}).get("tripped"):
         probs.append("熔斷中")
     site = run / "out" / "site" / "index.html"
