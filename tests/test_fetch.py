@@ -72,3 +72,14 @@ def test_zotero_pdf_paths_matches_doi_exactly():
         ],
     }
     assert zotero_pdf_paths(items, children, "10.2196/40764") == ["/Users/u/Zotero/storage/K1/a b.pdf"]
+
+
+def test_match_inbox_by_id_in_filename_then_doi_in_text():
+    from pipeline.fetch import match_inbox
+    works = [{"id": "W1", "doi": "10.1/aa"}, {"id": "W2", "doi": "10.2196/40764"}, {"id": "W3", "doi": None}]
+    files = {
+        "/in/W1 paper.pdf": "nothing",
+        "/in/random.pdf": "... https://doi.org/10.2196/40764 JMIR ...",
+        "/in/other.pdf": "doi:10.2196/407640 different paper",
+    }
+    assert match_inbox(files, works) == {"W1": "/in/W1 paper.pdf", "W2": "/in/random.pdf"}

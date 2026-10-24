@@ -2,7 +2,7 @@
 import hashlib
 import re
 import unicodedata
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urljoin, urlparse
 
 
 def is_pdf(data):
@@ -65,3 +65,34 @@ def zotero_pdf_paths(items, children, doi):
             if d.get("itemType") == "attachment" and d.get("contentType") == "application/pdf" and href.startswith("file://"):
                 paths.append(unquote(urlparse(href).path))
     return paths
+
+
+def match_inbox(files_text, works):
+    """files_text: {路徑: 前兩頁文字}。先比檔名裡的文章 id，再比文字裡的 DOI（DOI 後面不能接數字或字母）。"""
+    out = {}
+    for path, text in files_text.items():
+        name = path.rsplit("/", 1)[-1]
+        hit = next((w["id"] for w in works if re.search(rf"\b{w['id']}\b", name)), None)
+        if hit is None:
+            low = (text or "").lower()
+            hit = next(
+                (w["id"] for w in works if w.get("doi") and re.search(re.escape(w["doi"]) + r"(?![\w])", low)),
+                None,
+            )
+        if hit and hit not in out:
+            out[hit] = path
+    return out
+
+
+def citation_pdf_urls(html, base):
+    """期刊落地頁的 <meta name="citation_pdf_url">（Google Scholar 規範，多數出版社都有）。"""
+    text = (html or b"").decode("utf-8", "ignore")
+    out = []
+    for tag in re.findall(r"<meta\b[^>]*>", text, flags=re.I):
+        if re.search(r'name=["\']citation_pdf_url["\']', tag, flags=re.I):
+            m = re.search(r'content=["\']([^"\']+)["\']', tag, flags=re.I)
+            if m:
+                u = urljoin(base, m.group(1))
+                if u not in out:
+                    out.append(u)
+    return out

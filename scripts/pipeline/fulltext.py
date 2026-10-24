@@ -4,6 +4,7 @@ from .fetch import is_pdf, is_jats_xml
 SOURCES = [
     "zotero",
     "openalex",
+    "landing",
     "unpaywall",
     "europepmc",
     "pmc_oa",
