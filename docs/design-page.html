@@ -1,0 +1,211 @@
+<title>教授研究檔案流水線</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@600;700&family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column, flow rendered as a vertical track of stage rows; tables scroll inside their own boxes */
+:root{
+  --bg:#f5f7f8; --surface:#ffffff; --fg:#17232b; --muted:#56656f; --line:#d5dde2;
+  --accent:#1f6f78; --accent-soft:#e2f0f1; --stop:#9a4b12; --stop-soft:#f8eadf;
+  --display:"Noto Serif TC","Songti TC",serif; --body:"Noto Sans TC","PingFang TC",system-ui,sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11181d; --surface:#18222a; --fg:#e3eaee; --muted:#9aa9b3; --line:#2b3a44;
+  --accent:#5fb8c1; --accent-soft:#183238; --stop:#e6a06a; --stop-soft:#3a2617; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11181d; --surface:#18222a; --fg:#e3eaee; --muted:#9aa9b3; --line:#2b3a44;
+  --accent:#5fb8c1; --accent-soft:#183238; --stop:#e6a06a; --stop-soft:#3a2617; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.7}
+.wrap{max-width:860px;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:40px}
+h1,h2{font-family:var(--display);text-wrap:balance;line-height:1.3;margin:0}
+h1{font-size:2rem}
+h2{font-size:1.3rem;margin-bottom:12px}
+p{margin:0;max-width:65ch}
+.eyebrow{font-family:var(--mono);font-size:.75rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+header{display:flex;flex-direction:column;gap:12px}
+.status{align-self:flex-start;font-size:.8rem;padding:2px 10px;border-radius:99px;background:var(--stop-soft);color:var(--stop);font-weight:500}
+.lead{font-size:1.05rem}
+code,.mono{font-family:var(--mono);font-size:.85em}
+.track{display:flex;flex-direction:column;border-left:2px solid var(--line);margin-left:8px}
+.step{position:relative;padding:0 0 18px 22px}
+.step::before{content:"";position:absolute;left:-7px;top:7px;width:12px;height:12px;border-radius:50%;background:var(--accent)}
+.step.stop::before{background:var(--stop);border-radius:2px}
+.step .name{font-weight:700}
+.step .stage{font-family:var(--mono);font-size:.78rem;color:var(--accent);margin-left:6px}
+.step.stop .stage{color:var(--stop)}
+.step p{color:var(--muted);font-size:.92rem}
+.auto{font-family:var(--mono);font-size:.75rem;color:var(--muted);padding:0 0 14px 22px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:6px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:.9rem;min-width:560px}
+th,td{text-align:left;vertical-align:top;padding:8px 12px;border-bottom:1px solid var(--line)}
+th{font-weight:500;color:var(--muted);font-size:.8rem}
+tr:last-child td{border-bottom:none}
+.tag{display:inline-block;font-size:.75rem;padding:0 8px;border-radius:4px;background:var(--accent-soft);color:var(--accent);white-space:nowrap}
+.tag.dual{background:var(--stop-soft);color:var(--stop)}
+ol.criteria{margin:0;padding-left:1.4em;display:flex;flex-direction:column;gap:4px;max-width:70ch}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+.grid2>div{min-width:0}
+ul{margin:0;padding-left:1.2em}
+.note{color:var(--muted);font-size:.9rem}
+</style>
+
+<div class="wrap">
+<header>
+  <span class="eyebrow">設計稿 · docs/design.md 的圖解版</span>
+  <h1>教授研究檔案流水線</h1>
+  <span class="status">已確認 · 2026-10-25 追加多平台、全文找尋鏈、Zotero</span>
+  <p class="lead">輸入一位教授，產出近五年（2022–2026 出版）所有文章的合作網絡、主要合作者、研究領域、研究計畫，以及每篇文章的解析卡。每個說法都追溯到原文頁碼。</p>
+  <p class="note">實測教授：Fukuoka, Yoshimi（機構於停 1 確認）</p>
+</header>
+
+<section>
+  <h2>流程</h2>
+  <div class="track">
+    <div class="step stop"><span class="name">停 1　確認身分與文章</span><span class="stage">stop1</span>
+      <p>你給姓名與學校。腳本從 OpenAlex 找身分、列文章、去重，再用 ORCID、PubMed、Europe PMC、Semantic Scholar、arXiv 交叉比對漏收文章。全文找尋鏈逐篇找免費全文並歸位到 pdfs/。你確認人與文章，真的找不到的再補進 inbox/。</p></div>
+    <div class="auto">以下全自動</div>
+    <div class="step"><span class="name">標準化</span><span class="stage">ingest</span>
+      <p>雜湊原檔，PDF 轉成帶頁碼標記的文字，對應到文章 id。讀不出來的當場記例外。</p></div>
+    <div class="step"><span class="name">合作與領域</span><span class="stage">network</span>
+      <p>腳本用作者 id 計算合作者排名、年度、機構、作者序與主題分佈。Haiku 另外獨立數前 10 名。</p></div>
+    <div class="step"><span class="name">研究計畫</span><span class="stage">grants</span>
+      <p>查 NIH RePORTER、NSF、GRB、CORDIS、UKRI，加上論文致謝段的計畫編號。姓名與機構都吻合才收。</p></div>
+    <div class="step"><span class="name">解析卡</span><span class="stage">cards</span>
+      <p>Opus 寫卡，Sonnet 另外獨立抽設計與樣本；腳本比對，不一致交給裁決者。推翻者攻擊缺口、貢獻、發現、限制。腳本逐句核對引句。</p></div>
+    <div class="step"><span class="name">總覽</span><span class="stage">profile</span>
+      <p>腳本彙整數字，agent 寫領域敘述並附卡片 id，推翻者檢查。產出 profile.md 與網頁。</p></div>
+    <div class="step"><span class="name">獨立驗收</span><span class="stage">verify</span>
+      <p>沒參與過的 agent 只看判準與產出逐條判定。E2E 腳本重跑所有核對。</p></div>
+    <div class="step stop"><span class="name">停 2　一次呈現</span><span class="stage">stop2</span>
+      <p>依序呈現：例外與熔斷、驗收逐條結果、各段數字、花費、產出位置、需要你決定的事。</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>全文找尋鏈</h2>
+  <p class="note" style="margin-bottom:10px">每篇依序嘗試，找到就停。每個網址最多重試 3 次，每次嘗試都記錄。下載內容要通過檔頭檢查，付費牆網頁不算數。全部失敗才標「無免費全文」並列出試過的來源。</p>
+  <ol class="criteria">
+    <li>你的 Zotero 文獻庫（唯讀，複製不移動）</li>
+    <li>OpenAlex 所有開放位置</li>
+    <li>Unpaywall（需要你提供 email）</li>
+    <li>Europe PMC：PDF 與全文 XML</li>
+    <li>PMC 開放取用服務</li>
+    <li>Semantic Scholar</li>
+    <li>預印本：arXiv、bioRxiv、medRxiv、Research Square、JMIR Preprints</li>
+    <li>CORE（需要 API key）</li>
+    <li>你補進 inbox/ 的 PDF</li>
+  </ol>
+</section>
+
+<section>
+  <h2>產出整理</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>位置</th><th>內容</th></tr></thead>
+    <tbody>
+      <tr><td><code>pdfs/&lt;年&gt;/</code></td><td>全文歸位，檔名為文章 id、第一作者、短標題；index.csv 記錄每篇的狀態與來源</td></tr>
+      <tr><td><code>out/profile.md</code></td><td>教授總覽：合作者、領域、計畫，另發布成網頁</td></tr>
+      <tr><td><code>out/papers/</code></td><td>每篇一份解析卡</td></tr>
+      <tr><td><code>out/data/</code></td><td>works、coauthors、topics、grants 四張 CSV</td></tr>
+      <tr><td><code>out/zotero/</code></td><td>RIS 檔，含 PDF 附件、解析卡筆記、標籤，由你匯入 Zotero</td></tr>
+      <tr><td><code>work/</code></td><td>中間產物，不給人讀</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>每篇文章解析卡的欄位與監督</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>欄位</th><th>內容</th><th>監督方式</th></tr></thead>
+    <tbody>
+      <tr><td>大意</td><td>3–5 句</td><td><span class="tag">引句核對</span></td></tr>
+      <tr><td>研究設計</td><td>類型、方法、分析</td><td><span class="tag dual">雙軌 Opus ∥ Sonnet</span> → 裁決</td></tr>
+      <tr><td>研究樣本</td><td>對象、n、地點、期間、抽樣</td><td><span class="tag dual">雙軌</span> 數字必須出現在引句中</td></tr>
+      <tr><td>研究缺口</td><td>作者主張的缺口</td><td><span class="tag">引句核對</span> ＋ 推翻者</td></tr>
+      <tr><td>解決什麼</td><td>研究問題與貢獻</td><td><span class="tag">引句核對</span> ＋ 推翻者</td></tr>
+      <tr><td>發現</td><td>主要結果與數字</td><td><span class="tag">引句核對</span> ＋ 推翻者 ＋ 數字比對</td></tr>
+      <tr><td>研究限制</td><td>分「作者自述」與「推論」</td><td>自述需引句；推論需標明並經推翻者</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note" style="margin-top:10px">引句格式固定為 <code>"原文照抄" [W1234567, p.5]</code>。來源沒寫就寫「來源未提及」。</p>
+</section>
+
+<section>
+  <h2>教授層級的欄位</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>欄位</th><th>監督方式</th></tr></thead>
+    <tbody>
+      <tr><td>書目（標題、年、期刊、DOI、作者序）</td><td>OpenAlex 與 Crossref 機械比對</td></tr>
+      <tr><td>合作者排名</td><td>腳本以作者 id 計算，Haiku 獨立數前 10，兩者需一致</td></tr>
+      <tr><td>研究領域</td><td>分佈由腳本算；敘述每句附卡片 id，推翻者檢查</td></tr>
+      <tr><td>研究計畫</td><td>出處快照或致謝引句，腳本確認編號出現在出處；推翻者查是否同一人</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>驗收判準</h2>
+  <ol class="criteria">
+    <li>每篇有 OpenAlex id，出版年 2022–2026，無重複</li>
+    <li>停 1 確認的每篇文章都有一張卡</li>
+    <li>每張卡 7 欄齊全，空的寫「來源未提及」</li>
+    <li>全文卡引句核對 100% 通過；僅摘要卡標 abstract_only</li>
+    <li>雙軌每個不一致都有裁決或標 unresolved</li>
+    <li>合作者前 10 名：腳本重算一致，且與 Haiku 計數一致</li>
+    <li>每個研究計畫都有出處，編號出現在出處中</li>
+    <li>總覽每個主張都追溯到卡片 id 或書目</li>
+    <li>inbox/ 與 raw/ 原檔雜湊不變</li>
+    <li>state.json 與實際產出一致</li>
+  </ol>
+</section>
+
+<section class="grid2">
+  <div>
+    <h2>熔斷</h2>
+    <ul>
+      <li>例外篇數超過 30%</li>
+      <li>文章超過 80 篇（停 1 先問）</li>
+      <li>subagent 總 token 超過每篇 150k × 篇數 × 1.5</li>
+    </ul>
+  </div>
+  <div>
+    <h2>判斷規則</h2>
+    <ul>
+      <li>摘要與內文衝突時以內文為準</li>
+      <li>預印本與正式版只留正式版</li>
+      <li>社論、勘誤做短卡</li>
+      <li>自動段不增刪文章</li>
+      <li>判不出來就標 unresolved，不硬判</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>常見錯誤由哪一層擋住</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>錯誤</th><th>擋住的那一層</th></tr></thead>
+    <tbody>
+      <tr><td>同名同姓抓錯人</td><td>停 1 本人確認；計畫另有推翻者</td></tr>
+      <tr><td>捏造引句或頁碼</td><td>引句核對腳本逐字比對該頁</td></tr>
+      <tr><td>樣本數抄錯</td><td>雙軌比對，數字必須在引句中</td></tr>
+      <tr><td>把背景文獻的發現當成本文發現</td><td>推翻者</td></tr>
+      <tr><td>研究限制腦補</td><td>自述與推論分開標</td></tr>
+      <tr><td>合作者同人不同寫法</td><td>用作者 id 計數，不用姓名字串</td></tr>
+      <tr><td>論文裡藏的指令</td><td>所有工作說明都寫明不執行</td></tr>
+      <tr><td>中斷後重做</td><td>state.json 與逐篇完成標記</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>作者界線</h2>
+  <p>解析卡與總覽由 agent 寫，作為閱讀素材。「這位教授適不適合我」的判斷、寄給教授的信、研究計畫書由你自己寫。agent 只提供素材，例如可以問教授的問題清單。</p>
+</section>
+
+<section>
+  <h2>還沒決定</h2>
+  <ul>
+    <li>GRB 能否用程式穩定查詢，或要用瀏覽器（實測時確認）</li>
+    <li>要不要提供 Unpaywall 用的 email 與 CORE API key；沒提供就跳過並記錄</li>
+    <li>Fukuoka 教授的機構（你說 UCB，OpenAlex 可能顯示 UCSF），停 1 確認</li>
+  </ul>
+</section>
+</div>

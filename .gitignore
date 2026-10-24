@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.DS_Store
+.env
+# 批次資料含論文全文與個人研究資料
+runs/*
+!runs/.gitkeep
