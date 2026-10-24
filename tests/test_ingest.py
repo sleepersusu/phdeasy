@@ -59,3 +59,18 @@ def test_new_inbox_file_gets_hashed(tmp_path):
     hashes = {}
     verify_hashes(tmp_path, hashes)
     assert "inbox/mine.pdf" in hashes
+
+
+def test_supplement_file_is_quarantined(tmp_path):
+    _pdf(tmp_path / "app.pdf", "CONSORT-EHEALTH (V 1.6.1) - Submission/Publication Form\nAI HeartBot to Increase Women's Awareness of Heart Attack\n" + "word " * 600)
+    _, stype, exc = convert(tmp_path, W, {"status": "ok", "path": "app.pdf", "ext": "pdf"})
+    assert "not_main_text" in [k for k, _ in exc] and stype == "abstract"
+
+
+def test_rules_version_forces_recheck():
+    from ingest import needs_redo, RULES_VERSION
+    prev = {"source_sha256": "h", "rules": RULES_VERSION - 1}
+    assert needs_redo(prev, "h", True)
+    assert not needs_redo({"source_sha256": "h", "rules": RULES_VERSION}, "h", True)
+    assert needs_redo({"source_sha256": "h", "rules": RULES_VERSION}, "other", True)
+    assert needs_redo({"source_sha256": "h", "rules": RULES_VERSION}, "h", False)  # 文字檔不見

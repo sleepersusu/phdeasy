@@ -1,5 +1,5 @@
 """全文找尋鏈：依序問每個來源要候選網址，下載並檢查檔頭，每次嘗試都記錄。"""
-from .fetch import is_pdf, is_jats_xml
+from .fetch import is_jats_xml, is_pdf, is_supplementary_url
 
 SOURCES = [
     "zotero",
@@ -60,6 +60,10 @@ def run_chain(work, resolvers, download, log, sleep):
             continue
         results = []
         for url in urls:
+            if is_supplementary_url(url):
+                log({"id": work["id"], "source": name, "url": url, "result": "supplementary_url"})
+                results.append("supplementary_url")
+                continue
             data, status = _fetch(url, download, sleep)
             if data is not None and is_pdf(data):
                 log({"id": work["id"], "source": name, "url": url, "result": "ok"})

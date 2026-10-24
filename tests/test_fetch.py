@@ -83,3 +83,13 @@ def test_match_inbox_by_id_in_filename_then_doi_in_text():
         "/in/other.pdf": "doi:10.2196/407640 different paper",
     }
     assert match_inbox(files, works) == {"W1": "/in/W1 paper.pdf", "W2": "/in/random.pdf"}
+
+
+def test_supplementary_urls_detected():
+    from pipeline.fetch import is_supplementary_url
+    assert is_supplementary_url("https://jmir.org/api/download?alt_name=cancer_v8i1e31576_app4.pdf&filename=x.pdf")
+    assert is_supplementary_url("https://ars.els-cdn.com/content/image/1-s2.0-S0-mmc1.pdf")
+    assert is_supplementary_url("https://journal.org/article/10.1/abc/suppl_file/supplement.pdf")
+    assert is_supplementary_url("https://www.mdpi.com/x/s1")
+    assert not is_supplementary_url("https://cardio.jmir.org/2022/2/e40764/PDF")
+    assert not is_supplementary_url("https://link.springer.com/content/pdf/10.1007/s00520-022-06870-5.pdf")

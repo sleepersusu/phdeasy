@@ -45,7 +45,7 @@ def build(run):
         "coauthors": stats,
     }
     for g in net["possible_splits"]:
-        add_exception(run, "network", "network", "possible_author_split",
+        add_exception(run, "split:" + "+".join(g["keys"]), "network", "possible_author_split",
                       f"可能同一人被拆成多個 id：{' / '.join(f'{n}（{k}，{c} 篇）' for n, k, c in zip(g['names'], g['keys'], g['counts']))}；合併後最多 {g['combined_n_max']} 篇，停 2 由本人決定")
     (run / "work" / "network.json").write_text(json.dumps(net, ensure_ascii=False, indent=2))
     (run / "work" / "author_lists.md").write_text(author_lists_md(works, st["author_id"], surname))

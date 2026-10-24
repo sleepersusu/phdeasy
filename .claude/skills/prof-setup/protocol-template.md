@@ -43,6 +43,8 @@
 | 裁決者 | opus |
 | 推翻者 | opus |
 | 計數者 | haiku |
+| 計畫抽取 | sonnet |
+| 計畫推翻 | opus |
 | 總覽撰寫 | opus |
 | 獨立驗收 | opus |
 

@@ -1,0 +1,112 @@
+"""前端：所有需求欄位都要出現在資料與頁面上；缺資料時顯示「尚未產生」而不是空白。"""
+import json
+
+from pipeline.site import CARD_FIELDS, SECTIONS, build_site_data, render_html
+from pipeline.state import init_run, set_stage
+
+
+def make_run(tmp_path, with_card=False):
+    run = init_run(tmp_path / "runs" / "demo", professor={"name": "Yoshimi Fukuoka", "institution": "UCSF"})
+    set_stage(run, "grants", author_id="A0")
+    wd = run / "work"
+    works = [
+        {"id": "W1", "title": "Study </script> One", "year": 2024, "type": "article", "kind": "full", "venue": "J A", "doi": "10.1/a",
+         "authors": [{"id": "A0", "name": "Yoshimi Fukuoka", "position": "last", "is_corresponding": True, "institutions": []},
+                     {"id": "A1", "name": "Ann Lee", "position": "first", "is_corresponding": False, "institutions": ["UCSF"]}],
+         "target_position": "last", "target_corresponding": True, "abstract": "Abs.", "topic": {"name": "mHealth", "field": "Medicine"}},
+        {"id": "W2", "title": "Poster", "year": 2023, "type": "conference-abstract", "kind": "short", "venue": None, "doi": None,
+         "authors": [], "target_position": "middle", "target_corresponding": False, "abstract": "Short.", "topic": {}},
+    ]
+    (wd / "works.json").write_text(json.dumps(works))
+    (wd / "author_candidates.json").write_text(json.dumps([{"id": "A0", "name": "Yoshimi Fukuoka", "orcid": "https://orcid.org/0000", "institutions": ["UCSF"]}]))
+    (run / "pdfs" / "index.csv").write_text("id,year,kind,status,source,ext,path,sha256,url,tried,title\nW1,2024,full,ok,openalex,pdf,pdfs/2024/W1_Lee_Study.pdf,h,u,,Study\nW2,2023,short,not_needed,,,,,,,Poster\n")
+    (wd / "ingest.json").write_text(json.dumps({"W1": {"source_type": "pdf"}, "W2": {"source_type": "abstract"}}))
+    (wd / "network.json").write_text(json.dumps({
+        "roles": {"first": 0, "middle": 1, "last": 1, "unknown": 0, "corresponding": 1, "total": 2},
+        "years": {"2023": 1, "2024": 1}, "topics": {"field": [["Medicine", 1]], "subfield": [], "topic": [["mHealth", 1]], "domain": []},
+        "coauthors_total": 1, "coauthors_linked": 1,
+        "coauthors": [{"key": "A1", "name": "Ann Lee", "linked": True, "merged_names": [], "n": 1, "works": ["W1"], "years": {"2024": 1},
+                       "institutions": [["UCSF", 1]], "as_first": 1, "as_last": 0, "as_corresponding": 0}],
+        "possible_splits": [{"keys": ["A1", "A9"], "names": ["Ann Lee", "Ann Lee"], "counts": [1, 1], "combined_n_max": 2}]}))
+    (wd / "grants").mkdir()
+    (wd / "grants" / "grants_final.json").write_text(json.dumps([
+        {"key": "NIH:HS027803", "award_id": "R01HS027803", "funder": "AHRQ", "title": "Diabetes prevention", "target_role": "pi", "status": "confirmed",
+         "pi_names": ["YOSHIMI FUKUOKA"], "start": "2021-08-01", "end": "2026-07-31", "total_award": 1, "works": ["W1"],
+         "evidence": [{"type": "nih_pi"}], "refute": {"verdict": "keep", "reason": "ok"}}]))
+    if with_card:
+        c = run / "work" / "cards" / "W1"
+        c.mkdir(parents=True)
+        (c / "card.json").write_text(json.dumps({"id": "W1", "fields": {
+            "summary": {"text": "大意文字", "citations": [{"quote": "We enrolled 92 women", "loc": "p.2"}], "status": "ok"},
+            "limitations": {"author_stated": [{"text": "便利樣本", "citations": [{"quote": "convenience sample", "loc": "p.9"}]}], "inferred": []}}}))
+    return run
+
+
+def test_card_fields_are_the_seven_required():
+    assert [label for _, label in CARD_FIELDS] == ["大意", "研究設計", "研究樣本", "研究缺口", "解決什麼", "發現", "研究限制"]
+
+
+def test_site_data_has_every_requirement(tmp_path):
+    d = build_site_data(make_run(tmp_path))
+    for key in ("professor", "pipeline", "counts", "roles", "years", "topics", "coauthors", "possible_splits", "grants", "works", "exceptions", "decisions", "files"):
+        assert key in d, key
+    assert d["professor"]["orcid"] == "https://orcid.org/0000"
+    assert len(d["works"]) == 2
+    assert d["coauthors"][0]["name"] == "Ann Lee"
+    assert d["grants"][0]["status"] == "confirmed"
+
+
+def test_every_work_has_all_card_fields_even_without_card(tmp_path):
+    d = build_site_data(make_run(tmp_path))
+    for w in d["works"]:
+        assert [f["key"] for f in w["card"]["fields"]] == [k for k, _ in CARD_FIELDS]
+        assert all(f["state"] == "pending" for f in w["card"]["fields"])
+        assert "cards" in w["card"]["pending_note"]
+
+
+def test_card_values_used_when_present(tmp_path):
+    d = build_site_data(make_run(tmp_path, with_card=True))
+    w1 = next(w for w in d["works"] if w["id"] == "W1")
+    f = {x["key"]: x for x in w1["card"]["fields"]}
+    assert f["summary"]["state"] == "ok" and f["summary"]["text"] == "大意文字"
+    assert f["summary"]["citations"][0]["loc"] == "p.2"
+    assert f["limitations"]["author_stated"][0]["text"] == "便利樣本"
+    assert f["design"]["state"] == "pending"  # 卡片缺的欄位仍顯示待補
+
+
+def test_work_links_pdf_relative_to_site_and_fulltext_state(tmp_path):
+    d = build_site_data(make_run(tmp_path))
+    w1 = next(w for w in d["works"] if w["id"] == "W1")
+    assert w1["pdf_href"] == "../../pdfs/2024/W1_Lee_Study.pdf"
+    assert w1["fulltext"] == "ok" and w1["grants"] == ["NIH:HS027803"]
+    w2 = next(w for w in d["works"] if w["id"] == "W2")
+    assert w2["pdf_href"] is None and w2["fulltext"] == "not_needed"
+
+
+def test_decisions_include_possible_splits(tmp_path):
+    d = build_site_data(make_run(tmp_path))
+    assert any("Ann Lee" in x["text"] for x in d["decisions"])
+
+
+def test_html_has_all_sections_and_escapes_script(tmp_path):
+    html = render_html(build_site_data(make_run(tmp_path)))
+    for sid, _ in SECTIONS:
+        assert f'id="{sid}"' in html
+    for _, label in CARD_FIELDS:
+        assert label in html
+    assert "Study </script> One" not in html  # 標題裡的 </script> 不能破壞頁面
+    assert html.count("<script>") == 1
+
+
+def test_work_exception_states(tmp_path):
+    from pipeline.exceptions import add_exception, resolve_exception
+    run = make_run(tmp_path)
+    add_exception(run, "W1", "ingest", "abstract_only", "x")
+    add_exception(run, "W1", "setup", "year_mismatch", "y")
+    add_exception(run, "W2", "ingest", "no_text", "z")
+    resolve_exception(run, "W2", "ingest", "no_text", "ok")
+    d = build_site_data(run)
+    w1 = next(w for w in d["works"] if w["id"] == "W1")
+    assert sorted(e["state"] for e in w1["exceptions"]) == ["info", "open"]
+    w2 = next(w for w in d["works"] if w["id"] == "W2")
+    assert [e["state"] for e in w2["exceptions"]] == ["resolved"]

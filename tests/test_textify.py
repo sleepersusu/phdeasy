@@ -93,3 +93,11 @@ def test_normalize_for_match_unifies_ligatures_quotes_dashes():
 def test_units_counts_markers():
     assert units("[p.1]\na\n[p.2]\nb") == 2
     assert units("[§1] a\n[§2] b\n[§3] c") == 3
+
+
+def test_supplement_first_page_detected():
+    from pipeline.textify import looks_like_supplement
+    assert looks_like_supplement("[p.1]\n10/6/21, 8:01 PM\nCONSORT-EHEALTH (V 1.6.1) - Submission/Publication Form\n...")
+    assert looks_like_supplement("[p.1]\nMultimedia Appendix 2. Interview guide\n...")
+    assert looks_like_supplement("[p.1]\nSupplementary Material\nTable S1 ...")
+    assert not looks_like_supplement("[p.1]\nJMIR Cancer\nFeasibility and Acceptability of a Physical Activity Tracker\nAbstract\nBackground: ... CONSORT diagram in Figure 1")

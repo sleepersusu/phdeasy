@@ -24,3 +24,24 @@ def test_find_existing_file(tmp_path):
     (d / "W55_Other_Y.pdf").write_bytes(b"%PDF-1.4")
     assert find_existing(tmp_path, "W5") == "pdfs/2023/W5_Chang_X.pdf"
     assert find_existing(tmp_path, "W6") is None
+
+
+def test_find_existing_ignores_rejected_folder(tmp_path):
+    d = tmp_path / "pdfs" / "_rejected"
+    d.mkdir(parents=True)
+    (d / "W7_X_Y.pdf").write_bytes(b"%PDF-1.4")
+    assert find_existing(tmp_path, "W7") is None
+
+
+def test_reject_file_moves_and_keeps_hash(tmp_path):
+    from pipeline.index import reject_file
+    (tmp_path / "pdfs" / "2022").mkdir(parents=True)
+    f = tmp_path / "pdfs" / "2022" / "W7_X_Y.pdf"
+    f.write_bytes(b"%PDF-1.4")
+    hashes = {"pdfs/2022/W7_X_Y.pdf": "abc"}
+    index = {"W7": {"id": "W7", "year": 2022, "status": "ok", "path": "pdfs/2022/W7_X_Y.pdf", "url": "u"}}
+    new_rel = reject_file(tmp_path, "W7", index, hashes)
+    assert not f.exists() and (tmp_path / new_rel).exists()
+    assert new_rel.startswith("pdfs/_rejected/")
+    assert hashes == {new_rel: "abc"}
+    assert "W7" not in index

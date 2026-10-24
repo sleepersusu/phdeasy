@@ -112,3 +112,12 @@ def title_matches(text, title, threshold=0.6, head_chars=4000):
     if not words:
         return True
     return sum(1 for w in words if w in head_words) / len(words) >= threshold
+
+
+SUPPL_HEAD = re.compile(r"(consort[- ]?ehealth|submission/publication form|^(multimedia )?appendix\b|supplementa(ry|l) (material|file|information|appendix|data)|^table s\d|reporting checklist|checklist for)", re.I)
+
+
+def looks_like_supplement(text, head_lines=5):
+    """第一頁開頭幾行像附錄、補充資料或報告檢核表，不是論文正文。"""
+    lines = [l.strip() for l in MARKER.sub("\n", text[:3000]).split("\n") if l.strip()]
+    return any(SUPPL_HEAD.search(l) for l in lines[:head_lines])

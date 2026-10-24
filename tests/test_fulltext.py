@@ -97,3 +97,12 @@ def test_prefers_pdf_over_xml_within_source_order():
 def test_source_order_constant():
     assert SOURCES[0] == "zotero" and SOURCES[-1] == "inbox"
     assert "unpaywall" in SOURCES and "core" in SOURCES
+
+
+def test_supplementary_url_skipped_without_download():
+    log = []
+    dl, calls = make_dl({"https://x.org/a_app4.pdf": [(PDF, "ok")], "https://x.org/main.pdf": [(PDF, "ok")]})
+    res = run_chain({"id": "W1"}, [("openalex", lambda w: ["https://x.org/a_app4.pdf", "https://x.org/main.pdf"])], dl, log.append, sleep=lambda s: None)
+    assert res["url"] == "https://x.org/main.pdf"
+    assert calls == ["https://x.org/main.pdf"]
+    assert log[0]["result"] == "supplementary_url"

@@ -31,6 +31,20 @@ def find_existing(run, work_id):
     """已歸位的全文（之前跑過但索引沒記到時用）。"""
     run = Path(run)
     for p in sorted((run / "pdfs").glob(f"*/{work_id}_*")):
-        if p.suffix in (".pdf", ".xml"):
+        if p.parent.name != "_rejected" and p.suffix in (".pdf", ".xml"):
             return str(p.relative_to(run))
     return None
+
+
+def reject_file(run, work_id, index, hashes):
+    """抓錯的檔案移到 pdfs/_rejected/（不刪），雜湊紀錄跟著搬，索引列移除以便重找。回傳新相對路徑。"""
+    run = Path(run)
+    row = index.pop(work_id)
+    src = run / row["path"]
+    dest = run / "pdfs" / "_rejected" / src.name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    src.replace(dest)
+    rel = str(dest.relative_to(run))
+    if row["path"] in hashes:
+        hashes[rel] = hashes.pop(row["path"])
+    return rel

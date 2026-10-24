@@ -19,7 +19,14 @@ from pipeline.exceptions import add_exception, check_circuit, open_exceptions, r
 from pipeline.fetch import sha256_file
 from pipeline.index import load_index
 from pipeline.state import append_progress, load_state, set_stage
-from pipeline.textify import abstract_to_marked, has_text, pdf_to_marked, title_matches, units, xml_to_marked
+from pipeline.textify import abstract_to_marked, has_text, looks_like_supplement, pdf_to_marked, title_matches, units, xml_to_marked
+
+
+RULES_VERSION = 2  # 驗證規則改了就加一，舊結果會重驗（2：加入附錄／檢核表偵測）
+
+
+def needs_redo(prev, src_hash, text_exists):
+    return not (prev and prev.get("source_sha256") == src_hash and prev.get("rules") == RULES_VERSION and text_exists)
 
 
 def verify_hashes(run, hashes):
@@ -52,6 +59,8 @@ def convert(run, w, row):
             exc.append(("unreadable", f"{row['path']}：{type(e).__name__}: {e}"))
         if stype and not has_text(text):
             exc.append(("no_text", f"{row['path']} 抽不出文字（可能是掃描檔）"))
+        elif stype and looks_like_supplement(text):
+            exc.append(("not_main_text", f"{row['path']} 看起來是附錄或檢核表，不是論文正文，已隔離"))
         elif stype and not title_matches(text, w["title"]):
             exc.append(("title_mismatch", f"{row['path']} 前兩頁找不到文章標題，可能拿錯檔案，已隔離"))
         if not exc:
@@ -92,7 +101,7 @@ def main():
         row = index.get(w["id"], {})
         src_hash = row.get("sha256") or hashlib.sha256((w.get("abstract") or "").encode()).hexdigest()
         prev = ing.get(w["id"])
-        if prev and prev.get("source_sha256") == src_hash and (wd / "text" / f"{w['id']}.txt").exists():
+        if not needs_redo(prev, src_hash, (wd / "text" / f"{w['id']}.txt").exists()):
             counts[prev["source_type"]] = counts.get(prev["source_type"], 0) + 1
             continue
         text, stype, exc = convert(run, w, row)
@@ -108,6 +117,7 @@ def main():
             "source_type": stype,
             "source_path": row.get("path") if stype in ("pdf", "xml") else None,
             "source_sha256": src_hash,
+            "rules": RULES_VERSION,
             "units": units(text),
             "chars": len(text),
             "kind": w["kind"],

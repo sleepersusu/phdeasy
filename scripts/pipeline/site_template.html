@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__NAME__ 研究檔案</title>
+<style>
+:root{
+  --fg:#000;--bg:#fff;--muted:#3f3f3f;--line:#cfcfcf;--soft:#f4f4f4;
+  --green:#15803d;--on-green:#fff;--yellow:#facc15;--on-yellow:#000;--red:#b91c1c;--on-red:#fff;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:64px}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.6}
+a{color:var(--fg);text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding:0 16px}
+header.top{border-bottom:2px solid var(--fg);padding:20px 0 12px}
+header.top h1{margin:0;font-size:1.6rem;line-height:1.3}
+header.top .meta{color:var(--muted);font-size:.95rem;margin-top:4px}
+nav.sections{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+nav.sections .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:6px;padding-bottom:6px}
+nav.sections a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;text-decoration:none;white-space:nowrap;border-radius:6px;font-weight:600}
+nav.sections a:hover,nav.sections a[aria-current="true"]{background:var(--soft);text-decoration:underline}
+section{padding:28px 0 8px;border-bottom:1px solid var(--line)}
+section h2{font-size:1.3rem;margin:0 0 12px}
+h3{font-size:1.05rem;margin:20px 0 8px}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:12px 0}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:12px}
+.kpi .n{font-size:1.7rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.2}
+.kpi .l{color:var(--muted);font-size:.9rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;min-width:44px;padding:0 14px;border-radius:8px;border:2px solid transparent;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;transition:filter .15s}
+.btn:hover{filter:brightness(.92)}
+.btn-green{background:var(--green);color:var(--on-green)}
+.btn-yellow{background:var(--yellow);color:var(--on-yellow)}
+.btn-red{background:var(--red);color:var(--on-red)}
+.btn[aria-pressed="false"]{background:var(--bg);color:var(--fg);border-color:currentColor}
+.btn-green[aria-pressed="false"]{border-color:var(--green)}
+.btn-yellow[aria-pressed="false"]{border-color:#a16207}
+.btn-red[aria-pressed="false"]{border-color:var(--red)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.85rem;font-weight:600;white-space:nowrap;border:1px solid var(--fg)}
+.pill.g{background:var(--green);color:var(--on-green);border-color:var(--green)}
+.pill.y{background:var(--yellow);color:var(--on-yellow);border-color:#a16207}
+.pill.r{background:var(--red);color:var(--on-red);border-color:var(--red)}
+.pill.o{background:var(--bg);color:var(--fg)}
+.tablebox{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:.95rem}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line)}
+th{background:var(--soft);font-weight:700;white-space:nowrap}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+.bar{display:grid;grid-template-columns:minmax(120px,38%) 1fr 3ch;gap:8px;align-items:center;margin:4px 0}
+.bar .track{height:14px;background:var(--soft);border:1px solid var(--line);border-radius:3px}
+.bar .fill{height:100%;background:var(--fg)}
+.bar .v{text-align:right;font-variant-numeric:tabular-nums}
+.stages{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.list{display:flex;flex-direction:column;gap:10px;padding:0;margin:0;list-style:none}
+.item{border:1px solid var(--line);border-radius:8px;padding:12px}
+.item.attn{border-left:6px solid #a16207}
+.item.bad{border-left:6px solid var(--red)}
+details.paper{border:1px solid var(--line);border-radius:8px;margin:10px 0}
+details.paper>summary{list-style:none;cursor:pointer;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:44px}
+details.paper>summary::-webkit-details-marker{display:none}
+details.paper>summary .t{font-weight:700;font-size:1.02rem}
+details.paper>summary .t::before{content:"▸ ";}
+details.paper[open]>summary .t::before{content:"▾ ";}
+details.paper .inner{padding:0 12px 14px;border-top:1px solid var(--line)}
+dl.card{display:grid;grid-template-columns:8em 1fr;gap:0;margin:12px 0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+dl.card dt,dl.card dd{margin:0;padding:10px 12px;border-bottom:1px solid var(--line)}
+dl.card dt{background:var(--soft);font-weight:700}
+dl.card dt:last-of-type,dl.card dd:last-of-type{border-bottom:none}
+blockquote{margin:6px 0;padding:4px 10px;border-left:3px solid var(--fg);font-size:.92rem}
+blockquote .loc{font-family:var(--mono);font-size:.85rem;color:var(--muted)}
+.empty{padding:16px;border:1px dashed var(--fg);border-radius:8px}
+input[type=search],select{font:inherit;min-height:44px;padding:0 10px;border:2px solid var(--fg);border-radius:8px;background:var(--bg);color:var(--fg)}
+input[type=search]{flex:1 1 260px}
+label.fl{font-weight:600}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+footer{padding:24px 0 48px;color:var(--muted);font-size:.9rem}
+@media (max-width:640px){
+  dl.card{grid-template-columns:1fr}
+  dl.card dt{border-bottom:none;padding-bottom:2px}
+  .bar{grid-template-columns:1fr 3ch}
+  .bar .name{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<a class="sr" href="#papers">跳到文章解析</a>
+<header class="top"><div class="wrap"><h1 id="title"></h1><div class="meta" id="meta"></div></div></header>
+<nav class="sections" aria-label="區段"><div class="wrap">__NAV__</div></nav>
+<main class="wrap">__SECTIONS__</main>
+<footer class="wrap" id="foot"></footer>
+__FIELDS__
+<script>
+const D = __DATA__;
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pill = (cls, text) => `<span class="pill ${cls}">${esc(text)}</span>`;
+const body = id => $(`#${id} .body`);
+const ROLE = {first:"第一作者", middle:"中間作者", last:"最後作者"};
+const TYPE = {"article":"期刊論文","review":"綜述","preprint":"預印本","conference-abstract":"會議摘要","editorial":"社論","letter":"信件","erratum":"勘誤"};
+const role = (p, c) => (ROLE[p] || "作者序不明") + (c ? "＋通訊" : "");
+
+function fulltextPill(w){
+  if (w.fulltext === "ok") return pill("g", w.text_source === "xml" ? "✓ 全文（XML）" : "✓ 全文 PDF");
+  if (w.fulltext === "no_free_fulltext") return pill("r", "✗ 無免費全文（僅摘要）");
+  if (w.fulltext === "not_needed") return pill("o", "短卡：不需全文");
+  return pill("y", "? 全文狀態不明");
+}
+function grantPill(g){
+  if (g.status === "confirmed" && (g.target_role === "pi" || g.target_role === "co_pi")) return pill("g", "✓ 本人主持（API 確認）");
+  if (g.status === "pending") return pill("y", "? 待確認");
+  if (g.status === "acknowledged") return pill("o", "論文致謝提及");
+  return pill("o", "合作者主持");
+}
+function exPill(e){ return e.state === "open" ? pill("r", "✗ 未解決") : e.state === "resolved" ? pill("g", "✓ 已解決") : pill("y", "註記"); }
+
+function header(){
+  const p = D.professor;
+  $("#title").textContent = `${p.name} 研究檔案`;
+  $("#meta").innerHTML = `${esc(p.institution || "機構未提及")}｜出版年 ${esc(p.years)}｜資料更新 ${esc(D.generated || "")}`;
+  $("#foot").innerHTML = `由 phdeasy 流水線產生。數字都由腳本計算；文章解析每個說法都附原文引句與位置（p.N＝PDF 第幾頁，§N＝全文段落，abs＝摘要）。`;
+}
+
+function overview(){
+  const c = D.counts, p = D.professor, r = D.roles;
+  const ids = [p.author_id ? `<a href="https://openalex.org/${esc(p.author_id)}" target="_blank" rel="noopener">OpenAlex ${esc(p.author_id)}</a>` : "",
+               p.orcid ? `<a href="${esc(p.orcid)}" target="_blank" rel="noopener">ORCID</a>` : "ORCID 來源未提及"].filter(Boolean).join("｜");
+  const st = D.pipeline.stages.map(s => s.state === "done" ? pill("g", "✓ " + s.label) : s.state === "current" ? pill("y", "進行中：" + s.label) : pill("o", s.label)).join(" ");
+  const years = Object.entries(D.years);
+  const ymax = Math.max(1, ...years.map(([, n]) => n));
+  body("overview").innerHTML = `
+    <p>${ids}</p>
+    ${D.pipeline.halted ? `<div class="item bad"><strong>流水線已熔斷：</strong>${esc((D.pipeline.circuit || {}).reason)}</div>` : ""}
+    <div class="kpis">
+      <div class="kpi"><div class="n">${c.works}</div><div class="l">篇文章（完整 ${c.full}、短卡 ${c.short}）</div></div>
+      <div class="kpi"><div class="n">${c.fulltext_ok}/${c.full}</div><div class="l">有免費全文</div></div>
+      <div class="kpi"><div class="n">${c.coauthors}</div><div class="l">位合作者</div></div>
+      <div class="kpi"><div class="n">${c.grants_pi}</div><div class="l">個本人主持計畫</div></div>
+      <div class="kpi"><div class="n">${c.cards_done}/${c.works}</div><div class="l">篇解析卡完成</div></div>
+      <div class="kpi"><div class="n">${D.decisions.length}</div><div class="l">件待你決定</div></div>
+    </div>
+    <h3>她在文章裡的角色</h3>
+    <p>第一作者 <strong>${r.first ?? 0}</strong> 篇｜最後作者 <strong>${r.last ?? 0}</strong> 篇｜中間作者 <strong>${r.middle ?? 0}</strong> 篇｜通訊作者 <strong>${r.corresponding ?? 0}</strong> 篇</p>
+    <h3>每年篇數</h3>
+    ${years.map(([y, n]) => `<div class="bar"><span class="name">${esc(y)}</span><span class="track"><span class="fill" style="display:block;width:${n / ymax * 100}%"></span></span><span class="v">${n}</span></div>`).join("") || `<div class="empty">還沒有年度資料，由「合作與領域」階段產生。</div>`}
+    <h3>流水線進度</h3><div class="stages">${st}</div>`;
+}
+
+function decisions(){
+  const el = body("decisions");
+  if (!D.decisions.length){ el.innerHTML = `<div class="empty">目前沒有需要你決定的事。</div>`; return; }
+  el.innerHTML = `<p class="muted">這些項目流水線不會自己決定，會在停 2 一起請你確認。</p><ul class="list">` + D.decisions.map(d => `
+    <li class="item ${d.kind === "pdf" ? "bad" : "attn"}">
+      <div class="row">${d.kind === "pdf" ? pill("r", "缺全文") : pill("y", "? 待確認")} <strong>${esc(d.text)}</strong></div>
+      <div class="small">建議動作：${esc(d.action)}</div>
+      ${d.works ? `<div class="row small" style="margin-top:6px">${d.works.map(id => `<a href="#paper-${id}">${id}</a>`).join(" ")}</div>` : ""}
+    </li>`).join("") + `</ul>`;
+}
+
+let showAllCo = false;
+function coauthors(){
+  const el = body("coauthors");
+  const all = D.coauthors;
+  if (!all.length){ el.innerHTML = `<div class="empty">還沒有合作者資料，由「合作與領域」階段產生。</div>`; return; }
+  const rows = (showAllCo ? all : all.slice(0, 10)).map((s, i) => `<tr>
+    <td class="num">${i + 1}</td>
+    <td><strong>${esc(s.name)}</strong>${s.linked ? "" : " " + pill("y", "無作者 id")}${s.merged_names.length ? `<div class="small muted">也寫作：${esc(s.merged_names.join("、"))}</div>` : ""}</td>
+    <td class="num"><strong>${s.n}</strong></td>
+    <td class="small">${Object.entries(s.years).map(([y, n]) => `${y}:${n}`).join(" ")}</td>
+    <td class="small">第一 ${s.as_first}｜最後 ${s.as_last}｜通訊 ${s.as_corresponding}</td>
+    <td class="small">${esc((s.institutions[0] || ["來源未提及"])[0])}</td>
+    <td class="small">${s.works.map(id => `<a href="#paper-${id}">${id}</a>`).join(" ")}</td></tr>`).join("");
+  el.innerHTML = `
+    <p>共 <strong>${all.length}</strong> 位（有 OpenAlex 作者 id ${D.counts.coauthors_linked} 位）。以作者 id 計數；另派一個模型獨立數過一次，結果一致。</p>
+    ${D.possible_splits.length ? `<div class="item attn"><div class="row">${pill("y", "? 待確認")} <strong>可能是同一人被拆開計數</strong></div><ul class="small">${D.possible_splits.map(g => `<li>${g.names.map((n, i) => `${esc(n)}（${g.counts[i]} 篇）`).join(" ／ ")} → 合併後最多 ${g.combined_n_max} 篇</li>`).join("")}</ul></div>` : ""}
+    <div class="tablebox" style="margin-top:12px"><table><thead><tr><th>排名</th><th>合作者</th><th>篇數</th><th>年度</th><th>對方角色</th><th>主要機構</th><th>文章</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${all.length > 10 ? `<p><button class="btn btn-green" id="coToggle" aria-expanded="${showAllCo}">${showAllCo ? "只看前 10 位" : `顯示全部 ${all.length} 位`}</button></p>` : ""}`;
+  const b = $("#coToggle"); if (b) b.onclick = () => { showAllCo = !showAllCo; coauthors(); $("#coToggle").focus(); };
+}
+
+function topics(){
+  const el = body("topics"), t = D.topics;
+  const block = (title, items) => {
+    if (!items || !items.length) return "";
+    const max = Math.max(...items.map(x => x[1]));
+    return `<h3>${title}</h3>` + items.slice(0, 12).map(([n, c]) => `<div class="bar"><span class="name">${esc(n)}</span><span class="track"><span class="fill" style="display:block;width:${c / max * 100}%"></span></span><span class="v">${c}</span></div>`).join("");
+  };
+  const html = block("學科（field）", t.field) + block("次領域（subfield）", t.subfield) + block("研究主題（topic）", t.topic);
+  el.innerHTML = html ? `<p class="muted">依 OpenAlex 對每篇文章的主要主題分類計數。各領域的文字敘述由「總覽撰寫」階段產生。</p>` + html
+                      : `<div class="empty">還沒有領域資料，由「合作與領域」階段產生。</div>`;
+}
+
+let grantFilter = "mine";
+function grants(){
+  const el = body("grants");
+  if (!D.grants.length){ el.innerHTML = `<div class="empty">還沒有研究計畫資料，由「研究計畫」階段產生。</div>`; return; }
+  const groups = {
+    mine: ["本人主持", g => g.status === "confirmed" && ["pi","co_pi"].includes(g.target_role)],
+    pending: ["待確認", g => g.status === "pending"],
+    ack: ["論文致謝提及", g => g.status === "acknowledged"],
+    other: ["合作者主持", g => g.status === "other"],
+  };
+  const btn = (k, cls) => `<button class="btn ${cls}" aria-pressed="${grantFilter === k}" data-g="${k}">${groups[k][0]}（${D.grants.filter(groups[k][1]).length}）</button>`;
+  const list = D.grants.filter(groups[grantFilter][1]);
+  el.innerHTML = `
+    ${D.grants_reviewed ? "" : `<div class="item attn">${pill("y", "? 尚未經推翻者檢查")} 這份清單還沒跑完研究計畫階段。</div>`}
+    <p class="muted">只有 NIH／NSF 等資料庫列她為主持人、且姓名與機構都吻合的才算「本人主持」。只在論文致謝出現的不算她的計畫。</p>
+    <div class="row" role="group" aria-label="計畫篩選">${btn("mine","btn-green")}${btn("pending","btn-yellow")}${btn("ack","btn-green")}${btn("other","btn-green")}</div>
+    <ul class="list" style="margin-top:12px">${list.map(g => `<li class="item ${g.status === "pending" ? "attn" : ""}">
+      <div class="row">${grantPill(g)} <strong>${esc(g.title || g.funder || g.key)}</strong></div>
+      <div class="small">補助單位：${esc(g.funder || "來源未提及")}｜編號：${esc(g.award_id || "無編號")}${g.pi_names && g.pi_names.length ? `｜主持人：${esc(g.pi_names.join("、"))}` : ""}</div>
+      <div class="small">期間：${esc(g.start || "來源未提及")} – ${esc(g.end || "來源未提及")}${g.total_award ? `｜金額合計 US$${Number(g.total_award).toLocaleString()}` : ""}</div>
+      ${g.works.length ? `<div class="small">相關文章：${g.works.map(id => `<a href="#paper-${id}">${id}</a>`).join(" ")}</div>` : ""}
+      ${(g.evidence || []).filter(e => e.quote).slice(0, 2).map(e => `<blockquote>"${esc(e.quote)}" <span class="loc">[${esc(e.work_id)}, ${esc(e.loc)}]</span></blockquote>`).join("")}
+      ${g.refute && g.refute.reason ? `<div class="small muted">檢查結果：${esc(g.refute.reason)}</div>` : ""}
+    </li>`).join("") || `<li class="empty">這一類沒有計畫。試試其他分類。</li>`}</ul>`;
+  el.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { grantFilter = b.dataset.g; grants(); el.querySelector(`[data-g="${grantFilter}"]`).focus(); });
+}
+
+const PF = {q: "", ft: "all", year: "all"};
+function cardHtml(w){
+  const c = w.card;
+  const cites = cs => (cs || []).map(x => `<blockquote>"${esc(x.quote)}" <span class="loc">[${esc(w.id)}, ${esc(x.loc)}]</span></blockquote>`).join("");
+  const val = f => {
+    if (f.state === "pending") return pill("y", "尚未產生");
+    if (f.state === "not_in_source") return `<span class="muted">來源未提及</span>`;
+    const head = f.state === "unresolved" ? pill("y", "? 判不出來") + " " : "";
+    if (f.key === "limitations"){
+      const part = (t, xs, cls) => xs.length ? `<div><strong>${t}</strong> ${cls}<ul>${xs.map(x => `<li>${esc(x.text)}${cites(x.citations)}</li>`).join("")}</ul></div>` : "";
+      return head + (part("作者自述", f.author_stated, "") + part("推論", f.inferred, pill("y", "非作者原話")) || `<span class="muted">來源未提及</span>`);
+    }
+    return head + `<div>${esc(f.text || "")}</div>${cites(f.citations)}`;
+  };
+  return `${c.pending_note ? `<p class="small">${pill("y", "注意")} ${esc(c.pending_note)}</p>` : ""}
+    <dl class="card">${c.fields.map(f => `<dt>${esc(f.label)}</dt><dd>${val(f)}</dd>`).join("")}</dl>`;
+}
+function paperHtml(w){
+  const authors = w.authors.map(a => a.position && a.name && w.target_position === a.position && a.id === D.professor.author_id ? `<strong>${esc(a.name)}</strong>` : esc(a.name)).join("、");
+  return `<details class="paper" id="paper-${w.id}">
+    <summary>
+      <span class="t">${esc(w.title)}</span>
+      <span class="row small">${w.year}｜${esc(TYPE[w.type] || w.type)}｜${esc(w.venue || "期刊來源未提及")}｜${esc(role(w.target_position, w.target_corresponding))} ${fulltextPill(w)} ${w.card.exists ? pill("g", "✓ 已解析") : pill("y", "解析未產生")} ${w.exceptions.some(e => e.state === "open") ? pill("r", "有例外") : ""}</span>
+    </summary>
+    <div class="inner">
+      <div class="row" style="margin:12px 0">
+        ${w.pdf_href ? `<a class="btn btn-green" href="${esc(w.pdf_href)}" target="_blank" rel="noopener">開啟全文</a>` : `<span class="btn btn-red" aria-disabled="true">沒有全文檔</span>`}
+        ${w.doi ? `<a class="btn btn-green" href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">期刊頁（DOI）</a>` : ""}
+        <a class="btn btn-yellow" href="#paper-${w.id}" data-copy="${w.id}">複製這篇的連結</a>
+      </div>
+      <h3>解析</h3>${cardHtml(w)}
+      <h3>合作作者（${w.authors.length} 位）</h3><p class="small">${authors || "來源未提及"}</p>
+      <h3>書目</h3>
+      <p class="small">文章 id ${w.id}｜DOI ${esc(w.doi || "無")}｜領域 ${esc(w.topic.field || "未分類")} › ${esc(w.topic.subfield || "")} › ${esc(w.topic.name || "")}${w.added_by_owner ? "｜你在停 1 加入" : ""}</p>
+      ${w.grants.length ? `<p class="small">相關計畫：${w.grants.map(k => esc(k)).join("、")}</p>` : ""}
+      ${w.exceptions.length ? `<h3>這篇的例外</h3><ul class="small">${w.exceptions.map(e => `<li>${e.state === "resolved" ? pill("g", "✓ 已解決") : e.state === "info" ? pill("y", "註記") : pill("r", "✗ " + e.kind)} ${esc(e.detail)}</li>`).join("")}</ul>` : ""}
+      <details><summary class="small" style="cursor:pointer;min-height:44px;display:flex;align-items:center">摘要原文</summary><p class="small">${esc(w.abstract || "來源未提及")}</p></details>
+    </div></details>`;
+}
+function papers(){
+  const el = body("papers");
+  const years = [...new Set(D.works.map(w => w.year))].sort((a, b) => b - a);
+  if (!$("#pq")){
+    el.innerHTML = `
+      <div class="row" role="search">
+        <label class="sr" for="pq">搜尋文章</label>
+        <input type="search" id="pq" placeholder="搜尋標題、作者、期刊、領域">
+        <label class="fl" for="py">年份</label>
+        <select id="py"><option value="all">全部</option>${years.map(y => `<option>${y}</option>`).join("")}</select>
+      </div>
+      <div class="row" role="group" aria-label="全文篩選" style="margin-top:8px">
+        <button class="btn btn-green" data-ft="all">全部</button>
+        <button class="btn btn-green" data-ft="ok">有全文</button>
+        <button class="btn btn-yellow" data-ft="abstract">僅摘要／短卡</button>
+        <button class="btn btn-red" data-ft="exc">有例外</button>
+      </div>
+      <p id="pcount" class="small muted" aria-live="polite"></p><div id="plist"></div>`;
+    $("#pq").oninput = e => { PF.q = e.target.value.trim().toLowerCase(); papers(); };
+    $("#py").onchange = e => { PF.year = e.target.value; papers(); };
+    el.querySelectorAll("[data-ft]").forEach(b => b.onclick = () => { PF.ft = b.dataset.ft; papers(); });
+  }
+  el.querySelectorAll("[data-ft]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.ft === PF.ft)));
+  const hay = w => [w.title, w.venue, w.topic.field, w.topic.subfield, w.topic.name, ...w.authors.map(a => a.name)].join(" ").toLowerCase();
+  const list = D.works.filter(w =>
+    (!PF.q || hay(w).includes(PF.q)) &&
+    (PF.year === "all" || String(w.year) === PF.year) &&
+    (PF.ft === "all" || (PF.ft === "ok" && w.fulltext === "ok") || (PF.ft === "abstract" && w.fulltext !== "ok") || (PF.ft === "exc" && w.exceptions.some(e => e.state === "open"))));
+  $("#pcount").textContent = `顯示 ${list.length} / ${D.works.length} 篇`;
+  $("#plist").innerHTML = list.map(paperHtml).join("") || `<div class="empty">沒有符合的文章。試試清空搜尋字，或把篩選改成「全部」。</div>`;
+  $("#plist").querySelectorAll("[data-copy]").forEach(a => a.onclick = ev => {
+    ev.preventDefault(); const url = location.href.split("#")[0] + "#paper-" + a.dataset.copy;
+    navigator.clipboard?.writeText(url).then(() => { a.textContent = "已複製"; }, () => { location.hash = "paper-" + a.dataset.copy; });
+  });
+}
+
+let exFilter = "open";
+function exceptions(){
+  const el = body("exceptions");
+  const n = s => D.exceptions.filter(e => e.state === s).length;
+  const btn = (k, cls, label) => `<button class="btn ${cls}" aria-pressed="${exFilter === k}" data-x="${k}">${label}（${n(k)}）</button>`;
+  const list = D.exceptions.filter(e => e.state === exFilter);
+  el.innerHTML = `<p class="muted">自動段無法完成而被隔離的項目。未解決的例外超過 30% 時流水線會停下來。</p>
+    <div class="row" role="group" aria-label="例外篩選">${btn("open", "btn-red", "未解決")}${btn("info", "btn-yellow", "註記")}${btn("resolved", "btn-green", "已解決")}</div>
+    <div class="tablebox" style="margin-top:12px"><table><thead><tr><th>狀態</th><th>項目</th><th>階段</th><th>類型</th><th>說明</th></tr></thead><tbody>
+    ${list.map(e => `<tr><td>${exPill(e)}</td><td>${/^W\d+$/.test(e.id) ? `<a href="#paper-${e.id}">${e.id}</a>` : esc(e.id)}</td><td>${esc(e.stage)}</td><td>${esc(e.kind)}</td><td class="small">${esc(e.detail)}${e.resolved ? `<div class="muted">解決：${esc(e.resolved)}</div>` : ""}</td></tr>`).join("") || `<tr><td colspan="5">這一類沒有紀錄。</td></tr>`}
+    </tbody></table></div>`;
+  el.querySelectorAll("[data-x]").forEach(b => b.onclick = () => { exFilter = b.dataset.x; exceptions(); el.querySelector(`[data-x="${exFilter}"]`).focus(); });
+}
+
+function files(){
+  body("files").innerHTML = `<p class="muted">這些檔案都在本機批次資料夾裡。Zotero 匯入：檔案 → 匯入 → 選 .ris，PDF 會一起附上。</p>
+    <div class="row">${D.files.map(f => `<a class="btn btn-green" href="${esc(f.href)}" target="_blank" rel="noopener">${esc(f.label)}</a>`).join("")}</div>`;
+}
+
+function openFromHash(){
+  const id = decodeURIComponent(location.hash.slice(1));
+  if (id.startsWith("paper-")) openPaper(id.slice(6));
+}
+function navHighlight(){
+  const links = [...document.querySelectorAll("nav.sections a")];
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.setAttribute("aria-current", String(a.getAttribute("href") === "#" + e.target.id))); }), {rootMargin: "-40% 0px -55% 0px"});
+  document.querySelectorAll("main section").forEach(s => io.observe(s));
+}
+
+function openPaper(id){
+  let d = document.getElementById("paper-" + id);
+  if (!d){ PF.q = ""; PF.ft = "all"; PF.year = "all"; $("#pq").value = ""; $("#py").value = "all"; papers(); d = document.getElementById("paper-" + id); }
+  if (!d) return;
+  d.open = true; d.scrollIntoView({block: "start"}); d.querySelector("summary").focus({preventScroll: true});
+  try { history.replaceState(null, "", "#paper-" + id); } catch (e) {}
+}
+document.addEventListener("click", ev => {
+  const a = ev.target.closest('a[href^="#paper-"]');
+  if (!a || a.dataset.copy) return;
+  ev.preventDefault(); openPaper(a.getAttribute("href").slice(7));
+});
+
+header(); overview(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
+openFromHash();
+window.addEventListener("hashchange", openFromHash);
+</script>
+</body>
+</html>

@@ -96,3 +96,11 @@ def citation_pdf_urls(html, base):
                 if u not in out:
                     out.append(u)
     return out
+
+
+SUPPL_URL = re.compile(r"(_app\d+\.pdf|[/_-]mmc\d+|suppl|supplement|appendix|moesm|_esm\d*\b|_si\.pdf|/media-\d+|/s\d+$)", re.I)
+
+
+def is_supplementary_url(url):
+    """附錄／補充檔的網址（例 JMIR 的 _app4.pdf、Elsevier 的 mmc1、Springer 的 MOESM）。"""
+    return bool(SUPPL_URL.search(url or ""))

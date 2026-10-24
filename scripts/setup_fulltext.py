@@ -159,6 +159,8 @@ def main():
     ap.add_argument("run")
     ap.add_argument("--only", default=None)
     ap.add_argument("--retry-missing", action="store_true")
+    ap.add_argument("--reject", default=None, help="抓錯檔案的文章 id（逗號分隔）：檔案移到 pdfs/_rejected/ 後重找")
+    ap.add_argument("--reason", default="")
     args = ap.parse_args()
     run = Path(args.run)
     works = json.loads((run / "work" / "works.json").read_text())
@@ -166,6 +168,19 @@ def main():
     hashes_p = run / "work" / "hashes.json"
     hashes = json.loads(hashes_p.read_text()) if hashes_p.exists() else {}
     only = set(args.only.split(",")) if args.only else None
+    if args.reject:
+        from pipeline.exceptions import add_exception
+        from pipeline.index import reject_file
+
+        for wid in args.reject.split(","):
+            if wid in index:
+                bad_url = index[wid].get("url")
+                rel = reject_file(run, wid, index, hashes)
+                add_exception(run, wid, "setup", "wrong_file", f"{args.reason}；原檔移到 {rel}（來源 {bad_url}）")
+                print(f"  REJECT {wid} → {rel}")
+        save_index(run, index)
+        hashes_p.write_text(json.dumps(hashes, ensure_ascii=False, indent=2))
+        only = set(args.reject.split(","))
 
     resolvers = [
         ("zotero", r_zotero),
