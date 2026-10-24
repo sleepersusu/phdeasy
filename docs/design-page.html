@@ -196,6 +196,24 @@ ul{margin:0;padding-left:1.2em}
 </section>
 
 <section>
+  <h2>實測結果：Fukuoka, Yoshimi</h2>
+  <div class="tbl"><table>
+    <thead><tr><th>項目</th><th>結果</th></tr></thead>
+    <tbody>
+      <tr><td>文章</td><td>28 篇；OpenAlex 漏收的 2 篇由 PubMed／Europe PMC 補回</td></tr>
+      <tr><td>免費全文</td><td>22/25；3 篇只有摘要</td></tr>
+      <tr><td>合作者</td><td>77 位，獨立計數 36/36 一致；3 組可能同一人待你決定</td></tr>
+      <tr><td>研究計畫</td><td>本人主持 5、致謝 14、合作者主持 9、待確認 2；推翻 10</td></tr>
+      <tr><td>解析卡</td><td>28/28，引句 1,274 則全數核對通過；雙軌不一致 23 筆全數裁決；推翻 440 條中 7 條</td></tr>
+      <tr><td>總覽</td><td>60 句出處 60/60，推翻 2</td></tr>
+      <tr><td>E2E 與驗收</td><td>E2E 14/14；獨立驗收第 1 輪 10/12 → 修一輪 → 第 2 輪 11/12，剩餘一項已修正</td></tr>
+      <tr><td>花費</td><td>47 個 subagent，約 4.68M tokens（上限 5.63M）</td></tr>
+    </tbody>
+  </table></div>
+  <p class="note" style="margin-top:10px">實測中修掉 18 個問題，例如：附錄被當成正文、PMC 全文因伺服器錯誤被判為沒有、OpenAlex 把同一人拆成兩個 id、引句在參考文獻括號中間切斷。每個都先寫會失敗的測試再修，目前共 203 個測試。</p>
+</section>
+
+<section>
   <h2>作者界線</h2>
   <p>解析卡與總覽由 agent 寫，作為閱讀素材。「這位教授適不適合我」的判斷、寄給教授的信、研究計畫書由你自己寫。agent 只提供素材，例如可以問教授的問題清單。</p>
 </section>
