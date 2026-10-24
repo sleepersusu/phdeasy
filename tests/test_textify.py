@@ -1,0 +1,95 @@
+import pymupdf
+
+from pipeline.textify import (
+    pdf_to_marked,
+    xml_to_marked,
+    abstract_to_marked,
+    has_text,
+    title_matches,
+    normalize_for_match,
+    units,
+)
+
+
+def make_pdf(path, pages):
+    doc = pymupdf.open()
+    for t in pages:
+        page = doc.new_page()
+        page.insert_textbox(pymupdf.Rect(50, 50, 550, 800), t, fontsize=10)
+    doc.save(path)
+
+
+def test_pdf_pages_get_markers(tmp_path):
+    p = tmp_path / "a.pdf"
+    make_pdf(p, ["Walking Study Title\nIntro text here.", "Results: n = 120 women."])
+    text, n = pdf_to_marked(p)
+    assert n == 2
+    assert text.index("[p.1]") < text.index("Walking Study") < text.index("[p.2]") < text.index("n = 120")
+
+
+def test_scanned_pdf_has_no_text(tmp_path):
+    p = tmp_path / "scan.pdf"
+    doc = pymupdf.open()
+    doc.new_page()
+    doc.save(p)
+    text, n = pdf_to_marked(p)
+    assert n == 1 and not has_text(text)
+
+
+JATS = b"""<?xml version="1.0"?>
+<article><front><article-meta>
+ <title-group><article-title>AI HeartBot Pilot</article-title></title-group>
+ <funding-group><award-group><funding-source>NIH</funding-source><award-id>R01HL123</award-id></award-group></funding-group>
+ <abstract><sec><title>Background</title><p>Heart attack awareness is low.</p></sec></abstract>
+</article-meta></front>
+<body>
+ <sec><title>Methods</title><p>We enrolled <bold>92</bold> women.</p>
+  <table-wrap><caption><p>Table 1. Characteristics</p></caption></table-wrap></sec>
+ <sec><title>Results</title><p>Knowledge improved.</p></sec>
+</body>
+<back><ack><p>We thank the participants.</p></ack>
+ <ref-list><ref><mixed-citation>Smith J. Some cited paper. 2020.</mixed-citation></ref></ref-list></back>
+</article>"""
+
+
+def test_xml_paragraphs_numbered_and_sections_kept():
+    text, n = xml_to_marked(JATS)
+    assert "[§1]" in text
+    assert "We enrolled 92 women." in text
+    assert text.index("## Methods") < text.index("We enrolled") < text.index("## Results")
+    assert "Table 1. Characteristics" in text
+    assert "We thank the participants." in text  # 致謝要留（grants 會用）
+    assert "R01HL123" in text  # 補助資訊要留
+    assert "Some cited paper" not in text  # 參考文獻不要
+    assert n == units(text)
+
+
+def test_abstract_marker():
+    text = abstract_to_marked("Short abstract.")
+    assert text.startswith("[abs]") and "Short abstract." in text
+
+
+def test_has_text_threshold():
+    assert has_text("[p.1]\n" + "word " * 400)
+    assert not has_text("[p.1]\n\n[p.2]\n  ")
+
+
+def test_title_matches_with_hyphenation_and_case():
+    text = "[p.1]\nJMIR Cardio\nAn App-Based Physical Activ-\nity Intervention in Community-Dwelling Women\nAbstract ..."
+    assert title_matches(text, "An App-Based Physical Activity Intervention in Community-Dwelling Women")
+
+
+def test_title_mismatch_detects_wrong_file():
+    text = "[p.1]\nQuality of life among colorectal cancer survivors: a pilot trial\n..."
+    assert not title_matches(text, "AI HeartBot to Increase Women's Awareness and Knowledge of Heart Attack")
+
+
+def test_normalize_for_match_unifies_ligatures_quotes_dashes():
+    a = normalize_for_match("The ﬁrst “effect” – was signiﬁ-\ncant")
+    b = normalize_for_match('the first "effect" - was significant')
+    assert a == b
+
+
+def test_units_counts_markers():
+    assert units("[p.1]\na\n[p.2]\nb") == 2
+    assert units("[§1] a\n[§2] b\n[§3] c") == 3

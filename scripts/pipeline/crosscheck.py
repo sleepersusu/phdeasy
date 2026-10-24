@@ -111,3 +111,10 @@ def external_only(works, records):
         m["sources"] = sorted(m["sources"])
         out.append(m)
     return out
+
+
+def epmc_abstract(data):
+    hit = next(iter((data.get("resultList") or {}).get("result", [])), None)
+    if not hit or not hit.get("abstractText"):
+        return None
+    return " ".join(re.sub(r"<[^>]+>", " ", hit["abstractText"]).split())

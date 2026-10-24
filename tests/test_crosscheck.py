@@ -92,3 +92,10 @@ def test_external_only_by_doi_and_title_and_merges_sources():
     assert len(out) == 1
     assert out[0]["doi"] == "10.1/new"
     assert out[0]["sources"] == ["europepmc", "pubmed"]
+
+
+def test_epmc_abstract_strips_tags():
+    from pipeline.crosscheck import epmc_abstract
+    data = {"resultList": {"result": [{"abstractText": "<h4>Background</h4>Heart <i>attack</i> risk.<br/>Done."}]}}
+    assert epmc_abstract(data) == "Background Heart attack risk. Done."
+    assert epmc_abstract({"resultList": {"result": []}}) is None

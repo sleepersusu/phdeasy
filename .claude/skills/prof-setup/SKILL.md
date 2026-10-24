@@ -47,6 +47,10 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
    ```
    `--affil` 用 PubMed 能比對到的機構片語（例 `San Francisco`），避免同姓縮寫的其他人混進來。
    - 文章超過 80 篇 → 熔斷：`state_cli.py stage runs/<slug> halted --set 'circuit={"tripped":true,"reason":"文章 N 篇 > 80"}'`，問本人要不要縮範圍，停下。
+   接著補摘要（OpenAlex 沒摘要的改向 Europe PMC 要）：
+   ```bash
+   uv run python scripts/fill_abstracts.py runs/<slug>
+   ```
 3. **全文找尋鏈**（可能要幾分鐘，超過 2 分鐘就背景執行）
    ```bash
    uv run python scripts/setup_fulltext.py runs/<slug>
@@ -76,7 +80,13 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
 
 ## 4. 本人確認之後
 
-- 加入外部候選：把該 DOI 加進 `work/works.json`（先用 OpenAlex `https://api.openalex.org/works/doi:<doi>` 取資料，以 `pipeline.works.normalize_work` 標準化）；OpenAlex 查不到的記為例外，用 PubMed 摘要做 `abstract_only` 卡。
+- 加入外部候選：
+  ```bash
+  cd scripts && uv run python add_works.py ../runs/<slug> --doi <doi1> --doi <doi2> && cd ..
+  uv run python scripts/fill_abstracts.py runs/<slug>
+  uv run python scripts/setup_fulltext.py runs/<slug> --only <新 id，逗號分隔>
+  ```
+  年份不一致、作者 id 沒連上會自動記成註記類例外（不算熔斷）。OpenAlex 查不到的 DOI → 回報本人，記例外。
 - 本人說要移除的文章：從 `works.json` 移到 `work/dropped.json`，`reason: "removed_by_owner"`。
 - 本人補了 inbox → `uv run python scripts/setup_fulltext.py runs/<slug> --retry-missing`，再重跑 `setup_report.py`。
 - 把本人的決定逐條追加到 `protocol.md` 的「例外」與 `progress.md`。

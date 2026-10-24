@@ -168,3 +168,21 @@ def test_dedupe_conference_abstract_not_merged_into_article():
     )
     assert len(kept) == 2
     assert kept[1]["kind"] == "short"
+
+
+def test_fill_target_by_name_when_author_id_missing():
+    from pipeline.works import fill_target_by_name
+    r = raw("W9", "T")
+    r["authorships"][1]["author"] = {"id": None, "display_name": "Yoshimi Fukuoka", "orcid": None}
+    w = normalize_work(r, TARGET)
+    assert w["target_position"] is None
+    fill_target_by_name(w, "Fukuoka")
+    assert w["target_position"] == "last" and w["target_corresponding"] is True
+    assert w["target_link"] == "name_only"
+
+
+def test_fill_target_by_name_noop_when_linked():
+    from pipeline.works import fill_target_by_name
+    w = normalize_work(raw("W9", "T"), TARGET)
+    fill_target_by_name(w, "Target")
+    assert "target_link" not in w

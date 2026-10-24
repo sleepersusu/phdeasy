@@ -148,3 +148,16 @@ def dedupe(works, year_from, year_to):
                 w["possible_duplicate_of"] = prev["id"]
                 break
     return final, dropped
+
+
+def fill_target_by_name(work, surname):
+    """OpenAlex 沒把目標作者連到作者 id 時（外部候選常見），用姓氏補作者序，並標 name_only。"""
+    if work.get("target_position"):
+        return work
+    for a in work["authors"]:
+        if surname.lower() in (a.get("name") or "").lower().split():
+            work["target_position"] = a["position"]
+            work["target_corresponding"] = a["is_corresponding"]
+            work["target_link"] = "name_only"
+            break
+    return work
