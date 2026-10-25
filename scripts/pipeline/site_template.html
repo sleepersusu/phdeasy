@@ -82,6 +82,23 @@ input[type=search]{flex:1 1 260px}
 label.fl{font-weight:600}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 footer{padding:24px 0 48px;color:var(--muted);font-size:.9rem}
+body.lang-zh .t-en,body.lang-en .t-zh{display:none}
+body.lang-both .t-en{display:block;color:var(--muted);font-size:.93em;margin-top:2px}
+body.lang-both span.t-en{display:inline}
+header.top .wrap{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-end}
+.langs{display:flex;gap:6px}
+.match-form{display:grid;gap:12px;max-width:820px}
+.match-form label{font-weight:700}
+.match-form textarea,.match-form input[type=text]{font:inherit;width:100%;padding:10px;border:2px solid var(--fg);border-radius:8px;background:var(--bg);color:var(--fg)}
+.match-form fieldset{border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px 16px}
+.match-form fieldset label{font-weight:400;display:inline-flex;align-items:center;gap:6px;min-height:44px}
+.match-form input[type=checkbox]{width:20px;height:20px}
+.hint{color:var(--muted);font-size:.9rem;font-weight:400}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.score{height:8px;background:var(--soft);border:1px solid var(--line);border-radius:3px;width:120px;display:inline-block;vertical-align:middle}
+.score>span{display:block;height:100%;background:var(--fg)}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.mgrid>div{min-width:0}
 @media (max-width:640px){
   dl.card{grid-template-columns:1fr}
   dl.card dt{border-bottom:none;padding-bottom:2px}
@@ -93,13 +110,28 @@ footer{padding:24px 0 48px;color:var(--muted);font-size:.9rem}
 </head>
 <body>
 <a class="sr" href="#papers">跳到文章解析</a>
-<header class="top"><div class="wrap"><h1 id="title"></h1><div class="meta" id="meta"></div></div></header>
+<header class="top"><div class="wrap"><div><h1 id="title"></h1><div class="meta" id="meta"></div></div>
+  <div class="langs" role="group" aria-label="內容語言">
+    <button class="btn btn-green" data-lang="zh" aria-pressed="false">中文</button>
+    <button class="btn btn-green" data-lang="en" aria-pressed="false">English</button>
+    <button class="btn btn-green" data-lang="both" aria-pressed="true">雙語</button>
+  </div></div></header>
 <nav class="sections" aria-label="區段"><div class="wrap">__NAV__</div></nav>
 <main class="wrap">__SECTIONS__</main>
 <footer class="wrap" id="foot"></footer>
 __FIELDS__
 <script>
+__MATCHJS__
 const D = __DATA__;
+const LS = k => "phdeasy:" + (D.professor.author_id || "x") + ":" + k;
+const store = { get(k){ try { return JSON.parse(localStorage.getItem(LS(k))); } catch (e) { return null; } },
+                set(k, v){ try { localStorage.setItem(LS(k), JSON.stringify(v)); } catch (e) {} } };
+// 雙語：zh 與 en 各一段，切換語言時用 CSS 隱藏；缺翻譯時標明
+const bi = (zh, en, tag = "span") => {
+  const z = zh ? `<${tag} class="t-zh">${esc(zh)}</${tag}>` : `<${tag} class="t-zh muted">（尚無中文）</${tag}>`;
+  const e = en ? `<${tag} class="t-en" lang="en">${esc(en)}</${tag}>` : `<${tag} class="t-en muted">(no English translation yet)</${tag}>`;
+  return z + (tag === "span" ? " " : "") + e;
+};
 const $ = (s, el = document) => el.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pill = (cls, text) => `<span class="pill ${cls}">${esc(text)}</span>`;
@@ -127,6 +159,101 @@ function header(){
   $("#title").textContent = `${p.name} 研究檔案`;
   $("#meta").innerHTML = `${esc(p.institution || "機構未提及")}｜出版年 ${esc(p.years)}｜資料更新 ${esc(D.generated || "")}`;
   $("#foot").innerHTML = `由 phdeasy 流水線產生。數字都由腳本計算；文章解析每個說法都附原文引句與位置（p.N＝PDF 第幾頁，§N＝全文段落，abs＝摘要）。`;
+}
+
+function setLang(l){
+  document.body.classList.remove("lang-zh", "lang-en", "lang-both");
+  document.body.classList.add("lang-" + l);
+  document.querySelectorAll("[data-lang]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === l)));
+  store.set("lang", l);
+}
+
+const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升中年女性的身體活動與心血管健康知識，特別是少數族群。",
+                 tags: "chatbot、physical activity、women、cardiovascular、health disparities", methods: ["pilot-rct", "quasi-experimental"]};
+
+function matchDocs(){
+  const docs = D.works.map(w => {
+    const f = Object.fromEntries(w.card.fields.map(x => [x.key, x]));
+    const claims = k => ((f[k] && f[k].claims) || []).map(c => `${c.text} ${c.text_en || ""}`).join(" ");
+    return {id: w.id, kind: "paper", text: [w.title, w.title_zh, ...w.keywords_zh, ...w.keywords_en, w.topic.name, w.topic.subfield, w.topic.field,
+      f.summary && f.summary.text, f.summary && f.summary.text_en, f.design && f.design.text, f.design && f.design.text_en,
+      f.sample && f.sample.text, f.sample && f.sample.text_en, claims("gap"), claims("solves"), claims("findings")].filter(Boolean).join(" ")};
+  });
+  const gdocs = D.grants.filter(g => g.status !== "other").map(g => ({id: g.key, kind: "grant",
+    text: [g.title, g.title_zh, g.summary_en, g.summary_zh, g.funder, g.funder_zh].filter(Boolean).join(" ")}));
+  return buildIndex(docs.concat(gdocs));
+}
+let MIDX = null;
+
+function match(){
+  const el = body("match");
+  const saved = store.get("match") || {};
+  const designs = [...new Set(D.works.map(w => (w.card.fields.find(x => x.key === "design") || {}).facts).filter(Boolean).map(f => f["設計類型"]).filter(Boolean))];
+  if (!$("#mf")){
+    el.innerHTML = `
+      <p class="muted">輸入你想做的研究，頁面會在你的瀏覽器裡跟這位教授的文章、計畫、合作者與方法比對，列出重疊之處和證據。比對只看主題與用詞的重疊程度，<strong>不是</strong>「適不適合」的判斷；你輸入的內容只存在這台電腦的瀏覽器。</p>
+      <form id="mf" class="match-form">
+        <div><label for="m-goal">我想做的研究 <span class="hint">（中文或英文都可以；寫族群、介入方式、想看的結果會更準）</span></label>
+          <textarea id="m-goal" rows="4"></textarea></div>
+        <div><label for="m-tags">感興趣的主題、方法或族群 <span class="hint">（用逗號或頓號分隔）</span></label>
+          <input type="text" id="m-tags"></div>
+        <fieldset><legend>偏好的研究設計（可複選）</legend>${designs.map((d, i) => `<label><input type="checkbox" id="m-d${i}" value="${esc(d)}">${esc(d)}</label>`).join("")}</fieldset>
+        <div class="row">
+          <button type="submit" class="btn btn-green">開始比對</button>
+          <button type="button" class="btn btn-yellow" id="m-ex">填入範例</button>
+          <button type="button" class="btn btn-red" id="m-clear">清除</button>
+        </div>
+      </form>
+      <div id="m-out" aria-live="polite" style="margin-top:16px"></div>`;
+    $("#m-goal").value = saved.goal || ""; $("#m-tags").value = saved.tags || "";
+    el.querySelectorAll("fieldset input").forEach(c => c.checked = (saved.methods || []).includes(c.value.split("（")[1]?.replace("）", "") || c.value));
+    $("#mf").onsubmit = ev => { ev.preventDefault(); runMatch(); };
+    $("#m-ex").onclick = () => { $("#m-goal").value = EXAMPLE.goal; $("#m-tags").value = EXAMPLE.tags;
+      el.querySelectorAll("fieldset input").forEach(c => c.checked = EXAMPLE.methods.some(m => c.value.includes(m))); runMatch(); };
+    $("#m-clear").onclick = () => { $("#m-goal").value = ""; $("#m-tags").value = ""; el.querySelectorAll("fieldset input").forEach(c => c.checked = false);
+      store.set("match", null); $("#m-out").innerHTML = ""; $("#m-goal").focus(); };
+  }
+  if (saved.goal || saved.tags) runMatch();
+}
+
+function runMatch(){
+  const out = $("#m-out");
+  const goal = $("#m-goal").value.trim(), tags = $("#m-tags").value.trim();
+  const methods = [...document.querySelectorAll("#mf fieldset input:checked")].map(c => c.value);
+  store.set("match", {goal, tags, methods: methods.map(m => (m.match(/（(.+)）/) || [])[1] || m)});
+  if (!goal && !tags && !methods.length){ out.innerHTML = `<div class="empty">先寫下你想做的研究，或填幾個感興趣的主題，再按「開始比對」。也可以按「填入範例」看看結果長什麼樣子。</div>`; return; }
+  MIDX = MIDX || matchDocs();
+  const q = [goal, tags.replace(/[、，,;；]/g, " "), ...methods].join(" ");
+  const ranked = rankDocs(q, MIDX);
+  const papers = ranked.filter(r => r.kind === "paper"), grantsR = ranked.filter(r => r.kind === "grant");
+  if (!papers.length && !grantsR.length){ out.innerHTML = `<div class="empty">沒有找到重疊。試試寫得更具體（族群、介入方式、結果變項），或改用英文關鍵詞，例如 chatbot、physical activity、diabetes prevention。</div>`; return; }
+  const top = papers.slice(0, 6), max = (top[0] || grantsR[0]).score;
+  const W = Object.fromEntries(D.works.map(w => [w.id, w])), G = Object.fromEntries(D.grants.map(g => [g.key, g]));
+  const allHit = [...new Set(ranked.slice(0, 10).flatMap(r => r.matched))];
+  const show = m => { const d = displayTerms(q, m); return d.length ? d : m; };
+  const terms = show(allHit).slice(0, 14);
+  const topIds = new Set(top.map(r => r.id));
+  const coll = D.coauthors.map(c => ({c, n: c.works.filter(id => topIds.has(id)).length})).filter(x => x.n).sort((a, b) => b.n - a.n).slice(0, 6);
+  const dsel = methods.map(m => { const n = D.works.filter(w => ((w.card.fields.find(x => x.key === "design") || {}).facts || {})["設計類型"] === m).length; return {m, n}; });
+  const qs = ((D.profile.find(s => s.key === "questions") || {}).claims || []);
+  const qRel = qs.filter(c => (c.refs || []).some(r => topIds.has(r)));
+  const bar = s => `<span class="score" aria-hidden="true"><span style="width:${Math.round(s / max * 100)}%"></span></span>`;
+  out.innerHTML = `
+    <h3>重疊的主題詞</h3><div class="chips">${terms.map(t => `<span class="pill o">${esc(t)}</span>`).join("")}</div>
+    <div class="mgrid" style="margin-top:12px">
+      <div><h3>最相關的文章（${papers.length} 篇有重疊，列前 ${top.length}）</h3><ol class="list">${top.map(r => { const w = W[r.id]; return `<li class="item">
+        <div class="row">${bar(r.score)} <span class="small">${w.year}｜${esc(role(w.target_position, w.target_corresponding))}</span></div>
+        <a href="#paper-${w.id}"><strong>${bi(w.title_zh, w.title)}</strong></a>
+        <div class="chips small" style="margin-top:6px">命中：${show(r.matched).slice(0, 8).map(t => `<span class="pill o">${esc(t)}</span>`).join("")}</div></li>`; }).join("")}</ol></div>
+      <div>
+        <h3>相關計畫</h3>${grantsR.length ? `<ul class="list">${grantsR.slice(0, 4).map(r => { const g = G[r.id]; return `<li class="item">${grantPill(g)} ${bar(r.score)}<div><strong>${g.title ? bi(g.title_zh, g.title) : bi(g.funder_zh, g.funder)}</strong></div><div class="small">${esc(g.award_id || "")} ${esc(g.start || "")}–${esc(g.end || "")}</div></li>`; }).join("")}</ul>` : `<div class="empty">沒有重疊的計畫。</div>`}
+        <h3>這些文章裡常一起出現的合作者</h3>${coll.length ? `<ul>${coll.map(x => `<li>${esc(x.c.name)}：${x.n} 篇（全部合作 ${x.c.n} 篇）</li>`).join("")}</ul>` : `<div class="empty">沒有。</div>`}
+        ${dsel.length ? `<h3>你偏好的研究設計</h3><ul>${dsel.map(x => `<li>${esc(x.m)}：她有 <strong>${x.n}</strong> 篇</li>`).join("")}</ul>` : ""}
+      </div>
+    </div>
+    <h3>可以問教授的問題（與上面文章相關的${qRel.length ? "" : "；沒有直接相關，列出全部"}）</h3>
+    <ul>${(qRel.length ? qRel : qs).map(c => `<li>${esc(c.text)}</li>`).join("") || "<li>總覽尚未產生。</li>"}</ul>
+    <p class="small muted">分數是主題詞的重疊程度（依罕見程度加權），只用來排序，不代表適配度。點文章標題可以展開完整解析。</p>`;
 }
 
 function overview(){
@@ -223,7 +350,8 @@ function grants(){
     <p class="muted">只有 NIH／NSF 等資料庫列她為主持人、且姓名與機構都吻合的才算「本人主持」。只在論文致謝出現的不算她的計畫。</p>
     <div class="row" role="group" aria-label="計畫篩選">${btn("mine","btn-green")}${btn("pending","btn-yellow")}${btn("ack","btn-green")}${btn("other","btn-green")}</div>
     <ul class="list" style="margin-top:12px">${list.map(g => `<li class="item ${g.status === "pending" ? "attn" : ""}">
-      <div class="row">${grantPill(g)} <strong>${esc(g.title || g.funder || g.key)}</strong></div>
+      <div class="row">${grantPill(g)} <strong>${g.title ? bi(g.title_zh, g.title) : bi(g.funder_zh, g.funder)}</strong></div>
+      ${g.summary_zh || g.summary_en ? `<div class="small">${bi(g.summary_zh, g.summary_en, "div")}</div>` : ""}
       <div class="small">補助單位：${esc(g.funder || "來源未提及")}｜編號：${esc(g.award_id || "無編號")}${g.pi_names && g.pi_names.length ? `｜主持人：${esc(g.pi_names.join("、"))}` : ""}</div>
       <div class="small">期間：${esc(g.start || "來源未提及")} – ${esc(g.end || "來源未提及")}${g.total_award ? `｜金額合計 US$${Number(g.total_award).toLocaleString()}` : ""}</div>
       ${g.works.length ? `<div class="small">相關文章：${g.works.map(id => `<a href="#paper-${id}">${id}</a>`).join(" ")}</div>` : ""}
@@ -243,12 +371,12 @@ function cardHtml(w){
     if (f.state === "not_applicable") return `<span class="muted">短卡不適用（會議摘要、社論等）</span>`;
     const head = f.state === "unresolved" ? pill("y", "? 判不出來") + " " : "";
     if (f.key === "limitations"){
-      const part = (t, xs, cls) => xs.length ? `<div><strong>${t}</strong> ${cls}<ul>${xs.map(x => `<li>${esc(x.text)}${x.basis ? `<div class="small muted">推論依據：${esc(x.basis)}</div>` : ""}${cites(x.citations)}</li>`).join("")}</ul></div>` : "";
+      const part = (t, xs, cls) => xs.length ? `<div><strong>${t}</strong> ${cls}<ul>${xs.map(x => `<li>${bi(x.text, x.text_en, "div")}${x.basis ? `<div class="small muted">推論依據：${esc(x.basis)}</div>` : ""}${cites(x.citations)}</li>`).join("")}</ul></div>` : "";
       return head + (part("作者自述", f.author_stated, "") + part("推論", f.inferred, pill("y", "非作者原話")) || `<span class="muted">來源未提及</span>`);
     }
-    if (f.claims) return head + (f.claims.length ? `<ol>${f.claims.map(x => `<li>${esc(x.text)}${cites(x.citations)}</li>`).join("")}</ol>` : `<span class="muted">來源未提及</span>`);
+    if (f.claims) return head + (f.claims.length ? `<ol>${f.claims.map(x => `<li>${bi(x.text, x.text_en, "div")}${cites(x.citations)}</li>`).join("")}</ol>` : `<span class="muted">來源未提及</span>`);
     const facts = f.facts && Object.keys(f.facts).length ? `<div class="row small" style="margin-bottom:6px">${Object.entries(f.facts).map(([k, v]) => `<span class="pill o">${esc(k)}：${esc(v)}</span>`).join("")}</div>` : "";
-    return head + facts + `<div>${esc(f.text || "")}</div>${cites(f.citations)}`;
+    return head + facts + bi(f.text, f.text_en, "div") + cites(f.citations);
   };
   return `${c.pending_note ? `<p class="small">${pill("y", "注意")} ${esc(c.pending_note)}</p>` : ""}
     <dl class="card">${c.fields.map(f => `<dt>${esc(f.label)}</dt><dd>${val(f)}</dd>`).join("")}</dl>`;
@@ -257,7 +385,7 @@ function paperHtml(w){
   const authors = w.authors.map(a => a.position && a.name && w.target_position === a.position && a.id === D.professor.author_id ? `<strong>${esc(a.name)}</strong>` : esc(a.name)).join("、");
   return `<details class="paper" id="paper-${w.id}">
     <summary>
-      <span class="t">${esc(w.title)}</span>
+      <span class="t">${bi(w.title_zh, w.title)}</span>
       <span class="row small">${w.year}｜${esc(TYPE[w.type] || w.type)}｜${esc(w.venue || "期刊來源未提及")}｜${esc(role(w.target_position, w.target_corresponding))} ${fulltextPill(w)} ${w.card.exists ? pill("g", "✓ 已解析") : pill("y", "解析未產生")} ${w.exceptions.some(e => e.state === "open") ? pill("r", "有例外") : ""}</span>
     </summary>
     <div class="inner">
@@ -268,6 +396,7 @@ function paperHtml(w){
       </div>
       <h3>解析</h3>${cardHtml(w)}
       <h3>合作作者（${w.authors.length} 位）</h3><p class="small">${authors || "來源未提及"}</p>
+      ${(w.keywords_zh.length || w.keywords_en.length) ? `<h3>關鍵詞 Keywords</h3><div class="chips">${w.keywords_zh.map(k => `<span class="pill o t-zh">${esc(k)}</span>`).join("")}${w.keywords_en.map(k => `<span class="pill o t-en" lang="en">${esc(k)}</span>`).join("")}</div>` : ""}
       <h3>書目</h3>
       <p class="small">文章 id ${w.id}｜DOI ${esc(w.doi || "無")}｜領域 ${esc(w.topic.field || "未分類")} › ${esc(w.topic.subfield || "")} › ${esc(w.topic.name || "")}${w.added_by_owner ? "｜你在停 1 加入" : ""}</p>
       ${w.grants.length ? `<p class="small">相關計畫：${w.grants.map(k => esc(k)).join("、")}</p>` : ""}
@@ -353,7 +482,9 @@ document.addEventListener("click", ev => {
   ev.preventDefault(); openPaper(a.getAttribute("href").slice(7));
 });
 
-header(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
+setLang(store.get("lang") || "both");
+document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+header(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
 openFromHash();
 window.addEventListener("hashchange", openFromHash);
 </script>

@@ -8,6 +8,7 @@ from urllib.parse import unquote, urlparse
 from .cards import check_card, validate_card
 from .fetch import sha256_file
 from .grants import check_mention
+from .i18n import check_card_i18n, check_grants_i18n
 from .profile import fact_lookup
 from .state import load_state
 
@@ -179,6 +180,26 @@ def check_state(run, works):
     return _r("state_consistent", not probs, "state.json、前端、總覽與實際產出一致" if not probs else "; ".join(probs))
 
 
+def check_i18n(run, works):
+    bad = []
+    for w in works:
+        c = _j(run / "work" / "cards" / w["id"] / "card.json")
+        t = _j(run / "work" / "cards" / w["id"] / "i18n.json")
+        if c is None:
+            continue
+        if t is None:
+            bad.append(f"{w['id']} 沒有翻譯")
+            continue
+        bad += [f"{w['id']} {f['path']} {f['why']}" for f in check_card_i18n(c, t)]
+    grants = _j(run / "work" / "grants" / "grants_final.json", [])
+    gt = _j(run / "work" / "grants" / "i18n.json")
+    if grants and gt is None:
+        bad.append("計畫沒有翻譯")
+    elif grants:
+        bad += [f"{f['key']} {f['why']}" for f in check_grants_i18n(grants, gt)]
+    return _r("i18n", not bad, f"{len(works)} 篇卡片與 {len(grants)} 筆計畫中英對照核對通過" if not bad else "; ".join(bad[:6]))
+
+
 def run_all(run):
     run = Path(run)
     works = _j(run / "work" / "works.json", [])
@@ -186,5 +207,5 @@ def run_all(run):
     out += check_cards(run, works)
     out += [check_network(run), check_grants(run), check_profile(run, works)]
     out += check_index(run, works)
-    out += [check_ris(run, works), check_state(run, works)]
+    out += [check_ris(run, works), check_state(run, works), check_i18n(run, works)]
     return out

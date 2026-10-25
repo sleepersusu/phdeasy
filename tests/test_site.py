@@ -143,3 +143,28 @@ def test_profile_narrative_included_when_present(tmp_path):
 
 def test_profile_missing_is_empty_list(tmp_path):
     assert build_site_data(make_run(tmp_path))["profile"] == []
+
+
+def test_bilingual_fields_and_grants(tmp_path):
+    run = make_run(tmp_path, with_card=True)
+    (run / "work" / "cards" / "W1" / "i18n.json").write_text(json.dumps({
+        "id": "W1", "title_zh": "研究一", "en": {"summary": "Summary in English", "limitations": {"author_stated": ["Convenience sample"], "inferred": []}},
+        "keywords_zh": ["女性"], "keywords_en": ["women"]}))
+    (run / "work" / "grants" / "i18n.json").write_text(json.dumps({"NIH:HS027803": {"title_zh": "糖尿病預防", "summary_en": "S en", "summary_zh": "S zh"}}))
+    d = build_site_data(run)
+    w1 = next(w for w in d["works"] if w["id"] == "W1")
+    assert w1["title_zh"] == "研究一" and w1["keywords_en"] == ["women"]
+    f = {x["key"]: x for x in w1["card"]["fields"]}
+    assert f["summary"]["text_en"] == "Summary in English"
+    assert f["limitations"]["author_stated"][0]["text_en"] == "Convenience sample"
+    g = d["grants"][0]
+    assert g["title_zh"] == "糖尿病預防" and g["summary_zh"] == "S zh"
+    w2 = next(w for w in d["works"] if w["id"] == "W2")
+    assert w2["title_zh"] is None  # 沒翻譯時明確為 None，頁面顯示「尚未翻譯」
+
+
+def test_html_has_match_section_and_language_switch(tmp_path):
+    html = render_html(build_site_data(make_run(tmp_path)))
+    assert 'id="match"' in html
+    assert "function rankDocs" in html  # 比對邏輯內嵌
+    assert 'data-lang="zh"' in html and 'data-lang="en"' in html and 'data-lang="both"' in html

@@ -47,6 +47,11 @@ def make(tmp_path):
     (run / "out" / "site").mkdir(parents=True)
     (run / "out" / "site" / "index.html").write_text('<html>"id": "W1"</html>')
     (run / "out" / "profile.md").write_text("# x")
+    (wd / "cards" / "W1" / "i18n.json").write_text(json.dumps({
+        "id": "W1", "title_zh": "研究", "keywords_zh": list("abcde"), "keywords_en": list("abcde"),
+        "en": {"summary": "Study", "design": "Cross-sectional", "sample": "92 women",
+               "solves": ["x"], "findings": ["from 2.4 to 3.1"]}}))
+    (wd / "grants" / "i18n.json").write_text(json.dumps({"NIH:X": {"funder_zh": "x"}}))
     return run
 
 
@@ -124,3 +129,19 @@ def test_stale_fulltext_count_in_state_caught(tmp_path):
     run = make(tmp_path)
     set_stage(run, "verify", fulltext_ok=0)
     assert not results(run)["state_consistent"]["pass"]
+
+
+def test_missing_translation_caught(tmp_path):
+    run = make(tmp_path)
+    assert results(run)["i18n"]["pass"]
+    (run / "work" / "cards" / "W1" / "i18n.json").unlink()
+    assert not results(run)["i18n"]["pass"]
+
+
+def test_wrong_number_in_translation_caught(tmp_path):
+    run = make(tmp_path)
+    p = run / "work" / "cards" / "W1" / "i18n.json"
+    t = json.loads(p.read_text())
+    t["en"]["findings"] = ["from 2.4 to 3.9"]
+    p.write_text(json.dumps(t))
+    assert not results(run)["i18n"]["pass"]

@@ -18,6 +18,7 @@ CARD_FIELDS = [
     ("limitations", "研究限制"),
 ]
 SECTIONS = [
+    ("match", "與我的研究比對"),
     ("overview", "總覽"),
     ("profile", "教授總覽"),
     ("decisions", "待你決定"),
@@ -50,18 +51,30 @@ def _index(run):
         return {r["id"]: r for r in csv.DictReader(f)}
 
 
+def _en_list(tr, *keys):
+    v = (tr or {}).get("en") or {}
+    for k in keys:
+        v = (v or {}).get(k) if isinstance(v, dict) else None
+    return v if isinstance(v, list) else []
+
+
 def _card(run, wid, kind, source_type):
     c = _j(run / "work" / "cards" / wid / "card.json")
+    tr = _j(run / "work" / "cards" / wid / "i18n.json")
+    en = (tr or {}).get("en") or {}
     fields = []
     for key, label in CARD_FIELDS:
         v = ((c or {}).get("fields") or {}).get(key)
         if v is None:
             fields.append({"key": key, "label": label, "state": "pending"})
         elif key == "limitations":
+            sub = lambda s: [{**x, "text_en": (_en_list(tr, "limitations", s) + [None] * 99)[i]} for i, x in enumerate(v.get(s) or [])]
             fields.append({"key": key, "label": label, "state": v.get("status", "ok"),
-                           "author_stated": v.get("author_stated") or [], "inferred": v.get("inferred") or []})
+                           "author_stated": sub("author_stated"), "inferred": sub("inferred")})
         elif key in ("gap", "solves", "findings"):
-            fields.append({"key": key, "label": label, "state": v.get("status", "ok"), "claims": v.get("claims") or []})
+            ens = _en_list(tr, key) + [None] * 99
+            fields.append({"key": key, "label": label, "state": v.get("status", "ok"),
+                           "claims": [{**x, "text_en": ens[i]} for i, x in enumerate(v.get("claims") or [])]})
         else:
             facts = {}
             if key == "design" and v.get("type"):
@@ -70,13 +83,15 @@ def _card(run, wid, kind, source_type):
                 for k, lab in (("population", "對象"), ("n_enrolled", "納入人數"), ("n_analyzed", "分析人數"), ("country", "國家"), ("setting", "場域"), ("period", "期間")):
                     if v.get(k) not in (None, ""):
                         facts[lab] = v[k]
-            fields.append({"key": key, "label": label, "state": v.get("status", "ok"), "text": v.get("text"), "citations": v.get("citations") or [], "facts": facts})
+            fields.append({"key": key, "label": label, "state": v.get("status", "ok"), "text": v.get("text"),
+                           "text_en": en.get(key) if isinstance(en.get(key), str) else None, "citations": v.get("citations") or [], "facts": facts})
     note = "由「文章解析卡（cards）」階段產生，尚未執行" if c is None else None
     if kind == "short":
         note = (note + "；" if note else "") + "短卡：會議摘要或社論只填大意"
     if source_type == "abstract":
         note = (note + "；" if note else "") + "沒有全文，只依摘要解析"
-    return {"exists": c is not None, "pending_note": note, "fields": fields}
+    return {"exists": c is not None, "pending_note": note, "fields": fields,
+            "title_zh": (tr or {}).get("title_zh"), "keywords_zh": (tr or {}).get("keywords_zh") or [], "keywords_en": (tr or {}).get("keywords_en") or []}
 
 
 def _ex_state(e):
@@ -96,6 +111,9 @@ def build_site_data(run):
     flog = _j(wd / "grants" / "fetch_log.json", {}) or {}
     final = _j(wd / "grants" / "grants_final.json")
     grants = final if final is not None else (_j(wd / "grants" / "grants.json", []) or [])
+    gtr = _j(wd / "grants" / "i18n.json", {}) or {}
+    grants = [{**g, "title_zh": (gtr.get(g["key"]) or {}).get("title_zh"), "summary_en": (gtr.get(g["key"]) or {}).get("summary_en"),
+               "summary_zh": (gtr.get(g["key"]) or {}).get("summary_zh"), "funder_zh": (gtr.get(g["key"]) or {}).get("funder_zh")} for g in grants]
     grants_reviewed = final is not None
     exc = st.get("exceptions", [])
 
@@ -111,7 +129,9 @@ def build_site_data(run):
     for w in sorted(works, key=lambda w: (-(w.get("year") or 0), w["id"])):
         r = idx.get(w["id"], {})
         stype = (ing.get(w["id"]) or {}).get("source_type")
+        card = _card(run, w["id"], w["kind"], stype)
         wlist.append({
+            "title_zh": card.pop("title_zh"), "keywords_zh": card.pop("keywords_zh"), "keywords_en": card.pop("keywords_en"),
             "id": w["id"], "title": w["title"], "year": w["year"], "type": w["type"], "kind": w["kind"], "venue": w.get("venue"),
             "doi": w.get("doi"), "authors": [{"name": a.get("name"), "id": a.get("id"), "position": a.get("position"),
                                                "corresponding": a.get("is_corresponding")} for a in w.get("authors") or []],
@@ -122,7 +142,7 @@ def build_site_data(run):
             "grants": sorted(grants_by_work.get(w["id"], [])),
             "exceptions": [{"kind": e["kind"], "detail": e["detail"], "resolved": e.get("resolved"), "state": _ex_state(e)} for e in by_work_exc.get(w["id"], [])],
             "added_by_owner": bool(w.get("added_by_owner")),
-            "card": _card(run, w["id"], w["kind"], stype),
+            "card": card,
         })
 
     ex_list = [{**e, "state": _ex_state(e)} for e in exc]
@@ -179,7 +199,8 @@ def render_html(data):
     nav = "".join(f'<a href="#{sid}">{label}</a>' for sid, label in SECTIONS)
     sections = "".join(f'<section id="{sid}" aria-labelledby="h-{sid}"><h2 id="h-{sid}">{label}</h2><div class="body"></div></section>' for sid, label in SECTIONS)
     field_labels = "".join(f"<!-- {label} -->" for _, label in CARD_FIELDS)
-    return TEMPLATE.replace("__NAV__", nav).replace("__SECTIONS__", sections).replace("__FIELDS__", field_labels).replace("__DATA__", payload).replace("__NAME__", data["professor"]["name"] or "")
+    match_js = Path(__file__).with_name("site_match.js").read_text()
+    return TEMPLATE.replace("__MATCHJS__", match_js).replace("__NAV__", nav).replace("__SECTIONS__", sections).replace("__FIELDS__", field_labels).replace("__DATA__", payload).replace("__NAME__", data["professor"]["name"] or "")
 
 
 TEMPLATE = (Path(__file__).with_name("site_template.html")).read_text() if Path(__file__).with_name("site_template.html").exists() else ""
