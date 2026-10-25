@@ -33,6 +33,16 @@ async function pipelinePanel(){
   try { st = await API("status"); } catch (e) { return; }  // 不是在應用程式裡：不顯示
   document.getElementById("pipeline").hidden = false;
   document.getElementById("nav-pipeline").hidden = false;
+  window.APP_REMATCH = true;  // 教授卡片顯示「重新比對」按鈕
+  renderProfs(H.professors);
+  document.getElementById("professors").addEventListener("click", async ev => {
+    const b = ev.target.closest("[data-rematch]");
+    if (!b) return;
+    if (!confirm("請 Claude Code 依你目前的研究興趣與研究計畫重新比對這位教授？約需 10–20 分鐘，進度在「建新教授」那一區。")) return;
+    b.disabled = true;
+    try { await API("match", {slug: b.dataset.rematch}); document.getElementById("pipeline").scrollIntoView(); }
+    catch (e) { alert(e.message); b.disabled = false; }
+  });
   appBanner(st);
   renderPipeline(st);
   clearInterval(pollTimer);

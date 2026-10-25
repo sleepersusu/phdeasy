@@ -179,3 +179,13 @@ def test_build_site_writes_data_json(tmp_path):
     build_site.main()
     d = json.loads((run / "out" / "site" / "data.json").read_text())
     assert d["professor"] and d["works"]
+
+
+def test_site_data_carries_recommendations_and_staleness(tmp_path):
+    import json
+    from pipeline.match import me_fingerprint
+    run = make_run(tmp_path)
+    (run / "out").mkdir(exist_ok=True)
+    (run / "out" / "match.json").write_text(json.dumps({"fingerprint": "old", "targets": [], "read_first": []}))
+    d = build_site_data(run)
+    assert d["recommend"]["targets"] == [] and d["recommend"]["stale"] in (True, False)

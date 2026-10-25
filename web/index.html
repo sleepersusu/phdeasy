@@ -139,26 +139,45 @@ function renderCaps(cs){
       <ul>${c.items.map((it, i) => `<li>${bi((c.items_zh || [])[i], it, "div")}</li>`).join("")}</ul><div class="src">出處：${esc(c.src)}</div></div>`).join("")}</div>`;
 }
 
+const FIT = {strong: ["g", "強相關"], partial: ["y", "部分相關"], none: ["", "沒有相關"]};
+function kpis(p, middle){
+  const c = p.counts || {};
+  return `<div class="kpis">
+    <div class="kpi"><div class="n">${c.works ?? "–"}</div><div class="l">篇文章（2022–2026）</div></div>${middle}
+    <div class="kpi"><div class="n">${c.grants_pi ?? "–"}</div><div class="l">個本人主持計畫</div></div>
+    <div class="kpi"><div class="n">${c.coauthors ?? "–"}</div><div class="l">位合作者</div></div></div>`;
+}
+function recommendBlock(p){
+  const r = p.recommend, ts = r.targets, hit = ts.filter(t => t.fit !== "none"), miss = ts.filter(t => t.fit === "none");
+  const link = w => `<a href="${esc(p.href)}#paper-${esc(w.id)}">${bi(w.title_zh, w.title)}</a>`;
+  const n = k => ts.filter(t => t.fit === k).length;
+  return kpis(p, `<div class="kpi"><div class="n">${n("strong")}／${n("partial")}</div><div class="l">你的 ${ts.length} 個興趣與研究：強相關／部分相關</div></div>`) +
+    (r.stale ? `<div class="card" role="status"><span class="pill y">比對過期</span> 你的研究興趣或研究計畫改過了，這份推薦是用舊的內容比的。${window.APP_REMATCH ? `<button class="btn btn-yellow" data-rematch="${esc(p.slug)}">重新比對</button>` : "請跟 Claude 說「重新比對 " + esc(p.name) + "」。"}</div>` : "") +
+    (r.read_first.length ? `<div><strong>建議先看這幾篇</strong><ol>${r.read_first.map(w => `<li>${w.year ?? ""}｜${link(w)}</li>`).join("")}</ol></div>` : "") +
+    `<div><strong>依你的興趣與研究</strong>${hit.map(t => `<details class="card" style="margin-top:8px" ${t.fit === "strong" ? "open" : ""}>
+        <summary style="cursor:pointer;min-height:44px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="pill ${FIT[t.fit][0]}">${FIT[t.fit][1]}</span><strong>${esc(t.label_zh)}</strong>${t.kind === "study" ? `<span class="small muted">（你的研究計畫）</span>` : ""}</summary>
+        <div class="small">${esc(t.why)}</div>
+        ${t.papers.length ? `<ul>${t.papers.map(w => `<li>${link(w)}<div class="small muted">${esc(w.why)}</div></li>`).join("")}</ul>` : ""}
+        ${t.grants.length ? `<div class="small"><strong>相關計畫</strong></div><ul>${t.grants.map(g => `<li>${STATUS[g.status] ? `<span class="pill ${STATUS[g.status][0]}">${STATUS[g.status][1]}</span>` : ""} ${bi(g.title_zh, g.title)} <span class="small muted">${esc(g.award_id || "")}</span><div class="small muted">${esc(g.why)}</div></li>`).join("")}</ul>` : ""}
+      </details>`).join("")}
+      ${miss.length ? `<div class="small muted" style="margin-top:8px">沒有找到相關研究：${miss.map(t => esc(t.label_zh)).join("、")}</div>` : ""}</div>
+    <div class="small muted">推薦由 Claude 讀過她的文章解析與計畫後挑選，每筆都核對過原文、另有 agent 試著推翻；「適不適合」仍由你判斷。${window.APP_REMATCH && !r.stale ? ` <button class="btn btn-green" data-rematch="${esc(p.slug)}">重新比對</button>` : ""}</div>`;
+}
+function keywordBlock(p){
+  return kpis(p, `<div class="kpi"><div class="n">${p.n_strong}</div><div class="l">篇與你的計畫用詞高度重疊<br><span class="small">（共 ${p.n_overlap_papers} 篇有任一重疊）</span></div></div>`) +
+    `<div class="card"><span class="pill y">還沒比對</span> 還沒依你的興趣做推薦，以下只是用詞重疊（參考用）。${window.APP_REMATCH ? `<button class="btn btn-green" data-rematch="${esc(p.slug)}">依我的興趣比對</button>` : "請跟 Claude 說「比對 " + esc(p.name) + "」。"}</div>` +
+    (p.top_papers.length ? `<div><strong>用詞最重疊的文章</strong><ol>${p.top_papers.map(w => `<li><span class="bar" aria-hidden="true"><span style="width:${w.pct}%"></span></span> ${w.year}｜<a href="${esc(p.href)}#paper-${esc(w.id)}">${bi(w.title_zh, w.title)}</a><div class="small muted">命中：${w.terms.map(esc).join("、")}</div></li>`).join("")}</ol></div>` : "");
+}
 function renderProfs(ps){
   const el = body("professors");
   if (!ps.length){ el.innerHTML = `<div class="empty">還沒有教授檔案。跟 Claude 說「幫我建教授檔案：姓名，學校」就會開始建立。</div>`; return; }
-  el.innerHTML = `<p class="muted">每位教授都已經用你的研究計畫與興趣比對過。點「查看教授詳細資料」可以看完整的文章解析、合作者、計畫，並在那裡調整比對內容。</p>` +
+  el.innerHTML = `<p class="muted">依你的每個研究興趣與研究計畫，列出該先看教授的哪幾篇文章、哪個計畫。點文章標題會跳到那篇的完整解析。</p>` +
     ps.map(p => {
       const c = p.counts || {};
       return `<article class="prof">
         <div class="row" style="justify-content:space-between"><h3>${esc(p.name)}</h3>${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">查看教授詳細資料 →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}</div>
         <div class="muted small">${esc(p.institution || "")}</div>
-        <div class="kpis">
-          <div class="kpi"><div class="n">${c.works ?? "–"}</div><div class="l">篇文章（2022–2026）</div></div>
-          <div class="kpi"><div class="n">${p.n_strong}</div><div class="l">篇與你的計畫高度重疊<br><span class="small">（共 ${p.n_overlap_papers} 篇有任一重疊）</span></div></div>
-          <div class="kpi"><div class="n">${c.grants_pi ?? "–"}</div><div class="l">個本人主持計畫</div></div>
-          <div class="kpi"><div class="n">${c.coauthors ?? "–"}</div><div class="l">位合作者</div></div>
-        </div>
-        ${p.shared_terms.length ? `<div><strong>重疊的主題</strong><div class="chips" style="margin-top:6px">${p.shared_terms.map(t => `<span class="pill">${esc(t)}</span>`).join("")}</div></div>` : `<div class="empty">和你的計畫沒有找到明顯重疊。</div>`}
-        ${p.top_papers.length ? `<div><strong>最相關的文章</strong><ol>${p.top_papers.map(w => `<li><span class="bar" aria-hidden="true"><span style="width:${w.pct}%"></span></span> ${w.year}｜<a href="${esc(p.href)}#paper-${esc(w.id)}">${bi(w.title_zh, w.title)}</a><div class="small muted">命中：${w.terms.map(esc).join("、")}</div></li>`).join("")}</ol></div>` : ""}
-        ${p.top_grants.length ? `<div><strong>相關的研究計畫</strong><ul>${p.top_grants.map(g => `<li>${STATUS[g.status] ? `<span class="pill ${STATUS[g.status][0]}">${STATUS[g.status][1]}</span>` : ""} ${bi(g.title_zh, g.title)} <span class="small muted">${esc(g.award_id || "")}${g.end ? "，至 " + esc(g.end) : ""}</span></li>`).join("")}</ul></div>` : ""}
-        ${p.design_overlap.length ? `<div><strong>你計畫用的研究設計</strong><ul>${p.design_overlap.map(d => `<li>${esc(d.method)}：她有 <strong>${d.n}</strong> 篇</li>`).join("")}</ul></div>` : ""}
-        <div class="small muted">比對只看主題與用詞的重疊程度，不是「適不適合」的判斷。</div>
+        ${p.recommend ? recommendBlock(p) : keywordBlock(p)}
       </article>`;
     }).join("");
 }
@@ -183,7 +202,16 @@ function summarize(p, d, me){
     shared_terms: Object.entries(count).sort((a, b) => b[1] - a[1]).map(x => x[0]).slice(0, 12),
     top_papers: papers.slice(0, 3).map(r => ({id: r.id, title: W[r.id].title, title_zh: W[r.id].title_zh, year: W[r.id].year, terms: (r.terms || []).slice(0, 6), pct: Math.round(r.score / top * 100)})),
     top_grants: grants.slice(0, 2).map(r => ({key: r.id, title: G[r.id].title || G[r.id].funder, title_zh: G[r.id].title_zh || G[r.id].funder_zh, status: G[r.id].status, award_id: G[r.id].award_id, end: G[r.id].end})),
-    design_overlap: (m.methods || []).map(mth => ({method: mth, n: designs[mth] || 0})), designs};
+    design_overlap: (m.methods || []).map(mth => ({method: mth, n: designs[mth] || 0})), designs,
+    recommend: enrichRecommend(d.recommend, W, G)};
+}
+function enrichRecommend(r, W, G){
+  /* prof-match 的推薦只存 id；這裡帶入標題、年份、計畫狀態給卡片顯示 */
+  if (!r) return null;
+  const paper = x => ({...x, title: (W[x.id] || {}).title, title_zh: (W[x.id] || {}).title_zh, year: (W[x.id] || {}).year});
+  const grant = x => ({...x, title: (G[x.key] || {}).title || (G[x.key] || {}).funder, title_zh: (G[x.key] || {}).title_zh || (G[x.key] || {}).funder_zh,
+    status: (G[x.key] || {}).status, award_id: (G[x.key] || {}).award_id});
+  return {...r, targets: r.targets.map(t => ({...t, papers: t.papers.map(paper), grants: t.grants.map(grant)})), read_first: r.read_first.map(id => paper({id}))};
 }
 async function getJSON(u){ const r = await fetch(u, {cache: "no-store"}); if (!r.ok) throw new Error(u + "：" + r.status); return r.json(); }
 async function loadHome(){

@@ -73,7 +73,20 @@ def professor_summary(run, me, use_node=True):
                         "award_id": G[r["id"]].get("award_id"), "end": G[r["id"]].get("end")} for r in grants[:2]],
         "design_overlap": [{"method": mth, "n": designs.get(mth, 0)} for mth in (m.get("methods") or [])],
         "designs": designs,
+        "recommend": _enrich(d.get("recommend"), W, G),
     }
+
+
+def _enrich(r, W, G):
+    """prof-match 的推薦只存 id：帶入標題、年份、計畫狀態（與 web/index.html 的 enrichRecommend 相同）。"""
+    if not r:
+        return None
+    paper = lambda x: {**x, "title": W.get(x["id"], {}).get("title"), "title_zh": W.get(x["id"], {}).get("title_zh"), "year": W.get(x["id"], {}).get("year")}
+    grant = lambda x: {**x, "title": G.get(x["key"], {}).get("title") or G.get(x["key"], {}).get("funder"),
+                       "title_zh": G.get(x["key"], {}).get("title_zh") or G.get(x["key"], {}).get("funder_zh"),
+                       "status": G.get(x["key"], {}).get("status"), "award_id": G.get(x["key"], {}).get("award_id")}
+    return {**r, "targets": [{**t, "papers": [paper(x) for x in t["papers"]], "grants": [grant(x) for x in t["grants"]]} for t in r["targets"]],
+            "read_first": [paper({"id": i}) for i in r["read_first"]]}
 
 
 def professors_index(runs):

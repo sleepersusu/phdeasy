@@ -120,6 +120,15 @@ def _ex_state(e):
     return "resolved" if e.get("resolved") else ("info" if e["kind"] in INFO_KINDS else "open")
 
 
+def _recommend(run, owner):
+    """prof-match 的推薦（out/match.json）；本人的興趣或研究計畫改過就標 stale，提醒重新比對。"""
+    from .match import me_fingerprint
+    m = _j(run / "out" / "match.json")
+    if not m:
+        return None
+    return {**m, "stale": bool(owner) and m.get("fingerprint") != me_fingerprint(owner)}
+
+
 def build_site_data(run):
     run = Path(run)
     st = load_state(run)
@@ -205,6 +214,7 @@ def build_site_data(run):
         "grants": grants, "grants_reviewed": grants_reviewed,
         "match_docs": match_docs(wlist, grants),
         "me_query": (owner or {}).get("match"),
+        "recommend": _recommend(run, owner),
         "home_href": "../../../index.html",
         "profile": (_j(wd / "profile" / "final.json") or {}).get("sections", []),
         "works": wlist, "exceptions": ex_list, "decisions": decisions,

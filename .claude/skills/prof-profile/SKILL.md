@@ -61,7 +61,7 @@ uv run python scripts/state_cli.py progress runs/<slug> profile "總覽 <n> 句�
 uv run python scripts/state_cli.py stage runs/<slug> verify
 ```
 
-接著執行 `prof-verify`。
+接著執行 `prof-match`（依本人的研究興趣推薦該看的文章與計畫；stage 維持 verify），完成後執行 `prof-verify`。
 
 ## 規則
 

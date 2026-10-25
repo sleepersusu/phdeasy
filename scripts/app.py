@@ -31,7 +31,7 @@ from urllib.parse import unquote, urlparse
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
-from pipeline.jobs import UNATTENDED, Jobs, find_claude, prompt_continue, prompt_new
+from pipeline.jobs import UNATTENDED, Jobs, find_claude, prompt_continue, prompt_match, prompt_new
 
 SYNC_EVERY = 180
 FROZEN = getattr(sys, "frozen", False)  # Windows 安裝版（PyInstaller）
@@ -207,7 +207,7 @@ class App:
             save_account(self.runs, acct)
             self.account_chosen.set()
             return {"ok": True}
-        if path in ("new", "continue", "reply") and self.blocked:
+        if path in ("new", "continue", "reply", "match") and self.blocked:
             raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
         if path == "new":
             name, inst = (body.get("name") or "").strip(), (body.get("institution") or "").strip()
@@ -219,6 +219,11 @@ class App:
             if not (self.runs / slug / "state.json").exists():
                 raise ValueError(f"沒有這位教授：{slug}")
             return self.jobs.start("continue", prompt_continue(slug), f"繼續：{slug}", slug=slug)
+        if path == "match":
+            slug = (body.get("slug") or "").strip()
+            if not (self.runs / slug / "state.json").exists():
+                raise ValueError(f"沒有這位教授：{slug}")
+            return self.jobs.start("match", prompt_match(slug), f"重新比對：{slug}", slug=slug)
         if path == "reply":
             last = self.jobs.latest()
             if not last or not last.get("session"):

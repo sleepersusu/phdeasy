@@ -49,6 +49,11 @@ def prompt_continue(slug):
             "自動段一路跑到下一個停點（停 1 或停 2）或熔斷，然後把要我決定的事列清楚後停下。" + UNATTENDED)
 
 
+def prompt_match(slug):
+    return (f"對 runs/{slug} 重新比對：照 .claude/skills/prof-match/SKILL.md，先把 work/match/draft.json 與 refute.json 移到 work/match/_old/（不要刪），"
+            "依 runs/_me/me.json 目前的研究興趣與研究計畫重新跑 2.1–2.5，完成後回報 DONE 那一行。" + UNATTENDED)
+
+
 def describe(event):
     """stream-json 的一行 → 給本人看的一行文字（看不懂的事件回 None）。"""
     t = event.get("type")

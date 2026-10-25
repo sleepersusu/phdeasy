@@ -12,6 +12,7 @@
 | 研究計畫 | `grants` | `prof-grants` | 自動 |
 | 解析卡 | `cards` | `prof-cards` | 自動 |
 | 總覽 | `profile` | `prof-profile` | 自動 |
+| 比對推薦 | （`verify` 之前） | `prof-match` | 自動；本人改興趣後可單獨重跑 |
 | 驗收 | `verify` → `stop2` | `prof-verify` | ⏸ 本人 |
 
 每位教授一個批次資料夾 `runs/<slug>/`。開工先跑 `uv run python scripts/drive_sync.py runs`，把別台電腦在 Google 雲端硬碟上的更新拉下來（回 `BLOCKED` 表示另一台電腦還在用：停下告訴本人，不要自己加 `--force`；回 `SKIP` 表示這台沒裝或沒登入 Google Drive：告訴本人先裝好登入，再跑 `--setup` 選帳號），再讀該批次的 `state.json`，從 `stage` 接續；自動段的 skill 結尾直接執行下一個 skill，直到 `stop2` 或熔斷。
@@ -55,6 +56,7 @@
 | grants | `grants.py fetch／check-mentions／merge／apply-refute` |
 | cards | `cards.py todo／check／diff／check-refute／assemble` |
 | profile | `profile.py facts／check／assemble` |
+| match | `match.py inputs／check／check-refute／assemble` → `out/match.json`（首頁教授卡片讀它） |
 | verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
 | 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |
 | 應用程式 | `app.py`（Windows 安裝版／雙擊 `開啟教授檔案.command`）：伺服 `web/`（做好的 HTML／JS）與 `runs/` 的 JSON；首頁可建新教授、停點回覆、繼續，由 `pipeline/jobs.py` 在背景叫 Claude Code（dontAsk＋限定工具）；打開、每 3 分鐘、關掉時同步雲端 |
