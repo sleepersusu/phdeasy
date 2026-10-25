@@ -53,7 +53,15 @@ runs/<slug>/
   verify/           驗收報告
 ```
 
-`runs/` 含有論文全文，不進版本控制；改由 Google 雲端硬碟同步（`<我的雲端硬碟>/phdeasy教授檔案/`），每位教授一個資料夾。另一台電腦裝好 Google Drive 電腦版、clone 這個 repo 後跑 `uv run python scripts/drive_sync.py runs` 就會拉下全部教授檔案；兩台都改過的檔案用較新的，舊的收在 `_同步衝突/`。
+`runs/` 含有論文全文，不進版本控制；改由 Google 雲端硬碟同步（`<我的雲端硬碟>/phdeasy教授檔案/`），每位教授一個資料夾。兩台都改過的檔案用較新的，舊的收在 `_同步衝突/`；同一時間只讓一台電腦同步（雲端 `_使用中.json`，10 分鐘沒動靜就算放開）。
+
+換一台電腦（Mac 或 Windows）：
+
+1. 安裝 Google Drive 電腦版並登入同一個 Google 帳號。
+2. `git clone` 這個 repo，`uv sync`。
+3. `uv run python scripts/drive_sync.py runs --setup` 列出帳號，`--account <email>` 選定。
+4. `uv run python scripts/drive_sync.py runs` 拉下全部教授檔案。之後在 Claude Code 裡照常說「幫我建教授檔案…」，每段結束會自動同步。
+5. 收工時說「收工」，Claude Code 會跑 `--release`，另一台才能接著用。
 
 ## 怎麼確保沒出錯
 

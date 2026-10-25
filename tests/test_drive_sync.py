@@ -47,3 +47,36 @@ def test_find_drive_prefers_account(tmp_path):
     for acct in ("a@example.com", "b@example.com"):
         (tmp_path / "Library" / "CloudStorage" / f"GoogleDrive-{acct}" / "我的雲端硬碟").mkdir(parents=True)
     assert "b@example" in str(find_drive(tmp_path, prefer="b@example.com"))
+
+
+def test_other_computer_in_use_blocks_unless_forced(tmp_path):
+    a, b, drive = tmp_path / "A", tmp_path / "B", tmp_path / "drive"
+    _w(a / "x.txt", "1")
+    assert "blocked" not in sync(a, drive, my_id="pcA", device="Mac")
+    assert sync(b, drive, my_id="pcB", device="Win") == {"blocked": "Mac"}
+    assert "blocked" not in sync(b, drive, my_id="pcB", device="Win", force=True)
+    from pipeline.drive_sync import release
+    assert release(drive, my_id="pcB") and "blocked" not in sync(a, drive, my_id="pcA")
+
+
+def test_switching_remote_folder_never_deletes(tmp_path):
+    a = tmp_path / "A"
+    _w(a / "keep.txt", "1")
+    sync(a, tmp_path / "drive1", my_id="pcA")
+    sync(a, tmp_path / "drive2", my_id="pcA")  # 新雲端是空的：不可以因為舊 base 把這台的檔刪掉
+    assert (a / "keep.txt").exists() and (tmp_path / "drive2" / "keep.txt").exists()
+
+
+def test_remote_json_suddenly_tiny_does_not_overwrite_local(tmp_path):
+    a, drive = tmp_path / "A", tmp_path / "drive"
+    _w(a / "state.json", '{"x": "' + "a" * 5000 + '"}')
+    sync(a, drive, my_id="pcA")
+    _w(drive / "state.json", "{}", time.time() + 10)
+    n = sync(a, drive, my_id="pcA")
+    assert n.get("shrunk") == 1 and len((a / "state.json").read_text()) > 5000
+    assert any((drive / "_同步衝突").rglob("state.json"))
+
+
+def test_plan_ignores_subsecond_mtime_drift():
+    base = {"x": {"l": [5, 100], "r": [5, 100]}}
+    assert plan({"x": (5, 100.7)}, {"x": (5, 100.2)}, base) == []

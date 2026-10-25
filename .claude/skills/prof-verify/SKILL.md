@@ -67,8 +67,11 @@ uv run python scripts/e2e.py runs/<slug>
 ```bash
 uv run python scripts/state_cli.py progress runs/<slug> verify "E2E <a>/<b>；獨立驗收 通過 <x>／不通過 <y>／unclear <z>"
 uv run python scripts/state_cli.py stage runs/<slug> stop2
-uv run python scripts/build_site.py runs/<slug>
+uv run python scripts/build_home.py runs
+uv run python scripts/drive_sync.py runs --release
 ```
+
+`build_home.py` 會重建首頁與教授頁並同步雲端；`--release` 讓別台電腦可以接著用。
 
 然後照上面的順序把停 2 報告的重點告訴本人，附 `stop2-report.md` 與前端頁面路徑。
 

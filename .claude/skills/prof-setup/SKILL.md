@@ -65,6 +65,7 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
    ```bash
    uv run python scripts/state_cli.py stage runs/<slug> stop1 --set works_total=<N> --set fulltext_ok=<n> --set author_id='"<A id>"'
    uv run python scripts/state_cli.py progress runs/<slug> setup "<N> 篇（完整 x、短 y），全文 n/x，候選 c，待確認預印本 p"
+   uv run python scripts/drive_sync.py runs --release
    ```
 
 ## 3. 給本人看（停 1 呈現順序）
