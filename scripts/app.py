@@ -217,7 +217,7 @@ class App:
             i += 1
             dst = inbox / f"{wid}-{i}.pdf"
         dst.write_bytes(data)
-        return {"ok": True, "saved": str(dst.relative_to(self.runs))}
+        return {"ok": True, "saved": dst.relative_to(self.runs).as_posix()}
 
     def post(self, path, body):
         if path == "account":

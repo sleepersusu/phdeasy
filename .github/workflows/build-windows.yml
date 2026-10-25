@@ -27,9 +27,16 @@ jobs:
         run: python -m pip install --upgrade pip pyinstaller
 
       - name: Tests (app and sync)
+        shell: bash
         run: |
           python -m pip install pytest
-          python -m pytest -q -p no:warnings tests/test_app.py tests/test_drive_sync.py
+          set +e
+          python -m pytest -q -p no:warnings tests/test_app.py tests/test_drive_sync.py tests/test_jobs.py > pytest.txt 2>&1
+          code=$?
+          cat pytest.txt
+          # 失敗的測試寫成 annotation：不用登入也看得到哪裡壞了
+          grep -E "^(FAILED|ERROR)|^E  " pytest.txt | head -20 | while IFS= read -r l; do echo "::error::$l"; done
+          exit $code
 
       - name: Bundle pipeline (scripts, skills, web, CLAUDE.md…) into the app
         shell: bash
