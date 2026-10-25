@@ -155,11 +155,21 @@ def busy_elsewhere(remote_root, my_id, now=None):
     return None
 
 
-def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False):
-    """回傳 {動作: 數量}；別台正在用且沒有 force → 回傳 {"blocked": 那台電腦名}。"""
+def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_only=False):
+    """回傳 {動作: 數量}；別台正在用且沒有 force → 回傳 {"blocked": 那台電腦名}。
+    pull_only：別台正在用時，只把雲端較新的檔拉下來看（不推、不刪、不搶使用中、不更新 base）。"""
     local_root, remote_root = Path(local_root), Path(remote_root)
     remote_root.mkdir(parents=True, exist_ok=True)
     my_id = my_id or device_id()
+    if pull_only:
+        n = {}
+        loc, rem = scan(local_root), scan(remote_root)
+        for rel, r in rem.items():
+            l = loc.get(rel)
+            if not l or _sig(r)[1] > _sig(l)[1] + 2:
+                _copy(remote_root / rel, local_root / rel)
+                n["pull"] = n.get("pull", 0) + 1
+        return n
     other = busy_elsewhere(remote_root, my_id)
     if other and not force:
         return {"blocked": other.get("device") or "另一台電腦"}

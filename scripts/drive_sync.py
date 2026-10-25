@@ -10,6 +10,7 @@
 """
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -36,19 +37,23 @@ def target(runs, account=None, given=None):
     return d / FOLDER if d else None
 
 
-def run(runs, account=None, given=None, force=False, do_release=False):
+def run(runs, account=None, given=None, force=False, do_release=False, hold=False):
+    """hold=False（預設）：同步完就放開「使用中」，別台可以接著用；只有應用程式開著時用 hold=True 佔住。"""
+    hold = hold or os.environ.get("PHDEASY_HOLD") == "1"  # 應用程式開著時，它叫的重建／流水線也算在佔用中
     dst = target(runs, account, given)
     if not dst or not dst.parent.exists():
         print("SKIP 找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入，再跑 --setup")
         return 1
     n = sync(runs, dst, force=force)
     if "blocked" in n:
-        print(f"BLOCKED 另一台電腦（{n['blocked']}）10 分鐘內還在用，先不同步。那台收工（--release）後再跑；確定那台已關掉就加 --force")
+        p = sync(runs, dst, pull_only=True)
+        print(f"BLOCKED 另一台電腦（{n['blocked']}）10 分鐘內還在用：先只把雲端的資料拉下來看（拉下 {p.get('pull', 0)} 個檔），不推上去。"
+              "那台關掉後再同步；確定那台已關掉就加 --force")
         return 2
     msg = "、".join(f"{k} {v}" for k, v in sorted(n.items())) or "沒有變動"
-    if do_release:
+    if do_release or not hold:
         release(dst)
-        msg += "；已釋放使用中"
+        msg += "；已釋放使用中" if do_release else ""
     print(f"DONE 雲端同步 {dst}：{msg}")
     return 0
 

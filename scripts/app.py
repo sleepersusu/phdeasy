@@ -275,10 +275,11 @@ def main():
             print(f"已把流水線（{version}）放到 {ws}")
     app = App(ws)
     app.runs.mkdir(parents=True, exist_ok=True)
+    os.environ["PHDEASY_HOLD"] = "1"  # 子程序（重建、Claude Code）同步時不要放開這台的使用中
     choose_account(app.runs)
 
     print("從 Google 雲端硬碟同步…")
-    if drive_sync(app.runs) == 2:
+    if drive_sync(app.runs, hold=True) == 2:
         app.blocked = (busy_elsewhere(target(app.runs), device_id()) or {}).get("device") or "另一台電腦"
         print("另一台電腦還在用：這台先只看資料、不同步，也先不要建新教授。那台關掉後重開這個程式。")
         closer = None
@@ -325,7 +326,7 @@ def main():
         def periodic():
             while not stop.wait(SYNC_EVERY):
                 try:
-                    drive_sync(app.runs)
+                    drive_sync(app.runs, hold=not app.blocked)
                 except Exception as e:
                     print(f"同步失敗：{e}")
         threading.Thread(target=periodic, daemon=True).start()

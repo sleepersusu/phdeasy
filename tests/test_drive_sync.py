@@ -80,3 +80,27 @@ def test_remote_json_suddenly_tiny_does_not_overwrite_local(tmp_path):
 def test_plan_ignores_subsecond_mtime_drift():
     base = {"x": {"l": [5, 100], "r": [5, 100]}}
     assert plan({"x": (5, 100.7)}, {"x": (5, 100.2)}, base) == []
+
+
+def test_pull_only_when_other_computer_in_use(tmp_path):
+    a, b, drive = tmp_path / "A", tmp_path / "B", tmp_path / "drive"
+    _w(a / "prof" / "card.json", "data")
+    sync(a, drive, my_id="pcA", device="Mac")  # A 正在用（沒釋放）
+    _w(b / "mine.txt", "b-only")
+    n = sync(b, drive, my_id="pcB", device="Win", pull_only=True)
+    assert n.get("pull") == 1 and (b / "prof" / "card.json").read_text() == "data"
+    assert not (drive / "mine.txt").exists()  # 只拉不推
+    from pipeline.drive_sync import read_lock
+    assert read_lock(drive)["id"] == "pcA"  # 不搶使用中
+
+
+def test_cli_sync_releases_unless_holding(tmp_path, monkeypatch):
+    import drive_sync as cli
+    from pipeline.drive_sync import read_lock
+    drive = tmp_path / "drive"
+    monkeypatch.setattr(cli, "target", lambda runs, *a, **k: drive)
+    (tmp_path / "runs").mkdir()
+    cli.run(tmp_path / "runs")
+    assert not read_lock(drive).get("id")  # 一次性的同步（重建首頁、每段收尾）做完就放開
+    cli.run(tmp_path / "runs", hold=True)
+    assert read_lock(drive).get("id")  # 應用程式開著時才佔用
