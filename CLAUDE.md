@@ -57,6 +57,7 @@
 | profile | `profile.py facts／check／assemble` |
 | verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
 | 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |
+| 應用程式 | `app.py`（雙擊 `開啟教授檔案.command`／`.bat`）：打開時同步＋重建、開著每 3 分鐘同步、關掉時同步並釋放使用中；只看資料 |
 | 雲端 | `drive_sync.py runs`：`runs/` 與 `<我的雲端硬碟>/phdeasy教授檔案/` 雙向同步（帳號設定在 `runs/_me/drive.json`，只在這台）；每段收尾跑一次；停點（停 1、停 2）與本人說收工時加 `--release` 釋放「使用中」 |
 
 ## 腳本與測試
