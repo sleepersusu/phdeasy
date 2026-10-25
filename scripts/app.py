@@ -185,6 +185,9 @@ class App:
         self.need_account, self.account_chosen = threading.Event(), threading.Event()
         self.drive_choices = []
         self.claude_test = None
+        self.version = "dev"
+        self.update_info = None
+        self.quitting = threading.Event()  # 自動更新時設起來：關掉視窗、結束程式，讓安裝程式接手
 
     def after_job(self, job):
         try:
@@ -202,7 +205,7 @@ class App:
                 "blocked": self.blocked or (other or {}).get("device"), "running": self.jobs.running(), "job": job,
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
                 "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})},
-                "settings": self.settings()}
+                "settings": self.settings(), "update": self.update_info, "version": self.version}
 
     def settings(self):
         """設定頁要顯示的：雲端帳號（這台偵測到的全部）、Claude Code 測試結果、金鑰有沒有設（不顯示內容）。"""
@@ -221,6 +224,29 @@ class App:
                 "folder": str(dst) if dst else None, "claude_test": self.claude_test,
                 "keys": {"S2_API_KEY": keys.get("S2_API_KEY", False) or bool(os.environ.get("S2_API_KEY"))},
                 "workspace": str(self.workspace)}
+
+    def check_update(self):
+        from pipeline.updater import check
+        if self.version == "dev":  # 開發版（repo 直接跑）：用 git 更新，不自己下載安裝檔
+            return None
+        self.update_info = check(self.version)
+        return self.update_info
+
+    def do_update(self):
+        """下載新版安裝檔、安靜安裝；安裝程式等這個程式結束後才開始裝，裝完自動重開。"""
+        from pipeline.updater import download
+        info = self.update_info or self.check_update()
+        if not info or not info.get("available"):
+            raise ValueError("目前已經是最新版")
+        if os.name != "nt":
+            raise ValueError("自動更新只支援 Windows 安裝版；Mac 請用 git pull 更新")
+        if self.jobs.running():
+            raise ValueError("有工作在跑，等它跑完再更新")
+        exe = download(info["release"], self.workspace / "update")
+        subprocess.Popen([str(exe), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", f"/WAITPID={os.getpid()}", "/AUTOUPDATE=1"],
+                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0), close_fds=True)
+        threading.Timer(1.0, self.quitting.set).start()  # 先讓畫面收到回應，再結束程式
+        return {"ok": True, "installing": info["latest"]}
 
     def switch_account(self, acct):
         """換雲端帳號：先放開舊雲端的使用中，記下新帳號，在背景重新同步（新雲端當第一次同步：只合併不刪）。"""
@@ -318,6 +344,10 @@ class App:
             return self.switch_account(acct)
         if path == "sync":
             return self.resync()
+        if path == "check-update":
+            return self.check_update() or {"available": False, "current": self.version}
+        if path == "update":
+            return self.do_update()
         if path == "test-claude":
             return self.test_claude()
         if path == "login-claude":
@@ -467,6 +497,20 @@ def main():
         if install_bundle(bundle, ws, version):
             print(f"已把流水線（{version}）放到 {ws}")
     app = App(ws)
+    if FROZEN:
+        app.version = version
+
+        def update_loop():  # 打開時查一次，之後每 6 小時
+            while True:
+                try:
+                    info = app.check_update()
+                    if info and info.get("available"):
+                        print(f"有新版：{info['latest']}（目前 {app.version}）")
+                except Exception as e:
+                    print(f"檢查更新失敗：{e}")
+                if app.quitting.wait(6 * 3600):
+                    return
+        threading.Thread(target=update_loop, daemon=True).start()
     app.runs.mkdir(parents=True, exist_ok=True)
     os.environ["PHDEASY_HOLD"] = "1"  # 子程序（重建、Claude Code）同步時不要放開這台的使用中
     if not choose_account(app.runs, ask=None):
@@ -503,7 +547,7 @@ def main():
     if exe and (FROZEN or os.name == "nt" or a.window):
         win = AppWindow(exe, url, ws / ".window")
         win.open()
-        win.wait_closed()  # 關掉視窗＝結束：最後同步、釋放使用中、停掉正在跑的流水線
+        win.wait_closed(alive=lambda: not app.quitting.is_set())  # 關掉視窗（或自動更新）＝結束：最後同步、釋放使用中、停掉正在跑的流水線
         stop.set()
         close_all()
         srv.shutdown()
@@ -537,8 +581,8 @@ def main():
         main._console_handler = HANDLER(on_console)
         ctypes.windll.kernel32.SetConsoleCtrlHandler(main._console_handler, True)
     try:
-        while True:
-            time.sleep(3600)
+        app.quitting.wait()
+        close_all()
     finally:
         stop.set()
 

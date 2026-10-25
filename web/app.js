@@ -14,6 +14,7 @@ function appBanner(st){
   /* 最上方的狀態列：第一次選雲端帳號、正在同步（同步完自動重新整理，資料才是最新的） */
   let el = document.getElementById("app-banner");
   if (!el){ el = document.createElement("div"); el.id = "app-banner"; el.className = "wrap"; document.querySelector("main").before(el); }
+  if (wasSyncing && !st.syncing && !st.need_account){ wasSyncing = false; location.reload(); return; }  // 同步完：重新整理拿最新資料
   if (st.need_account){
     el.innerHTML = `<div class="card" style="margin-top:12px;border:2px solid var(--fg)"><h3 style="margin-top:0">選擇放教授檔案的 Google 帳號</h3>
       <p class="small">這台電腦登入了多個 Google 雲端硬碟帳號。選一次就好，之後會記住。</p>
@@ -21,9 +22,19 @@ function appBanner(st){
     el.querySelectorAll("[data-acct]").forEach(b => b.onclick = async () => { b.disabled = true; try { await API("account", {account: b.dataset.acct}); } catch (e) { alert(e.message); b.disabled = false; } });
   } else if (st.syncing){
     el.innerHTML = `<div class="card" style="margin-top:12px" role="status"><span class="pill y">同步中</span> 正在從 Google 雲端硬碟拉最新的教授檔案，第一次會比較久…完成後會自動重新整理。</div>`;
+  } else if (st.update && st.update.available){
+    el.innerHTML = `<div class="card" style="margin-top:12px;border:2px solid var(--green)" role="status"><span class="pill g">有新版本</span>
+      <strong>${esc(st.update.latest)}</strong>（你現在是 ${esc(st.update.current)}）
+      ${st.update.release && st.update.release.page ? `<a href="${esc(st.update.release.page)}" target="_blank" rel="noopener" class="small">看更新內容</a>` : ""}
+      <div class="row" style="margin-top:8px"><button class="btn btn-green" id="do-update" ${st.running ? "disabled" : ""}>更新並重開</button>
+      <span class="small muted">${st.running ? "有工作在跑，跑完再更新" : "會先同步雲端，再自動安裝並重新打開；教授資料不會動。"}</span></div></div>`;
+    el.querySelector("#do-update")?.addEventListener("click", async ev => {
+      ev.currentTarget.disabled = true;
+      try { await API("update", {}); el.innerHTML = `<div class="card" style="margin-top:12px" role="status"><span class="pill y">更新中</span> 正在下載並安裝新版，視窗會自己關掉再打開，大約一分鐘。</div>`; }
+      catch (e) { alert(e.message); ev.currentTarget.disabled = false; }
+    });
   } else {
     el.innerHTML = st.blocked ? `<div class="card" style="margin-top:12px"><span class="pill y">只能看</span> 另一台電腦（${esc(st.blocked)}）正在用：已拉下雲端的資料給你看，但這台先不推上去、不跑流水線。那台關掉後重開這個程式。</div>` : "";
-    if (wasSyncing) location.reload();
   }
   wasSyncing = st.syncing || st.need_account;
 }
@@ -144,7 +155,7 @@ let lastSettings = "";
 function renderSettings(st){
   const el = document.querySelector("#settings .body");
   const g = st.settings || {};
-  const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, uv: st.uv, running: st.running});
+  const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, uv: st.uv, running: st.running, v: st.version, u: st.update && st.update.latest});
   if (shape === lastSettings) return;
   lastSettings = shape;
   const t = g.claude_test;
@@ -174,6 +185,11 @@ function renderSettings(st){
         <button class="btn btn-green" id="open-secrets">打開金鑰檔</button>
         <p class="small muted">金鑰檔在你的雲端硬碟裡，每台電腦都會同步到；程式不會顯示金鑰內容。打開後在等號後面貼上 key、存檔即可。</p>
       </div>
+      <div class="card"><h3 style="margin-top:0">版本</h3>
+        <p class="small">目前版本：<strong>${esc(st.version || "dev")}</strong>${st.update && st.update.latest ? `｜最新：${esc(st.update.latest)}` : ""}</p>
+        ${st.version && st.version !== "dev" ? `<button class="btn btn-green" id="check-update">檢查更新</button><p class="small muted">打開程式時與每 6 小時會自動檢查；有新版會出現在最上方。</p>`
+          : `<p class="small muted">開發版（從 repo 直接跑）：用 git pull 更新。</p>`}
+      </div>
       <div class="card"><h3 style="margin-top:0">流水線工具（uv）</h3>
         ${st.uv ? `<p class="small"><span class="pill g">✓</span> 已安裝：<span class="muted">${esc(st.uv)}</span></p>`
           : `<p class="small"><span class="pill r">✗</span> 沒有 uv（要建新教授才需要）。</p><button class="btn btn-yellow" id="install-uv2">安裝 uv</button>`}
@@ -186,6 +202,7 @@ function renderSettings(st){
     await API("account", {account: b.dataset.switch});
   }));
   el.querySelector("#sync-now")?.addEventListener("click", act(() => API("sync", {})));
+  el.querySelector("#check-update")?.addEventListener("click", act(async () => { const r = await API("check-update", {}); if (!r.available) alert("已經是最新版（" + (r.current || "") + "）"); }));
   el.querySelector("#claude-test")?.addEventListener("click", act(async () => { el.querySelector("#claude-test").textContent = "測試中（最多 3 分鐘）…"; await API("test-claude", {}); }));
   el.querySelector("#claude-login")?.addEventListener("click", act(() => API("login-claude", {})));
   el.querySelector("#open-secrets")?.addEventListener("click", act(() => API("open-secrets", {})));

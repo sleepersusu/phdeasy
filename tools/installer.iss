@@ -48,3 +48,38 @@ Name: "{autodesktop}\教授研究檔案"; Filename: "{app}\教授研究檔案.ex
 
 [Run]
 Filename: "{app}\教授研究檔案.exe"; Description: "打開教授研究檔案"; Flags: nowait postinstall skipifsilent
+; 自動更新（安靜安裝）裝完直接重開
+Filename: "{app}\教授研究檔案.exe"; Flags: nowait; Check: IsAutoUpdate
+
+[Code]
+function OpenProcess(dwDesiredAccess: Cardinal; bInheritHandle: Boolean; dwProcessId: Cardinal): THandle;
+  external 'OpenProcess@kernel32.dll stdcall';
+function WaitForSingleObject(hHandle: THandle; dwMilliseconds: Cardinal): Cardinal;
+  external 'WaitForSingleObject@kernel32.dll stdcall';
+function CloseHandle(hObject: THandle): Boolean;
+  external 'CloseHandle@kernel32.dll stdcall';
+
+function IsAutoUpdate(): Boolean;
+begin
+  Result := ExpandConstant('{param:AUTOUPDATE|0}') = '1';
+end;
+
+{ 自動更新：程式帶 /WAITPID=程式編號 叫起安裝程式，先等舊的程式完全關掉（最多 2 分鐘，讓它同步雲端）再開始裝 }
+function InitializeSetup(): Boolean;
+var
+  Pid: Integer;
+  H: THandle;
+begin
+  Pid := StrToIntDef(ExpandConstant('{param:WAITPID|0}'), 0);
+  if Pid > 0 then
+  begin
+    H := OpenProcess($00100000, False, Pid);
+    if H <> 0 then
+    begin
+      WaitForSingleObject(H, 120000);
+      CloseHandle(H);
+    end;
+    Sleep(1500);
+  end;
+  Result := True;
+end;
