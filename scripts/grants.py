@@ -267,7 +267,11 @@ def merge(run):
                 _rejected(run, "grants", f"{m['work_id']} {m.get('funder')}", f"引句核對失敗：{m['check']}", f"\"{m['quote']}\" [{m['work_id']}, {m['loc']}]")
                 with open(gd / ".rejected_mentions", "a") as f:
                     f.write(tag + "\n")
-    grants = merge_grants(projects, awards, checked)
+    keep = {w["id"] for w in json.loads((run / "work" / "works.json").read_text())}  # 本人移除或合併的文章不算
+    awards = [a for a in awards if a["work_id"] in keep]
+    grants = merge_grants(projects, awards, [m for m in checked if m["work_id"] in keep])
+    for g in grants:
+        g["works"] = [w for w in g["works"] if w in keep]
     (gd / "grants.json").write_text(json.dumps(grants, ensure_ascii=False, indent=2))
     by = {}
     for g in grants:

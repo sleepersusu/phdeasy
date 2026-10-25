@@ -296,3 +296,20 @@ def test_currency_by_source():
     assert currency({"source": "nhmrc"}) == "AUD" and currency({"source": "arc"}) == "AUD"
     assert currency({"key": "NIH:HL114180"}) == "USD" and currency({"source": "nsf"}) == "USD"
     assert currency({"source": "openalex"}) is None
+
+
+def test_merge_cli_ignores_dropped_works(tmp_path):
+    import json, sys
+    sys.path.insert(0, "scripts")
+    import grants as cli
+    run = tmp_path / "r"
+    gd = run / "work" / "grants"
+    gd.mkdir(parents=True)
+    (run / "work" / "works.json").write_text(json.dumps([{"id": "W1"}]))
+    (gd / "projects.json").write_text("[]")
+    (gd / "openalex_awards.json").write_text(json.dumps([{"work_id": "W2", "funder": "NHMRC", "award_id": "2017642"}]))
+    (gd / "mentions_checked.json").write_text(json.dumps([{"work_id": "W1", "funder": "NHMRC", "award_id": "2017642", "quote": "q", "loc": "p.1", "check": "ok"},
+                                                          {"work_id": "W2", "funder": "NHMRC", "award_id": "2017642", "quote": "q", "loc": "p.1", "check": "ok"}]))
+    cli.merge(run)
+    g = json.loads((gd / "grants.json").read_text())
+    assert [x["works"] for x in g] == [["W1"]]
