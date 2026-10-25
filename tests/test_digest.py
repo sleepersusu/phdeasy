@@ -35,3 +35,17 @@ def test_assemble_keeps_every_figure_even_without_explanation():
     out, rej = assemble_digest(d, TEXT, LABELS, FIGS)
     assert [f["label"] for f in out["figures"]] == ["Table 1", "Figure 1"]
     assert out["figures"][1]["zh"] is None and out["figures"][1]["image"] and len(rej) == 1
+
+
+def test_method_detail_needs_every_part_and_allows_not_reported():
+    from pipeline.digest import METHOD_KEYS, check_method
+    m = {k: {"not_reported": True, "en": "Not reported", "zh": "原文未提及"} for k in METHOD_KEYS}
+    m["design"] = {"en": "Randomized controlled trial.", "zh": "隨機對照試驗。", "citations": C("randomized controlled trial of conversational AI", "p.1")}
+    m["sample_size"] = {"en": "103 enrolled.", "zh": "收 103 人。", "citations": C("We enrolled 103 participants in a randomized", "p.1")}
+    assert check_method(m, TEXT) == []
+    bad = dict(m)
+    del bad["variables"]
+    bad["sample_size"] = {"en": "105 enrolled.", "zh": "收 103 人。", "citations": C("We enrolled 103 participants in a randomized", "p.1")}
+    bad["design"] = {"en": "RCT.", "zh": "隨機對照試驗。", "citations": []}
+    whys = {f["why"] for f in check_method(bad, TEXT)}
+    assert {"missing_part", "numbers_differ", "no_citation"} <= whys

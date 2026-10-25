@@ -4,6 +4,7 @@
 """
 import argparse
 import json
+import re
 from pathlib import Path
 
 from pipeline.export import paper_dir_name
@@ -11,16 +12,55 @@ from pipeline.figures import from_jats, from_pdf
 from pipeline.state import append_progress
 
 
-def merge_xml_pdf(jats, pdf_items):
-    """XML 標好的圖表清單為準（不會漏）；PDF 抓到同一個圖號的，補上頁碼與頁面截圖。XML 沒標任何圖表才用 PDF 的。"""
+def merge_xml_pdf(jats, pdf_items, keep_images=False):
+    """XML 標好的圖表清單為準（不會漏）；PDF 抓到同一個圖號的，補上頁碼與頁面截圖。XML 沒標任何圖表才用 PDF 的。
+    keep_images：已經有原始圖檔的不要被頁面截圖蓋掉。"""
     if not jats:
         return pdf_items
     by = {it["label"].lower(): it for it in pdf_items}
     out = []
     for it in jats:
         p = by.get(it["label"].lower())
-        out.append({**it, **({"page": p["page"], "loc": p["loc"], "image": p["image"]} if p else {})})
+        if p and not (keep_images and it.get("image")):
+            it = {**it, "page": p["page"], "loc": p["loc"], "image": p["image"]}
+        out.append(it)
     return out
+
+
+def pmcid_of(run, wid):
+    import csv
+    with open(run / "pdfs" / "index.csv", newline="") as f:
+        for r in csv.DictReader(f):
+            if r["id"] == wid:
+                m = re.search(r"PMC\d+", r.get("url") or "")
+                return m.group(0) if m else None
+    return None
+
+
+def pmc_images(items, pmcid, figdir):
+    """從 PMC 開放取用資料集（https://pmc-oa-opendata.s3.amazonaws.com，美國國家醫學圖書館的公開資料）下載 XML 裡每張圖的原始檔。回傳拿到幾張。"""
+    from pipeline.figures import match_graphic, pmc_files
+    from pipeline.http import get
+    if not pmcid:
+        return 0
+    data, st = get(f"https://pmc-oa-opendata.s3.amazonaws.com/?list-type=2&prefix={pmcid}.", accept="application/xml")
+    keys = pmc_files(data) if data else []
+    n = 0
+    for it in items:
+        k = match_graphic(it.get("graphic"), keys)
+        if not k:
+            continue
+        name = k.rsplit("/", 1)[-1]
+        dst = Path(figdir) / name
+        if not dst.exists():
+            img, st = get(f"https://pmc-oa-opendata.s3.amazonaws.com/{k}", accept="image/*")
+            if not img or img[:3] not in (b"\xff\xd8\xff", b"\x89PN", b"GIF"):
+                continue
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            dst.write_bytes(img)
+        it["image"] = name
+        n += 1
+    return n
 
 
 def figure_pdf(run, w):
@@ -60,8 +100,12 @@ def extract(run):
         figdir = run / "out" / "papers" / folder / "figures"
         try:
             if e["source_type"] == "xml":
-                pdf = figure_pdf(run, wmap[wid])  # XML 沒有圖片：另外抓出版社的 PDF 只拿來截圖表頁（不放進 pdfs/，不改原檔）
-                items = merge_xml_pdf(from_jats(src.read_bytes()), from_pdf(pdf, figdir) if pdf else [])
+                jats = from_jats(src.read_bytes())
+                got = pmc_images(jats, pmcid_of(run, wid), figdir)  # 原始圖檔：PMC 開放取用資料集
+                if jats and got < sum(1 for j in jats if j.get("graphic") and not j.get("table_html")):
+                    pdf = figure_pdf(run, wmap[wid])  # 還有圖沒拿到：另外抓免費 PDF，截那一頁（不放進 pdfs/，不改原檔）
+                    jats = merge_xml_pdf(jats, from_pdf(pdf, figdir) if pdf else [], keep_images=True)
+                items = jats
             else:
                 items = from_pdf(src, figdir)
         except Exception as ex:

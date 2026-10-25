@@ -45,6 +45,10 @@ blockquote{margin:6px 0;padding:6px 10px;border-left:3px solid var(--line);backg
 .fig img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;display:block;margin-top:8px;cursor:zoom-in}
 .fig img.big{cursor:zoom-out}
 .empty{padding:14px;border:1px dashed var(--fg);border-radius:8px}
+.tbl{overflow-x:auto;margin-top:8px;border:1px solid var(--line);border-radius:6px}
+.tbl table{border-collapse:collapse;font-size:.85rem;min-width:100%}
+.tbl th,.tbl td{border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top}
+.tbl th{background:var(--soft)}
 .facts{font-size:.9rem;margin:4px 0}
 @media (max-width:760px){.bi,.bihead{grid-template-columns:1fr}.bi>.en{border-right:none;border-bottom:1px solid var(--line)}.bihead>div:last-child{display:none}}
 </style>
@@ -95,8 +99,15 @@ function render(d, w){
     h += `<div class="empty">這篇還沒有 AI 重點整理${w.text_source === "none" ? "（沒有全文也沒有摘要，只有標題）" : "（由「單篇重點」階段產生）"}。下面是解析卡的大意。</div>`;
     if (F.summary) h += `<div style="margin-top:8px">${pair(F.summary.text_en, F.summary.text)}</div>`;
   }
-  // 2. 研究設計
-  h += `<h2>研究設計</h2>`;
+  // 2. 研究方法（詳細）：設計、場域、對象、樣本、介入、變項、測量、分析、限制
+  if (g && g.method && g.method.length){
+    h += `<h2>研究方法（詳細）</h2>`;
+    g.method.forEach(m => {
+      h += `<div class="field"><div class="name">${esc(m.label_zh)} <span class="small muted" lang="en">${esc(m.label_en)}</span></div>${m.not_reported ? `<div class="small muted">原文未提及 · Not reported</div>` : pair(m.en, m.zh) + cites(m.citations)}</div>`;
+    });
+  }
+  // 3. 研究設計（解析卡）
+  h += `<h2>${g && g.method && g.method.length ? "設計與樣本摘要" : "研究設計"}</h2>`;
   const facts = F.design && F.design.facts ? Object.entries(F.design.facts).map(([k, v]) => `${esc(k)}：${esc(v)}`).join("｜") : "";
   const sfacts = F.sample && F.sample.facts ? Object.entries(F.sample.facts).map(([k, v]) => `${esc(k)}：${esc(v)}`).join("｜") : "";
   if (g && g.design) h += pair(g.design.en, g.design.zh, "", "", "") + cites(g.design.citations);
@@ -111,7 +122,8 @@ function render(d, w){
     h += `<div class="fig"><div class="row" style="justify-content:space-between"><strong>${esc(f.label)}</strong><span class="loc">${esc(f.loc || "")}</span></div>
       <div class="small" lang="en" style="margin-top:4px">${esc(f.caption || "")}</div>
       ${f.en || f.zh ? `<div style="margin-top:8px">${pair(f.en, f.zh, "What it shows", "這張在講什麼")}</div>${cites(f.citations)}` : `<div class="small muted" style="margin-top:6px">（還沒有 AI 說明）</div>`}
-      ${f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)} 所在頁面（${esc(f.loc || "")}）">` : `<div class="small muted" style="margin-top:6px">沒有頁面截圖（XML 全文）：請開全文看這張圖。</div>`}</div>`;
+      ${f.table_html ? `<div class="tbl">${f.table_html}</div>` : ""}
+      ${f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)}（${esc(f.loc || "原文")}）">` : (f.table_html ? "" : `<div class="small muted" style="margin-top:6px">這張圖沒有拿到圖檔。</div>`)}</div>`;
   });
   // 4. 解析卡其他欄位（左英右中）
   h += `<h2>完整解析</h2>`;

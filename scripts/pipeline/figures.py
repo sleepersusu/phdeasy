@@ -54,14 +54,57 @@ def captions_from_blocks(blocks):
             sc = _caption_score(chunk, rest)
             key = label.lower()
             if key not in best or sc > best[key][0]:
-                best[key] = (sc, order if key not in best else best[key][1], {"label": label, "caption": cap[:800], "page": page})
+                best[key] = (sc, order if key not in best else best[key][1], {"label": label, "caption": cap[:800], "page": page, "raw": m.group(1).strip()})
             order += 1
             break
     items = [v[2] for v in best.values()]
     return sorted(items, key=lambda x: (x["page"] or 0, [v[1] for v in best.values() if v[2] is x][0]))
 
 
-def from_pdf(path, out_dir, zoom=1.4, max_pages=60):
+def figure_clip(page, label, caption_head):
+    """在這一頁找出這張圖表本身的範圍（不要整頁）：
+    圖：標題附近的圖片與向量圖形聯集，加上標題；表：從表題往下，直到下一個大空白或其他圖表標題。找不到就回 None（用整頁）。"""
+    import pymupdf
+    pr = page.rect
+    blocks = [b for b in page.get_text("blocks") if b[4].strip()]
+    head = re.sub(r"\s+", " ", caption_head).lower()
+    starts = lambda t: any(re.sub(r"\s+", " ", ln).strip().lower().startswith(head) for ln in t.split("\n"))
+    cap = next((b for b in blocks if starts(b[4])), None)
+    if cap is None:
+        return None
+    cap_r = pymupdf.Rect(cap[:4])
+    is_table = label.lower().startswith(("table", "tableau", "tabla", "tabelle"))
+    if not is_table:
+        rects = [pymupdf.Rect(i["bbox"]) for i in page.get_image_info() if pymupdf.Rect(i["bbox"]).get_area() > pr.get_area() * 0.01]
+        try:
+            rects += [d["rect"] for d in page.get_drawings() if d["rect"].get_area() > pr.get_area() * 0.002]
+        except Exception:
+            pass
+        rects = [r for r in rects if r.width < pr.width * 0.98 or r.height < pr.height * 0.98]  # 整頁背景框不算
+        if not rects:
+            return None
+        u = pymupdf.Rect(rects[0])
+        for r in rects[1:]:
+            u |= r
+        u |= cap_r
+        return (u + (-8, -8, 8, 8)) & pr
+    # 表：表題往下接續的區塊
+    below = sorted([pymupdf.Rect(b[:4]) for b in blocks if b[1] >= cap_r.y0 - 2], key=lambda r: r.y0)
+    u, last = pymupdf.Rect(cap_r), cap_r.y1
+    for r in below:
+        if r.y0 - last > 36:  # 大空白：表格結束
+            break
+        txt = next((b[4] for b in blocks if abs(b[1] - r.y0) < 0.5 and abs(b[0] - r.x0) < 0.5), "")
+        if r != cap_r and CAPTION.match(txt or "") and not starts(txt):
+            break
+        u |= r
+        last = max(last, r.y1)
+    if u.height < 40:
+        return None
+    return (u + (-8, -8, 8, 8)) & pr
+
+
+def from_pdf(path, out_dir, zoom=2.0, max_pages=60):
     import pymupdf
     blocks = []
     with pymupdf.open(path) as doc:
@@ -73,11 +116,19 @@ def from_pdf(path, out_dir, zoom=1.4, max_pages=60):
         items = captions_from_blocks(blocks)
         out_dir = Path(out_dir)
         for it in items:
-            png = out_dir / f"p{it['page']}.png"
+            page = doc[it["page"] - 1]
+            slug = re.sub(r"[^A-Za-z0-9]+", "-", it["label"]).strip("-").lower()
+            clip = None
+            try:
+                clip = figure_clip(page, it["label"], it.get("raw") or it["label"])
+            except Exception:
+                clip = None
+            png = out_dir / (f"{slug}.png" if clip else f"p{it['page']}.png")
             if not png.exists():
                 out_dir.mkdir(parents=True, exist_ok=True)
-                doc[it["page"] - 1].get_pixmap(matrix=pymupdf.Matrix(zoom, zoom)).save(str(png))
+                page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip).save(str(png))
             it["image"] = png.name
+            it["cropped"] = bool(clip)
             it["loc"] = f"p.{it['page']}"
     return items
 
@@ -86,8 +137,28 @@ def _text(el):
     return re.sub(r"\s+", " ", "".join(el.itertext())).strip() if el is not None else ""
 
 
+SAFE_TAGS = {"table", "thead", "tbody", "tfoot", "tr", "th", "td", "b", "bold", "i", "italic", "sup", "sub", "br", "caption"}
+TAG_MAP = {"bold": "b", "italic": "i"}
+
+
+def _table_html(el):
+    """JATS 的 <table> 轉成安全的 HTML 表格（只留表格結構與粗斜體、上下標；合併儲存格保留 colspan/rowspan）。"""
+    import html as _h
+    def walk(node):
+        tag = node.tag.split("}")[-1]
+        inner = _h.escape(node.text or "") + "".join(walk(c) + _h.escape(c.tail or "") for c in node)
+        if tag not in SAFE_TAGS:
+            return inner
+        t = TAG_MAP.get(tag, tag)
+        attrs = "".join(f' {a}="{int(node.get(a))}"' for a in ("colspan", "rowspan") if (node.get(a) or "").isdigit())
+        return f"<{t}{attrs}>{inner}</{t}>"
+    tbl = next((c for c in el.iter() if c.tag.split("}")[-1] == "table"), None)
+    return walk(tbl) if tbl is not None else None
+
+
 def from_jats(data):
-    """JATS XML：<fig> 與 <table-wrap> 本來就標好了，直接取 label＋caption（沒有圖片檔，畫面上請開全文看圖）。"""
+    """JATS XML：<fig> 與 <table-wrap> 本來就標好了。回傳 label、caption、graphic（圖檔名，之後從 PMC 開放取用資料集下載）、
+    table_html（表格本身，前端直接畫成表格）。"""
     root = ET.fromstring(data)
     out, n = [], 0
     for el in root.iter():
@@ -98,5 +169,28 @@ def from_jats(data):
         label = _text(el.find("./label")) or ("Figure" if tag == "fig" else "Table") + f" {n}"
         cap = _text(el.find("./caption"))
         full = cap if cap.lower().startswith(label.lower().rstrip(".:")) else f"{label} {cap}"
-        out.append({"label": norm_label(label), "caption": full.strip()[:800], "page": None, "loc": None, "image": None})
+        g = next((c for c in el.iter() if c.tag.split("}")[-1] == "graphic"), None)
+        href = None
+        if g is not None:
+            href = next((v for k, v in g.attrib.items() if k.endswith("href")), None)
+        out.append({"label": norm_label(label), "caption": full.strip()[:800], "page": None, "loc": None, "image": None,
+                    "graphic": href, "table_html": _table_html(el) if tag == "table-wrap" else None})
     return out
+
+
+def pmc_files(list_xml):
+    """PMC 開放取用資料集（AWS 公開資料，美國國家醫學圖書館提供）的檔案清單 XML → 檔名列表。"""
+    return re.findall(r"<Key>([^<]+)</Key>", list_xml.decode("utf-8", "ignore") if isinstance(list_xml, bytes) else list_xml)
+
+
+def match_graphic(href, keys):
+    """XML 裡的圖檔名（可能沒有副檔名）對到資料集裡的檔案。"""
+    if not href:
+        return None
+    base = href.rsplit("/", 1)[-1]
+    stem = base.rsplit(".", 1)[0] if "." in base else base
+    for k in keys:
+        name = k.rsplit("/", 1)[-1]
+        if name == base or name.rsplit(".", 1)[0] == stem and name.lower().endswith((".jpg", ".jpeg", ".png", ".gif")):
+            return k
+    return None

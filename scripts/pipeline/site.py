@@ -128,7 +128,7 @@ def _paper_extras(run, w):
     figs = (_j(run / "work" / "figures" / f"{w['id']}.json") or {}).get("items") or []
     if dg:
         figs = dg.get("figures") or figs  # 有重點的用重點裡的（含 AI 說明），沒有就只列標題與截圖
-    return {"folder": folder, "digest": {k: dg.get(k) for k in ("key_points", "design")} if dg else None, "figures": figs}
+    return {"folder": folder, "digest": {k: dg.get(k) for k in ("key_points", "design", "method")} if dg else None, "figures": figs}
 
 
 def _recommend(run, owner):

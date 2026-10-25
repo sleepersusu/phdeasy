@@ -63,3 +63,14 @@ def test_xml_list_is_authoritative_and_pdf_adds_images():
     out = merge_xml_pdf(jats, pdf)
     assert [o["label"] for o in out] == ["Figure 1", "Table 1"] and out[0]["image"] == "p3.png" and out[1]["image"] is None
     assert merge_xml_pdf([], pdf) == pdf
+
+
+def test_jats_table_rendered_safely_and_graphic_matched():
+    from pipeline.figures import from_jats, match_graphic
+    xml = b"""<article xmlns:xlink="http://www.w3.org/1999/xlink"><body>
+      <fig><label>Figure 1</label><caption><p>Flow</p></caption><graphic xlink:href="cardio-g001"/></fig>
+      <table-wrap><label>Table 1</label><caption><p>Baseline</p></caption><table onclick="x()"><thead><tr><th>Age</th></tr></thead>
+      <tbody><tr><td colspan="2"><bold>60</bold><script>alert(1)</script></td></tr></tbody></table></table-wrap></body></article>"""
+    f, t = from_jats(xml)
+    assert f["graphic"] == "cardio-g001" and match_graphic(f["graphic"], ["P/PMC1.1.pdf", "P/cardio-g001.jpg"]) == "P/cardio-g001.jpg"
+    assert '<td colspan="2"><b>60</b>' in t["table_html"] and "<script" not in t["table_html"] and "onclick" not in t["table_html"]

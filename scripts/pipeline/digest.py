@@ -10,6 +10,44 @@ from .i18n import numbers_match
 from .quotes import check_quote
 
 
+# 研究方法的詳細拆解（本人要求：設計、樣本、變項等要詳細，也要有限制）
+METHOD_KEYS = ["design", "setting", "participants", "sample_size", "intervention", "variables", "measures", "analysis",
+               "limitations_author", "limitations_inferred"]
+METHOD_LABELS = {"design": ("Study design", "研究設計"), "setting": ("Setting & period", "場域與期間"),
+                 "participants": ("Participants (eligibility, recruitment)", "研究對象（納入／排除、招募）"),
+                 "sample_size": ("Sample size, attrition & power", "樣本數、流失與檢定力"),
+                 "intervention": ("Intervention / exposure & comparator", "介入／暴露與對照"),
+                 "variables": ("Variables (independent, dependent, covariates)", "變項（自變項、依變項、共變項）"),
+                 "measures": ("Measures & time points", "測量工具與時間點"), "analysis": ("Statistical analysis", "統計分析"),
+                 "limitations_author": ("Limitations stated by the authors", "作者自述的限制"),
+                 "limitations_inferred": ("Further limitations (reviewer's inference, not the authors')", "其他限制（整理者推論，非作者原話）")}
+
+
+def check_method(m, text):
+    fails = []
+    for k in METHOD_KEYS:
+        it = (m or {}).get(k)
+        if not it:
+            fails.append({"path": f"method.{k}", "why": "missing_part"})
+            continue
+        if it.get("not_reported"):
+            continue
+        en, zh = (it.get("en") or "").strip(), (it.get("zh") or "").strip()
+        if not en or not zh:
+            fails.append({"path": f"method.{k}", "why": "need_en_and_zh"})
+            continue
+        if not numbers_match(zh, en):
+            fails.append({"path": f"method.{k}", "why": "numbers_differ"})
+        cites = it.get("citations") or []
+        if not cites and k != "limitations_inferred":
+            fails.append({"path": f"method.{k}", "why": "no_citation"})
+        for j, c in enumerate(cites):
+            ok, why = check_quote(text, c.get("quote"), c.get("loc"))
+            if not ok:
+                fails.append({"path": f"method.{k}.citations[{j}]", "why": why, "quote": c.get("quote"), "loc": c.get("loc")})
+    return fails
+
+
 def _items(d):
     for i, k in enumerate(d.get("key_points") or []):
         yield f"key_points[{i}]", k
@@ -35,6 +73,8 @@ def check_digest(d, text, figure_labels):
             fails.append({"path": f"figure:{lab}", "why": "figure_not_in_paper"})
     if len(got) != len(set(got)):
         fails.append({"path": "figures", "why": "figure_duplicate"})
+    if "method" in d:
+        fails += check_method(d["method"], text)
     for path, it in _items(d):
         en, zh = (it.get("en") or "").strip(), (it.get("zh") or "").strip()
         if not en or not zh:
@@ -57,7 +97,11 @@ def assemble_digest(d, text, figure_labels, figures):
     bad = {f["path"].split(".citations")[0] for f in check_digest(d, text, figure_labels)
            if f["why"] not in ("need_3_to_6", "figure_missing", "figure_not_in_paper", "figure_duplicate")}
     rejected = []
-    out = {"id": d.get("id"), "key_points": [], "design": None, "figures": []}
+    out = {"id": d.get("id"), "key_points": [], "design": None, "figures": [], "method": None}
+    if d.get("method"):
+        mbad = {f["path"].split(".citations")[0] for f in check_method(d["method"], text)}
+        out["method"] = [{"key": k, "label_en": METHOD_LABELS[k][0], "label_zh": METHOD_LABELS[k][1], **d["method"][k]}
+                         for k in METHOD_KEYS if d["method"].get(k) and f"method.{k}" not in mbad]
     for i, k in enumerate(d.get("key_points") or []):
         (rejected if f"key_points[{i}]" in bad else out["key_points"]).append(k)
     if d.get("design") and "design" not in bad:
@@ -73,5 +117,6 @@ def assemble_digest(d, text, figure_labels, figures):
         src = by[lab]
         e = explained.get(lab) or {}
         out["figures"].append({"label": lab, "caption": src.get("caption"), "image": src.get("image"), "loc": src.get("loc"),
+                               "table_html": src.get("table_html"),
                                "en": e.get("en"), "zh": e.get("zh"), "citations": e.get("citations") or []})
     return out, rejected

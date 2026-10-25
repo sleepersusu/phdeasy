@@ -20,6 +20,12 @@ uv run python scripts/digest.py todo runs/<slug>
 
 > 讀 `.claude/skills/prof-digest/digester.md` 照做。slug=<slug>，id=<id 清單>
 
+## 2b. 研究方法詳細拆解（每個 agent 4–5 篇）
+
+> 讀 `.claude/skills/prof-digest/detailer.md` 照做。slug=<slug>，id=<id 清單>
+
+在重點檔加上 `method`：設計、場域與期間、對象、樣本數與流失、介入／對照、變項、測量、分析、作者自述限制、推論限制。
+
 ## 3. 核對與組裝
 
 ```bash
