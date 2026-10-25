@@ -89,7 +89,7 @@ function renderPipeline(st){
       ${st.blocked ? `<li><span class="pill y">!</span> 另一台電腦（${esc(st.blocked)}）正在用：這台先不同步，那台關掉後重開這個程式。</li>` : ""}
     </ul></div>
 
-    <div class="card" style="margin-top:12px"><h3 style="margin-top:0">建新教授</h3>
+    <div class="card" style="margin-top:12px" id="new"><h3 style="margin-top:0">新增教授</h3>
       <p class="small muted">按下開始後，Claude Code 會在背景找身分、列文章、找全文，跑到停 1 停下來，請你確認。這段通常要 10–30 分鐘；看資料時保持程式開著。</p>
       <label for="np-name">教授姓名（必填）</label><input type="text" id="np-name" placeholder="例：Liliana Laranjo">
       <label for="np-inst">學校／機構（必填）</label><input type="text" id="np-inst" placeholder="例：The University of Sydney（Westmead Applied Research Centre）">
@@ -124,6 +124,7 @@ function renderPipeline(st){
   if (keep.orcid) el.querySelector("#np-orcid").value = keep.orcid;
   if (keep.reply && el.querySelector("#reply")) el.querySelector("#reply").value = keep.reply;
   const log = el.querySelector(".log"); if (log) log.scrollTop = running ? log.scrollHeight : (keep.logTop || 0);
+  if (location.hash === "#new" && !keep.focus){ el.querySelector("#np-name")?.focus(); el.querySelector("#np-name")?.scrollIntoView({block: "center"}); history.replaceState(null, "", location.pathname); }
   if (keep.focus && document.getElementById(keep.focus)) document.getElementById(keep.focus).focus();
 
   const act = (fn) => async (ev) => { ev.target.disabled = true; try { await fn(); renderPipeline(await API("status")); } catch (e) { alert(e.message); ev.target.disabled = false; } };

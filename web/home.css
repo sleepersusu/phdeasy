@@ -58,3 +58,5 @@ textarea{min-height:110px}
 .checks li{margin:4px 0}
 .pill.r{background:var(--red);color:var(--on-red);border-color:var(--red)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+.stars{font-size:1.5rem;letter-spacing:2px;color:#a16207;white-space:nowrap}
+.stars .off{color:var(--line)}

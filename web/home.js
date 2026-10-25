@@ -77,14 +77,32 @@ function keywordBlock(p){
     `<div class="card"><span class="pill y">還沒比對</span> 還沒依你的興趣做推薦，以下只是用詞重疊（參考用）。${window.APP_REMATCH ? `<button class="btn btn-green" data-rematch="${esc(p.slug)}">依我的興趣比對</button>` : "請跟 Claude 說「比對 " + esc(p.name) + "」。"}</div>` +
     (p.top_papers.length ? `<div><strong>用詞最重疊的文章</strong><ol>${p.top_papers.map(w => `<li><span class="bar" aria-hidden="true"><span style="width:${w.pct}%"></span></span> ${w.year}｜<a href="${esc(p.href)}#paper-${esc(w.id)}">${bi(w.title_zh, w.title)}</a><div class="small muted">命中：${w.terms.map(esc).join("、")}</div></li>`).join("")}</ol></div>` : "");
 }
+function matchStars(r){
+  /* 匹配程度 1–5 顆星：你的興趣與研究裡，強相關算 1、部分相關算 0.5，佔全部的比例換成星數 */
+  if (!r || !r.targets.length) return null;
+  const score = r.targets.reduce((a, t) => a + (t.fit === "strong" ? 1 : t.fit === "partial" ? 0.5 : 0), 0) / r.targets.length;
+  return {n: Math.max(1, Math.min(5, Math.round(score * 5))), score};
+}
+function starsHTML(r){
+  const s = matchStars(r);
+  if (!s) return `<span class="pill y" title="還沒依你的興趣比對">還沒比對</span>`;
+  const n = r.targets.length, st = r.targets.filter(t => t.fit === "strong").length, pa = r.targets.filter(t => t.fit === "partial").length;
+  return `<span class="stars" role="img" aria-label="匹配程度 ${s.n} 顆星（共 5 顆）" title="你的 ${n} 個興趣與研究：強相關 ${st}、部分相關 ${pa}">${"★".repeat(s.n)}<span class="off">${"★".repeat(5 - s.n)}</span></span>`;
+}
 function renderProfs(ps){
   const el = body("professors");
-  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有教授檔案。跟 Claude 說「幫我建教授檔案：姓名，學校」就會開始建立。</div>`; return; }
-  el.innerHTML = `<p class="muted">依你的每個研究興趣與研究計畫，列出該先看教授的哪幾篇文章、哪個計畫。點文章標題會跳到那篇的完整解析。</p>` +
+  const head = document.querySelector("#professors h2");
+  if (head && !document.getElementById("add-prof")){
+    head.style.display = "flex"; head.style.justifyContent = "space-between"; head.style.alignItems = "center"; head.style.gap = "8px";
+    head.insertAdjacentHTML("beforeend", window.APP_REMATCH ? `<a class="btn btn-green" id="add-prof" href="pipeline.html#new">＋ 新增教授</a>` : "");
+  }
+  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按右上角「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
+  el.innerHTML = `<p class="muted">星星是匹配程度：依你的每個研究興趣與研究計畫，看她有多少強相關、部分相關的研究。點文章標題會跳到那篇的完整解析。</p>` +
     ps.map(p => {
       const c = p.counts || {};
       return `<article class="prof">
-        <div class="row" style="justify-content:space-between"><h3>${esc(p.name)}</h3>${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">查看教授詳細資料 →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}</div>
+        <div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(p.name)}</h3></div>
+          <div style="text-align:right">${starsHTML(p.recommend)}<div style="margin-top:6px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">查看教授詳細資料 →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}</div></div></div>
         <div class="muted small">${esc(p.institution || "")}</div>
         ${p.recommend ? recommendBlock(p) : keywordBlock(p)}
       </article>`;
@@ -137,7 +155,7 @@ async function loadHome(){
 }
 
 let OFFLINE_HOME = false;
-const PAGES = [["index.html", "首頁"], ["me.html", "我的資料"], ["professors.html", "教授比對"], ["pipeline.html", "建新教授"], ["settings.html", "設定"]];
+const PAGES = [["index.html", "首頁"], ["me.html", "我的資料"], ["professors.html", "目標教授"], ["pipeline.html", "工作進度"], ["settings.html", "設定"]];
 function setupHomeViews(){
   /* 應用程式：每一塊是一個頁面（me.html、professors.html…），首頁是按鈕；離線單檔版：全部在一頁 */
   const nav = document.querySelector("nav.sections .wrap");
@@ -152,13 +170,10 @@ function setupHomeViews(){
     hub.querySelector(".body").innerHTML = `
       <div class="grid">
         <a class="card" href="me.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">我的資料</strong><div class="small muted">CV、研究計畫、我能做到的事</div></a>
-        <a class="card" href="professors.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">教授比對</strong><div class="small muted">${ps.length} 位教授：依你的興趣該先看哪幾篇、哪個計畫</div></a>
-        <a class="card" href="pipeline.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">建新教授</strong><div class="small muted">輸入姓名與學校，Claude Code 在背景建檔；停點在這裡回覆</div></a>
+        <a class="card" href="professors.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">目標教授</strong><div class="small muted">${ps.length} 位：匹配程度、該先看哪幾篇與哪個計畫；在這裡新增教授</div></a>
+        <a class="card" href="pipeline.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">工作進度</strong><div class="small muted">Claude Code 在背景跑的工作、停點回覆</div></a>
         <a class="card" href="settings.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">設定</strong><div class="small muted">雲端帳號、AI、金鑰、版本</div></a>
-      </div>
-      ${ps.length ? `<h3>教授</h3><ul class="list" style="list-style:none;padding:0;display:grid;gap:8px">${ps.map(p => `<li class="card row" style="justify-content:space-between">
-        <div><strong>${esc(p.name)}</strong> <span class="small muted">${esc(p.institution || "")}</span><div class="small">${(p.counts || {}).works ?? "–"} 篇｜${fit(p)}</div></div>
-        <a class="btn btn-green" href="${esc(p.href)}">進入 →</a></li>`).join("")}</ul>` : ""}`;
+      </div>`;
   } else {
     document.getElementById("hub")?.remove();
     const back = document.createElement("div");

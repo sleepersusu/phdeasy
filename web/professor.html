@@ -176,7 +176,7 @@ const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升�
 function recommendHTML(){
   /* prof-match：Claude 依你的興趣與研究計畫挑出的推薦（核對過出處、推翻過） */
   const r = D.recommend;
-  if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在首頁「教授比對」按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
+  if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在「目標教授」頁按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
   const W = Object.fromEntries(D.works.map(w => [w.id, w])), G = Object.fromEntries(D.grants.map(g => [g.key, g]));
   const FITL = {strong: ["g", "強相關"], partial: ["y", "部分相關"], none: ["", "沒有相關"]};
   const paper = id => W[id] ? `<a href="#paper-${esc(id)}">${bi(W[id].title_zh, W[id].title)}</a> <span class="small muted">${W[id].year}</span>` : esc(id);
