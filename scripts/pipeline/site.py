@@ -131,6 +131,15 @@ def _paper_extras(run, w):
     return {"folder": folder, "digest": {k: dg.get(k) for k in ("key_points", "design", "method")} if dg else None, "figures": figs}
 
 
+def _proposal(run, owner, grants):
+    """prof-propose 的研究構想草稿（out/proposal.json）；本人 CV 或她期間內的經費變了就標 stale。"""
+    from .propose import active_grants, fingerprint
+    p = _j(run / "out" / "proposal.json")
+    if not p:
+        return None
+    return {**p, "stale": bool(owner) and p.get("fingerprint") != fingerprint(owner, active_grants(grants))}
+
+
 def _recommend(run, owner):
     """prof-match 的推薦（out/match.json）；本人的興趣或研究計畫改過就標 stale，提醒重新比對。"""
     from .match import me_fingerprint
@@ -226,6 +235,8 @@ def build_site_data(run):
         "grants": grants, "grants_reviewed": grants_reviewed,
         "match_docs": match_docs(wlist, grants),
         "me_query": (owner or {}).get("match"),
+        "joint_proposal": (owner or {}).get("proposal") if (owner or {}).get("proposal_with") == run.name else None,
+        "proposal_draft": _proposal(run, owner, grants),
         "recommend": _recommend(run, owner),
         "home_href": "../../../index.html",
         "profile": (_j(wd / "profile" / "final.json") or {}).get("sections", []),

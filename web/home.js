@@ -31,6 +31,14 @@ function renderMe(m){
 
 function renderProposal(p){
   if (!p){ body("proposal").innerHTML = `<div class="empty">還沒有研究計畫資料。</div>`; return; }
+  if (H.me && H.me.proposal_with){  // 跟教授一起討論出來的計畫：放在那位教授的頁面（我們的進展），不算本人獨立的計畫
+    const prof = (H.professors || []).find(x => x.slug === H.me.proposal_with);
+    const name = prof ? prof.name : H.me.proposal_with;
+    body("proposal").innerHTML = `<div class="card">「${bi(p.title_zh, p.title)}」是你跟 <strong>${esc(name)}</strong> 一起討論出來的，放在她的教授頁「我們的進展」。
+      <div class="row" style="margin-top:8px"><a class="btn btn-green" href="professor.html?p=${encodeURIComponent(H.me.proposal_with)}&v=progress">看我們的進展 →</a></div>
+      <p class="small muted" style="margin-top:8px">每位目標教授另外有一份依你的 CV 與她目前的經費做的「研究構想草稿」，在各教授頁裡。</p></div>`;
+    return;
+  }
   body("proposal").innerHTML = `
     <div class="card">
       <h3 style="margin-top:0">${bi(p.title_zh, p.title, "div")}</h3>
@@ -170,7 +178,7 @@ function setupHomeViews(){
     const fit = p => p.recommend ? `${p.recommend.targets.filter(t => t.fit === "strong").length} 個興趣強相關` : "還沒比對";
     hub.querySelector(".body").innerHTML = `
       <div class="grid">
-        <a class="card" href="me.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">我的資料</strong><div class="small muted">CV、研究計畫、我能做到的事</div></a>
+        <a class="card" href="me.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">我的資料</strong><div class="small muted">CV、研究興趣、我能做到的事</div></a>
         <a class="card" href="professors.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">目標教授</strong><div class="small muted">${ps.length} 位：匹配程度、該先看哪幾篇與哪個計畫；在這裡新增教授</div></a>
         <a class="card" href="pipeline.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">工作進度</strong><div class="small muted">Claude Code 在背景跑的工作、停點回覆</div></a>
         <a class="card" href="settings.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">設定</strong><div class="small muted">雲端帳號、AI、金鑰、版本</div></a>
