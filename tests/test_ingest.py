@@ -74,3 +74,13 @@ def test_rules_version_forces_recheck():
     assert not needs_redo({"source_sha256": "h", "rules": RULES_VERSION}, "h", True)
     assert needs_redo({"source_sha256": "h", "rules": RULES_VERSION}, "other", True)
     assert needs_redo({"source_sha256": "h", "rules": RULES_VERSION}, "h", False)  # 文字檔不見
+
+
+def test_short_card_without_any_source_is_title_only(tmp_path):
+    _, stype, exc = convert(tmp_path, {**W, "kind": "short", "abstract": None}, {"status": "not_needed"})
+    assert stype == "none" and [k for k, _ in exc] == ["title_only"]
+
+
+def test_title_only_does_not_count_toward_circuit(tmp_path):
+    from pipeline.exceptions import INFO_KINDS
+    assert "title_only" in INFO_KINDS

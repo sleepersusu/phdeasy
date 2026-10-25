@@ -41,6 +41,10 @@ uv run python scripts/state_cli.py show runs/<slug>
    - 抓每篇文章在 OpenAlex 的補助標註。
    - 擷取每篇的致謝段，寫成 `ack_snippets.md`。
    - 論文裡出現的 NIH 完整編號都回查 RePORTER，查出它的 PI。
+   - 機構在澳洲（AU）時，腳本自動查：
+     - **NHMRC**：下載 2018 年起各申請年度的 Summary of results Excel，快照存在 `sources/nhmrc/`。這份資料只列 CIA，所以本人是第二順位以後的計畫要靠致謝段補。
+     - **ARC**：Data Portal API。
+     - **MRFF**：沒有公開資料集，記成 manual。
    - `fetch_log.json` 裡出現 `manual(...)`（機構在台灣、英國或歐盟）時，用內建瀏覽器查該系統：
      - 台灣：GRB https://www.grb.gov.tw （以計畫主持人姓名＋機構搜尋）
      - 英國：UKRI https://gtr.ukri.org

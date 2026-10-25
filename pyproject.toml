@@ -3,7 +3,10 @@ name = "phdeasy"
 version = "0.1.0"
 description = "教授研究檔案流水線"
 requires-python = ">=3.11,<3.14"
-dependencies = ["pymupdf>=1.24"]
+dependencies = [
+    "openpyxl>=3.1.5",
+    "pymupdf>=1.24",
+]
 
 [dependency-groups]
 dev = ["pytest>=8"]

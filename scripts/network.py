@@ -48,7 +48,12 @@ def build(run):
         "owner_decisions": owner,
         "coauthors": stats,
     }
-    for g in net["possible_splits"]:
+    cut = stats[TOP - 1]["n"] if len(stats) >= TOP else 0
+    rank_relevant = [g for g in net["possible_splits"] if g["combined_n_max"] >= cut]
+    net["possible_splits_minor"] = len(net["possible_splits"]) - len(rank_relevant)
+    net["possible_splits"] = rank_relevant  # 只有會改變前 10 名的才請本人決定；其他只記數量
+    (run / "work" / "network.json").write_text(json.dumps(net, ensure_ascii=False, indent=2))
+    for g in rank_relevant:
         add_exception(run, "split:" + "+".join(g["keys"]), "network", "possible_author_split",
                       f"可能同一人被拆成多個 id：{' / '.join(f'{n}（{k}，{c} 篇）' for n, k, c in zip(g['names'], g['keys'], g['counts']))}；合併後最多 {g['combined_n_max']} 篇，停 2 由本人決定")
     (run / "work" / "network.json").write_text(json.dumps(net, ensure_ascii=False, indent=2))
@@ -76,6 +81,8 @@ def build(run):
           f"本人第一作者 {net['roles']['first']}、最後作者 {net['roles']['last']}、通訊 {net['roles']['corresponding']}")
     for i, s in enumerate(top, 1):
         print(f"  {i}. {s['name']} ({s['key']}) {s['n']} 篇")
+    if net.get("possible_splits_minor"):
+        print(f"  另有 {net['possible_splits_minor']} 組可能同一人不影響前 {TOP} 名，只記數量")
     for g in net["possible_splits"]:
         print(f"  可能同一人：{' / '.join(f'{n} {k} {c}篇' for n, k, c in zip(g['names'], g['keys'], g['counts']))}")
 

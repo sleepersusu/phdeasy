@@ -170,3 +170,11 @@ def apply_lead_scope(works):
         if w["kind"] == "full" and not led:
             w["kind"], w["short_reason"] = "short", "not_led"
     return works
+
+
+def apply_no_content(works, ids):
+    """完整卡卻完全沒有內容（無全文也無摘要）的改成短卡，理由 no_content。"""
+    for w in works:
+        if w["id"] in ids and w["kind"] == "full":
+            w["kind"], w["short_reason"] = "short", "no_content"
+    return works

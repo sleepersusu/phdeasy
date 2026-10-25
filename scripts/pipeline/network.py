@@ -158,6 +158,19 @@ def compare_counts(stats, agent, top=10, min_n=1):
     return diffs
 
 
+def _compatible(x, y):
+    """同姓，名字相容（相同或一方是另一方的首字母），兩邊都有中間名時也要相容。"""
+    tx = _norm_name(x).lower().replace(".", " ").replace("-", " ").split()
+    ty = _norm_name(y).lower().replace(".", " ").replace("-", " ").split()
+    if len(tx) < 2 or len(ty) < 2 or tx[-1] != ty[-1]:
+        return False
+    ok = lambda a, b: a == b or (len(a) == 1 and b.startswith(a)) or (len(b) == 1 and a.startswith(b))
+    gx, gy = tx[:-1], ty[:-1]
+    if not ok(gx[0], gy[0]):
+        return False
+    return not (len(gx) > 1 and len(gy) > 1 and not ok(gx[1], gy[1]))
+
+
 def possible_splits(stats):
     """OpenAlex 可能把同一人拆成多個作者 id：姓名詞組相同（不論順序）或姓氏＋名首字母相同。只列出，不合併。"""
     linked = [s for s in stats if s["linked"]]
@@ -173,7 +186,7 @@ def possible_splits(stats):
 
     for i, a in enumerate(linked):
         for b in linked[i + 1:]:
-            if tokens(a["name"]) == tokens(b["name"]) or _sig(a["name"]) == _sig(b["name"]):
+            if tokens(a["name"]) == tokens(b["name"]) or _compatible(a["name"], b["name"]):
                 parent[find(b["key"])] = find(a["key"])
     groups = defaultdict(list)
     for s in linked:

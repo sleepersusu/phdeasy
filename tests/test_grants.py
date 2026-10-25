@@ -230,3 +230,51 @@ def test_funder_key_folds_ligatures():
     from pipeline.grants import funder_key
     assert funder_key("UCSF Diabetes Family Fund for Innovative Patient Care Education and Scientiﬁc Discovery Award") == \
         funder_key("UCSF Diabetes Family Fund for Innovative Patient Care Education and Scientific Discovery Award")
+
+
+def test_nhmrc_projects_header_variants_and_roles():
+    from pipeline.grants import nhmrc_projects
+    rows = [
+        {"APP ID": 2009001, "Grant Title": "Digital health for hypertension", "CIA Name": "Associate Professor Liliana Laranjo",
+         "Administering Institution": "The University of Sydney", "Total": 1500000, "Scheme": "Investigator Grants", "Start Year": 2023},
+        {"Application ID": "2019876", "Title": "Heart failure trial", "Chief Investigator A": "Professor Clara Chow",
+         "Chief Investigators": "Chow C, Laranjo L, Redfern J", "Admin Institution": "The University of Sydney", "Budget": "2,000,000", "Grant Type": "Ideas", "Start Year": "2024"},
+        {"APP ID": 1, "Grant Title": "Unrelated", "CIA Name": "Dr Jane Smith", "Administering Institution": "Monash University", "Total": 1},
+    ]
+    ps = {p["key"]: p for p in nhmrc_projects(rows, "Liliana Laranjo", "The University of Sydney", "2023")}
+    assert set(ps) == {"ID:NHMRC2009001", "ID:NHMRC2019876"}
+    a = ps["ID:NHMRC2009001"]
+    assert a["target_role"] == "pi" and a["status"] == "confirmed" and a["funder"] == "NHMRC" and a["total_award"] == 1500000
+    assert a["start"] == "2023" and a["round"] == "2023"
+    b = ps["ID:NHMRC2019876"]
+    assert b["target_role"] == "co_pi" and b["pi_names"][0] == "Professor Clara Chow" and b["total_award"] == 2000000
+
+
+def test_inst_match_accepts_list_of_institutions():
+    insts = ["University of Technology Sydney", "The University of Sydney", "Westmead Hospital"]
+    assert inst_match("University of Sydney", insts)
+    assert not inst_match("Monash University", insts)
+
+
+def test_nhmrc_numbers_unify_with_funder_context():
+    k = "ID:NHMRC2017642"
+    assert normalize_award("NHMRC 2017642") == k
+    assert normalize_award("2017642", funder="National Health and Medical Research Council") == k
+    assert normalize_award("GNT2017642", funder="NHMRC") == k
+    assert normalize_award("APP2017642", funder="Australian National Health and Medical Research Council (NHMRC)") == k
+    assert normalize_award("2017642") == "ID:2017642"  # 沒有補助單位脈絡時不亂猜
+
+
+def test_merge_attaches_ack_to_nhmrc_project():
+    projects = [{"key": "ID:NHMRC2017642", "award_id": "NHMRC 2017642", "funder": "NHMRC", "title": "Digital health", "target_role": "pi",
+                 "status": "confirmed", "pi_names": ["Liliana Laranjo"], "source": "nhmrc"}]
+    mentions = [{"work_id": "W1", "funder": "National Health and Medical Research Council", "award_id": "2017642",
+                 "quote": "grant number 2017642", "loc": "p.1", "check": "ok"}]
+    g = merge_grants(projects, [], mentions)
+    assert len(g) == 1 and g[0]["works"] == ["W1"]
+
+
+def test_merge_splits_multiple_award_ids_in_one_mention():
+    m = [{"work_id": "W1", "funder": "NHMRC", "award_id": "2022036, 2022566; 2044237", "quote": "grants 2022036, 2022566 and 2044237", "loc": "p.1", "check": "ok"}]
+    keys = sorted(g["key"] for g in merge_grants([], [], m))
+    assert keys == ["ID:NHMRC2022036", "ID:NHMRC2022566", "ID:NHMRC2044237"]

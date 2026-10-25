@@ -22,7 +22,7 @@ from pipeline.state import append_progress, load_state, set_stage
 from pipeline.textify import abstract_to_marked, has_text, looks_like_supplement, pdf_to_marked, title_matches, units, xml_to_marked
 
 
-RULES_VERSION = 3  # 驗證規則改了就加一，舊結果會重驗（2：附錄／檢核表偵測；3：還原 \x02 負號）
+RULES_VERSION = 4  # 驗證規則改了就加一，舊結果會重驗（2：附錄／檢核表偵測；3：還原 \x02 負號；4：無內容短卡只列標題）
 
 
 def needs_redo(prev, src_hash, text_exists):
@@ -69,7 +69,10 @@ def convert(run, w, row):
         if w["kind"] == "full":
             exc.append(("abstract_only", "沒有可用全文，只用摘要"))
         return abstract_to_marked(w["abstract"]), "abstract", exc
-    exc.append(("no_source", "沒有全文也沒有摘要"))
+    if w["kind"] == "short":  # 會議摘要等無內容的短卡：只列標題，屬註記類（本人 2026-10-25 決定）
+        exc.append(("title_only", "沒有全文也沒有摘要，只列標題"))
+    else:
+        exc.append(("no_source", "沒有全文也沒有摘要"))
     return "", "none", exc
 
 

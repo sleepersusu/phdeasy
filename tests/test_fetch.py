@@ -110,3 +110,6 @@ def test_osf_guid_and_pdf_pick():
     listing = [("SAP", "plan.pdf", "https://osf.io/download/2/"), ("Protocol", "trial protocol.pdf", "https://osf.io/download/1/"),
                ("Protocol", "notes.docx", "https://osf.io/download/3/")]
     assert osf_pdfs(listing) == ["https://osf.io/download/1/", "https://osf.io/download/2/"]  # 只要 PDF，Protocol 資料夾優先
+    tricky = [("Engagement trajectories", "Analysis plan (protocol v2).pdf", "https://osf.io/download/e/"),
+              ("Protocol", "2026 Effect of a mobile health intervention.pdf", "https://osf.io/download/p/")]
+    assert osf_pdfs(tricky)[0] == "https://osf.io/download/p/"  # 名為 Protocol 的資料夾勝過檔名含 protocol

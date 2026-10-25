@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from pipeline.exceptions import add_exception
-from pipeline.grants import ack_snippets, apply_verdicts, check_mention, merge_grants, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects
+from pipeline.grants import ack_snippets, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match
 from pipeline.http import get_json, openalex_params
 from pipeline.state import load_state
 
@@ -50,6 +50,7 @@ def fetch(run):
     author = get_json(f"https://api.openalex.org/authors/{st['author_id']}?x=1{openalex_params()}")
     insts = author.get("last_known_institutions") or []
     inst = insts[0]["display_name"] if insts else (st["professor"].get("institution") or "")
+    inst_all = [i["display_name"] for i in insts] or [inst]  # 身分比對用全部目前機構
     country = insts[0].get("country_code") if insts else None
     works = json.loads((run / "work" / "works.json").read_text())
     log, projects = [], []
@@ -64,7 +65,7 @@ def fetch(run):
     def nih_pi():
         d = _post_json(NIH_SEARCH, {"criteria": {"pi_names": [{"first_name": first, "last_name": last}], "fiscal_years": list(range(2018, 2027))}, "limit": 500})
         _save(gd, "nih_pi", d)
-        ps = [p for p in nih_projects(d, name, inst) if (p["end"] or "9999") >= "2022"]
+        ps = [p for p in nih_projects(d, name, inst_all) if (p["end"] or "9999") >= "2022"]
         for p in ps:
             p["source"] = "nih_pi"
         projects.extend(ps)
@@ -75,7 +76,7 @@ def fetch(run):
     def nsf():
         d = get_json(f"https://api.nsf.gov/services/v1/awards.json?pdPIName={quote(last)}&printFields=id,title,piFirstName,piLastName,coPDPI,awardeeName,startDate,expDate,fundsObligatedAmt,abstractText")
         _save(gd, "nsf_pi", d)
-        ps = [p for p in nsf_projects(d, name, inst) if p["target_role"] != "other_pi" and (p["end"] or "9999") >= "2022"]
+        ps = [p for p in nsf_projects(d, name, inst_all) if p["target_role"] != "other_pi" and (p["end"] or "9999") >= "2022"]
         for p in ps:
             p["source"] = "nsf"
         projects.extend(ps)
@@ -131,7 +132,7 @@ def fetch(run):
             return 0
         d = _post_json(NIH_SEARCH, {"criteria": {"project_nums": nums}, "limit": 500})
         _save(gd, "nih_lookup", d)
-        ps = nih_projects(d, name, inst)
+        ps = nih_projects(d, name, inst_all)
         for p in ps:
             p["source"] = "nih_lookup"
         projects.extend(p for p in ps if p["key"] not in known)
@@ -139,6 +140,10 @@ def fetch(run):
 
     attempt("nih_reporter_lookup", nih_lookup)
 
+    if country == "AU":
+        attempt("nhmrc_outcomes", lambda: _nhmrc(gd, name, inst_all, projects))
+        attempt("arc_dataportal", lambda: _arc(gd, name, inst_all, projects))
+        log.append({"source": "mrff", "result": "manual(MRFF 無公開資料集；以論文致謝補足)"})
     for src, applies in (("grb_taiwan", country == "TW"), ("ukri_gtr", country == "GB"), ("cordis_eu", country in EU)):
         if not applies:
             log.append({"source": src, "result": f"skipped(機構國家 {country})"})
@@ -147,12 +152,73 @@ def fetch(run):
 
     (gd / "projects.json").write_text(json.dumps(projects, ensure_ascii=False, indent=2))
     (gd / "openalex_awards.json").write_text(json.dumps(awards, ensure_ascii=False, indent=2))
-    (gd / "fetch_log.json").write_text(json.dumps({"institution": inst, "country": country, "log": log}, ensure_ascii=False, indent=2))
+    (gd / "fetch_log.json").write_text(json.dumps({"institution": inst, "institutions": inst_all, "country": country, "log": log}, ensure_ascii=False, indent=2))
     n_sn = sum(len(v) for v in snippets.values())
     print(f"DONE 機構 {inst}（{country}）；API 計畫 {len(projects)}（本人 PI/co-PI {sum(p['target_role'] in ('pi', 'co_pi') for p in projects)}）；"
           f"OpenAlex 補助標註 {len(awards)}；致謝段 {n_sn} 段／{len(snippets)} 篇；回查 NIH 編號 {len(nums)}")
     for l in log:
         print(f"  {l['source']}: {l['result']} {l.get('records', '')}")
+
+
+def _nhmrc(gd, name, inst, projects):
+    """NHMRC 各申請年度 Summary of results（2018 起），存快照到 sources/nhmrc/。"""
+    import re as _re
+    import openpyxl
+    from pipeline.http import get
+    page, status = get("https://www.nhmrc.gov.au/funding/data-research/outcomes", timeout=60)
+    if page is None:
+        raise RuntimeError(status)
+    links = sorted(set(_re.findall(r'href="([^"]+\.xlsx)"', page.decode("utf-8", "ignore"))))
+    d = gd / "sources" / "nhmrc"
+    d.mkdir(parents=True, exist_ok=True)
+    found = 0
+    for url in links:
+        m = _re.search(r"(20\d\d)", url.rsplit("/", 1)[-1])
+        if not m or int(m.group(1)) < 2018:
+            continue
+        year = m.group(1)
+        f = d / f"nhmrc-{year}.xlsx"
+        if not f.exists():
+            data, st = get(url, timeout=120)
+            if data is None:
+                continue
+            f.write_bytes(data)
+        wb = openpyxl.load_workbook(f, read_only=True, data_only=True)
+        for ws in wb.worksheets:
+            rows = list(ws.iter_rows(values_only=True))
+            hi = next((i for i, r in enumerate(rows[:15]) if r and any(c and "title" in str(c).lower() for c in r)), None)
+            if hi is None:
+                continue
+            header = [str(c or "").strip() for c in rows[hi]]
+            recs = [dict(zip(header, r)) for r in rows[hi + 1:] if r and any(r)]
+            surname = name.split()[-1].lower()
+            recs = [r for r in recs if any(isinstance(v, str) and surname in v.lower() for v in r.values())]
+            for p in nhmrc_projects(recs, name, inst, year):
+                p["source"] = "nhmrc"
+                p["snapshot"] = f"sources/nhmrc/nhmrc-{year}.xlsx"
+                if p["key"] not in {x["key"] for x in projects}:
+                    projects.append(p)
+                    found += 1
+    return found
+
+
+def _arc(gd, name, inst, projects):
+    d = get_json(f"https://dataportal.arc.gov.au/NCGP/API/grants?filter={quote(name.split()[-1])}")
+    _save(gd, "arc", d)
+    n = 0
+    for g in d.get("data", []):
+        a = g.get("attributes", {})
+        people = [a.get("lead-investigator") or ""] + [x for x in (a.get("investigators-at-announcement") or "").split(";")]
+        if not any(name_match(p_.strip(), name) for p_ in people if p_):
+            continue
+        role = "pi" if name_match(a.get("lead-investigator") or "", name) else "co_pi"
+        org = a.get("administering-organisation") or a.get("current-admin-organisation") or ""
+        projects.append({"key": f"ID:ARC{g['id']}", "award_id": f"ARC {g['id']}", "funder": "ARC", "title": a.get("grant-summary", "")[:200],
+                         "pi_names": [p_.strip() for p_ in people if p_.strip()], "org": org, "target_role": role,
+                         "status": "confirmed" if inst_match(org, inst) else "pending", "start": str(a.get("funding-commencement-year") or ""),
+                         "end": None, "total_award": float(a.get("announced-funding-amount") or 0), "abstract": a.get("grant-summary"), "source": "arc"})
+        n += 1
+    return n
 
 
 def check_mentions(run):

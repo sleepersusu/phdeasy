@@ -227,3 +227,11 @@ def test_assemble_wrong_number_in_sample_text_makes_field_unresolved():
     card, _ = assemble(c, TEXT)
     assert card["fields"]["sample"]["status"] == "unresolved"
     assert check_card(card, TEXT) == []
+
+
+def test_title_only_card_is_valid_short_card():
+    from pipeline.cards import title_only_card
+    c = title_only_card("W9")
+    assert validate_card(c, kind="short") == []
+    assert c["fields"]["summary"]["status"] == "not_in_source" and c["basis"] == "title_only"
+    assert check_card(c, "") == []

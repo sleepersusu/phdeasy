@@ -12,10 +12,17 @@ CONTEXT = 2  # 關鍵字行前後各帶幾行
 STATUS_RANK = {"confirmed": 0, "pending": 1, "acknowledged": 2, "other": 3}
 
 
-def normalize_award(x):
+NHMRC_RE = re.compile(r"NHMRC|NATIONAL HEALTH AND MEDICAL RESEARCH COUNCIL", re.I)
+
+
+def normalize_award(x, funder=None):
     if not x:
         return None
-    raw = re.sub(r"[\u2010-\u2015\u2212]", "-", x.strip().upper())
+    up = x.strip().upper()
+    m = re.fullmatch(r"(?:NHMRC\s*)?(?:APP|GNT|ID)?\s*#?\s*(\d{6,7})", up)
+    if m and (up.startswith("NHMRC") or NHMRC_RE.search(funder or "")):
+        return f"ID:NHMRC{m.group(1)}"
+    raw = re.sub(r"[\u2010-\u2015\u2212]", "-", up)
     s = re.sub(r"-\d{2}([A-Z]\d+)?$", "", raw)
     s = re.sub(r"[\s\-_/#.]", "", s)
     m = NIH_CORE.match(s)
@@ -76,6 +83,9 @@ def _inst(s):
 
 
 def inst_match(a, b):
+    """b 可以是單一機構或機構清單（目標作者可能同時隸屬多個機構）。"""
+    if isinstance(b, (list, tuple, set)):
+        return any(inst_match(a, x) for x in b)
     a, b = _inst(a), _inst(b)
     return bool(a and b) and (a == b or a in b or b in a)
 
@@ -176,7 +186,7 @@ def merge_grants(projects, openalex_awards, mentions):
         g = _add(acc, p["key"], dict(p))
         g["evidence"].append({"type": p.get("source", "api")})
     for a in openalex_awards:
-        key = normalize_award(a.get("award_id")) or funder_key(a.get("funder"))
+        key = normalize_award(a.get("award_id"), a.get("funder")) or funder_key(a.get("funder"))
         g = _add(acc, key, {"key": key, "award_id": a.get("award_id"), "funder": a.get("funder"), "title": None,
                             "target_role": "acknowledged", "status": "acknowledged", "pi_names": []})
         g["works"].append(a["work_id"])
@@ -184,11 +194,13 @@ def merge_grants(projects, openalex_awards, mentions):
     for m in mentions:
         if m.get("check") != "ok":
             continue
-        key = normalize_award(m.get("award_id")) if m.get("award_id") else funder_key(m.get("funder"))
-        g = _add(acc, key, {"key": key, "award_id": m.get("award_id"), "funder": m.get("funder"), "title": None,
-                            "target_role": "acknowledged", "status": "acknowledged", "pi_names": []})
-        g["works"].append(m["work_id"])
-        g["evidence"].append({"type": "ack", "work_id": m["work_id"], "quote": m["quote"], "loc": m["loc"]})
+        ids = [x.strip() for x in re.split(r"[,;]|\band\b", m.get("award_id") or "") if x.strip()] or [None]
+        for aid in ids:  # 一句致謝列多個編號時拆成多筆
+            key = normalize_award(aid, m.get("funder")) if aid else funder_key(m.get("funder"))
+            g = _add(acc, key, {"key": key, "award_id": aid, "funder": m.get("funder"), "title": None,
+                                "target_role": "acknowledged", "status": "acknowledged", "pi_names": []})
+            g["works"].append(m["work_id"])
+            g["evidence"].append({"type": "ack", "work_id": m["work_id"], "quote": m["quote"], "loc": m["loc"]})
     for g in acc.values():
         g["works"] = sorted(set(g["works"]))
     return sorted(acc.values(), key=lambda g: (STATUS_RANK.get(g["status"], 9), g["key"]))
@@ -265,3 +277,44 @@ def apply_verdicts(grants, verdicts):
             unresolved.append(g)
         final.append(g)
     return final, rejected, unresolved, missing
+
+
+def _col(row, *keys, exclude=()):
+    for h, v in row.items():
+        hl = str(h).lower()
+        if any(k in hl for k in keys) and not any(x in hl for x in exclude):
+            return v
+    return None
+
+
+def _money(v):
+    try:
+        return float(str(v).replace(",", "").replace("$", "").strip())
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def nhmrc_projects(rows, target_name, target_inst, round_year):
+    """NHMRC 各年度 Summary of results（欄名每年不同，以關鍵字找欄）。CIA 吻合＝pi；其他 CI 欄吻合＝co_pi。"""
+    out = []
+    for r in rows:
+        cia = str(_col(r, "cia", "chief investigator a") or "")
+        others = [str(v) for h, v in r.items() if v and "investigator" in str(h).lower()
+                  and not any(k in str(h).lower() for k in ("cia", "chief investigator a"))]
+        others_names = [x.strip() for v in others for x in re.split(r"[;,]", v) if x.strip()]
+        if name_match(cia, target_name):
+            role = "pi"
+        elif any(name_match(x, target_name) for x in others_names):
+            role = "co_pi"
+        else:
+            continue
+        inst = str(_col(r, "admin") or "")
+        app = str(_col(r, "app id", "application id", "app_id", "grant id") or "").split(".")[0]
+        start = _col(r, "start")
+        out.append({"key": f"ID:NHMRC{app}", "award_id": f"NHMRC {app}", "funder": "NHMRC",
+                    "title": _col(r, "title"), "pi_names": [cia] + [x for x in others_names if x != cia][:8], "org": inst,
+                    "target_role": role, "status": "confirmed" if inst_match(inst, target_inst) else "pending",
+                    "scheme": _col(r, "scheme", "grant type", "type"), "start": str(start).split(".")[0] if start else None,
+                    "end": None, "round": str(round_year), "total_award": _money(_col(r, "total", "budget", "amount")),
+                    "abstract": _col(r, "summary", "plain", "abstract")})
+    return out

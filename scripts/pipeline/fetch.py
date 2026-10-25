@@ -121,4 +121,5 @@ def osf_guid(urls):
 def osf_pdfs(listing):
     """listing: [(資料夾名, 檔名, 下載網址)]。只留 PDF，Protocol 資料夾或檔名含 protocol 的排前面。"""
     pdfs = [(f, n, u) for f, n, u in listing if n.lower().endswith(".pdf") and u]
-    return [u for f, n, u in sorted(pdfs, key=lambda x: (0 if "protocol" in (x[0] + x[1]).lower() else 1, x[0], x[1]))]
+    rank = lambda f, n: 0 if f.strip().lower() == "protocol" else (1 if "protocol" in n.lower() else 2)
+    return [u for f, n, u in sorted(pdfs, key=lambda x: (rank(x[0], x[1]), x[0], x[1]))]

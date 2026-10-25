@@ -198,3 +198,12 @@ def test_apply_lead_scope_marks_non_lead_as_short():
     assert out["W1"]["kind"] == "full" and out["W2"]["kind"] == "full"
     assert out["W3"]["kind"] == "short" and out["W3"]["short_reason"] == "not_led"
     assert out["W4"]["kind"] == "short" and "short_reason" not in out["W4"]  # 本來就是會議摘要等短卡
+
+
+def test_apply_no_content_turns_lead_full_into_short():
+    from pipeline.works import apply_no_content
+    ws = [{"id": "W1", "kind": "full"}, {"id": "W2", "kind": "full"}, {"id": "W3", "kind": "short", "short_reason": "not_led"}]
+    out = {w["id"]: w for w in apply_no_content(ws, {"W2", "W3"})}
+    assert out["W1"]["kind"] == "full"
+    assert out["W2"]["kind"] == "short" and out["W2"]["short_reason"] == "no_content"
+    assert out["W3"]["short_reason"] == "not_led"  # 原本就是非主導短卡，不改理由

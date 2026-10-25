@@ -182,3 +182,13 @@ def test_possible_splits_skips_owner_merged():
         {"id": "W2", "year": 2023, "kind": "full", "authors": [au("A9", "Thomas J. Hoffmann"), au(T, "Y F")], "topic": {}},
     ]
     assert possible_splits(coauthor_stats(works, T, "Fukuoka", aliases={"A9": "A1"})) == []
+
+
+def test_possible_splits_requires_compatible_first_and_middle():
+    from pipeline.network import possible_splits
+    s = lambda k, n: {"key": k, "name": n, "n": 1, "linked": True}
+    stats = [s("A1", "Yang Liu"), s("A2", "Yuanli Liu"), s("A3", "Sabrina Wong"), s("A4", "Samuel Yeung Shan Wong"),
+             s("A5", "Derek P. Chew"), s("A6", "Derek S. Chew"), s("A7", "C. Choy"), s("A8", "Carina K Choy"),
+             s("A9", "R. John Simes"), s("A10", "Robert John Simes"), s("A11", "Peter Lee"), s("A12", "Peter Lee")]
+    keys = sorted(sorted(g["keys"]) for g in possible_splits(stats))
+    assert keys == [["A10", "A9"], ["A11", "A12"], ["A7", "A8"]]

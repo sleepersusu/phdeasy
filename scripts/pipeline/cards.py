@@ -265,3 +265,8 @@ def missing_refute_paths(c, verdicts):
     ok = {v["path"] for v in verdicts if v.get("verdict") in ("keep", "reject", "partial")}
     paths = [p for p, field, sub, idx, _ in _items(c) if field in CLAIM_FIELDS or field == "limitations"]
     return [p for p in paths if p not in ok]
+
+
+def title_only_card(work_id):
+    """沒有任何內容可解析的短卡（會議摘要等）：只列標題，由腳本產生，不派 agent。"""
+    return {"id": work_id, "basis": "title_only", "fields": {"summary": {"status": "not_in_source", "citations": []}}}
