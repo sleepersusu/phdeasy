@@ -104,3 +104,7 @@ SUPPL_URL = re.compile(r"(_app\d+\.pdf|[/_-]mmc\d+|suppl|supplement|appendix|moe
 def is_supplementary_url(url):
     """附錄／補充檔的網址（例 JMIR 的 _app4.pdf、Elsevier 的 mmc1、Springer 的 MOESM）。"""
     return bool(SUPPL_URL.search(url or ""))
+
+
+def needs_fulltext(w):
+    return w["kind"] == "full" or w.get("short_reason") == "not_led"

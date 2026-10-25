@@ -186,3 +186,15 @@ def test_fill_target_by_name_noop_when_linked():
     w = normalize_work(raw("W9", "T"), TARGET)
     fill_target_by_name(w, "Target")
     assert "target_link" not in w
+
+
+def test_apply_lead_scope_marks_non_lead_as_short():
+    from pipeline.works import apply_lead_scope
+    ws = [{"id": "W1", "kind": "full", "target_position": "first", "target_corresponding": False},
+          {"id": "W2", "kind": "full", "target_position": "middle", "target_corresponding": True},
+          {"id": "W3", "kind": "full", "target_position": "middle", "target_corresponding": False},
+          {"id": "W4", "kind": "short", "target_position": "last", "target_corresponding": False}]
+    out = {w["id"]: w for w in apply_lead_scope(ws)}
+    assert out["W1"]["kind"] == "full" and out["W2"]["kind"] == "full"
+    assert out["W3"]["kind"] == "short" and out["W3"]["short_reason"] == "not_led"
+    assert out["W4"]["kind"] == "short" and "short_reason" not in out["W4"]  # 本來就是會議摘要等短卡

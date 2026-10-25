@@ -161,3 +161,12 @@ def fill_target_by_name(work, surname):
             work["target_link"] = "name_only"
             break
     return work
+
+
+def apply_lead_scope(works):
+    """範圍 A：本人是第一、最後或通訊作者的才做完整卡；其他完整卡改短卡並標 not_led（仍抓全文供計畫致謝用）。"""
+    for w in works:
+        led = w.get("target_position") in ("first", "last") or w.get("target_corresponding")
+        if w["kind"] == "full" and not led:
+            w["kind"], w["short_reason"] = "short", "not_led"
+    return works

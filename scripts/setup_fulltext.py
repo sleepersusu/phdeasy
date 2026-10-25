@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import quote
 
-from pipeline.fetch import citation_pdf_urls, match_inbox, missing_report, pdf_relpath, sha256_file, zotero_pdf_paths
+from pipeline.fetch import citation_pdf_urls, match_inbox, needs_fulltext, missing_report, pdf_relpath, sha256_file, zotero_pdf_paths
 from pipeline.fulltext import SkipSource, run_chain
 from pipeline.index import find_existing, load_index, save_index
 from pipeline.http import get, get_json
@@ -220,7 +220,7 @@ def main():
             continue
         row = {"id": w["id"], "year": w["year"], "kind": w["kind"], "title": w["title"]}
         existing = find_existing(run, w["id"])
-        if w["kind"] == "short":
+        if not needs_fulltext(w):
             row["status"] = "not_needed"
         elif existing:
             h = sha256_file(run / existing)
@@ -249,7 +249,7 @@ def main():
     have = {i for i, r in index.items() if r["status"] == "ok"}
     tried = {i: r.get("tried", "").split("; ") for i, r in index.items() if r["status"] == "no_free_fulltext"}
     (run / "missing.md").write_text(missing_report(works, have, tried))
-    full = [w for w in works if w["kind"] == "full"]
+    full = [w for w in works if needs_fulltext(w)]
     by_src = {}
     for r in index.values():
         if r["status"] == "ok":

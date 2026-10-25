@@ -93,3 +93,10 @@ def test_supplementary_urls_detected():
     assert is_supplementary_url("https://www.mdpi.com/x/s1")
     assert not is_supplementary_url("https://cardio.jmir.org/2022/2/e40764/PDF")
     assert not is_supplementary_url("https://link.springer.com/content/pdf/10.1007/s00520-022-06870-5.pdf")
+
+
+def test_needs_fulltext_includes_not_led_short_cards():
+    from pipeline.fetch import needs_fulltext
+    assert needs_fulltext({"kind": "full"})
+    assert needs_fulltext({"kind": "short", "short_reason": "not_led"})  # 致謝段找計畫要用
+    assert not needs_fulltext({"kind": "short"})
