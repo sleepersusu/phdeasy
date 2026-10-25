@@ -4,7 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-CAPTION = re.compile(r"^\s*((?:Supplementary\s+|Supplemental\s+|Extended\s+Data\s+)?(?:Figure|Fig\.?|Table|Box|Chart|Graph)\s*S?\d+[A-Za-z]?)\s*[.:|\-–—]?\s*(.*)", re.I | re.S)
+CAPTION = re.compile(r"^\s*((?:Supplementary\s+|Supplemental\s+|Extended\s+Data\s+)?(?:Figure|Fig\.?|Table|Box|Chart|Graph|Encadr[ée]|Tableau|Figura|Tabla|Tabelle|Abbildung|Quadro)\s*S?\d+[A-Za-z]?)\s*[.:|\-–—]?\s*(.*)", re.I | re.S)
 
 
 def norm_label(label):
@@ -24,23 +24,41 @@ def _looks_like_caption(label, rest):
     return True
 
 
+def _caption_score(text, rest):
+    """同一個 label 出現好幾次時挑最像標題的：短、後面有說明、不像一整段內文。"""
+    score = 0
+    if len(text) < 400:
+        score += 2
+    if re.match(r"^(An?\s+)?(overview|flow|summary|characteristics|results?|schematic|map|framework|diagram|timeline|baseline|comparison|distribution|association|proportion)", rest.strip(), re.I):
+        score += 1
+    if re.search(r"\b(was|were|is|are|we|our)\b", rest[:120]):
+        score -= 1
+    return score
+
+
 def captions_from_blocks(blocks):
-    """blocks: [(頁碼, 文字)]，依閱讀順序。回傳 [{label, caption, page}]，同一個 label 只留第一個像標題的。"""
-    out, seen = [], set()
+    """blocks: [(頁碼, 文字)]，依閱讀順序。回傳 [{label, caption, page}]，同一個 label 留最像標題的那一個，依頁序排。"""
+    best = {}
+    order = 0
     for page, text in blocks:
         lines = (text or "").split("\n")
         for i in range(len(lines)):  # 標題不一定在區塊開頭（PDF 常把上一段和表題併成一塊）
-            m = CAPTION.match("\n".join(lines[i:]))
+            chunk = "\n".join(lines[i:])
+            m = CAPTION.match(chunk)
             if not m:
                 continue
             label, rest = norm_label(m.group(1)), m.group(2)
-            if label.lower() in seen or not _looks_like_caption(label, rest):
+            if not _looks_like_caption(label, rest):
                 continue
-            seen.add(label.lower())
             cap = re.sub(r"\s+", " ", f"{m.group(1)} {rest}").strip()
-            out.append({"label": label, "caption": cap[:800], "page": page})
+            sc = _caption_score(chunk, rest)
+            key = label.lower()
+            if key not in best or sc > best[key][0]:
+                best[key] = (sc, order if key not in best else best[key][1], {"label": label, "caption": cap[:800], "page": page})
+            order += 1
             break
-    return out
+    items = [v[2] for v in best.values()]
+    return sorted(items, key=lambda x: (x["page"] or 0, [v[1] for v in best.values() if v[2] is x][0]))
 
 
 def from_pdf(path, out_dir, zoom=1.4, max_pages=60):

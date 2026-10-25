@@ -32,3 +32,22 @@ def test_jats_figs_and_tables():
 def test_caption_in_the_middle_of_a_block_is_found():
     blocks = [(5, "Results were consistent.\nTable 2  OR of cardiovascular disease according to menopause category\nAge-adjusted model")]
     assert [c["label"] for c in captions_from_blocks(blocks)] == ["Table 2"]
+
+
+def test_non_english_labels():
+    caps = captions_from_blocks([(2, "Encadré 1 Les principes de McWhinney"), (3, "Tableau 2. Caractéristiques"), (4, "Tabla 1 Resultados")])
+    assert [c["label"] for c in caps] == ["Encadré 1", "Tableau 2", "Tabla 1"]
+
+
+def test_real_caption_beats_body_text_starting_with_label():
+    blocks = [(9, "Fig. 5 The nursing model was developed in response to evidence that modifiable risk factors were common, and nurses provided " + "long text " * 60),
+              (11, "Fig. 5 An overview of nursing model of care")]
+    caps = captions_from_blocks(blocks)
+    assert caps[0]["page"] == 11 and "overview" in caps[0]["caption"]
+
+
+def test_soft_hyphen_ignored_when_matching_quotes():
+    from pipeline.quotes import check_quote
+    text = "[p.1]\nWe used a meta­analysis of eleven trials in adults.\n"
+    assert check_quote(text, "We used a meta-analysis of eleven trials", "p.1")[0] or check_quote(text, "We used a metaanalysis of eleven trials", "p.1")[0]
+    assert check_quote(text, "We used a meta­analysis of eleven trials", "p.1")[0]
