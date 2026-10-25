@@ -72,6 +72,12 @@ def get_json(url, retry_429=(), **kw):
     return json.loads(data)
 
 
+def s2_headers():
+    """Semantic Scholar API 金鑰（本人申請，存在環境變數 S2_API_KEY，不進 git）。"""
+    key = os.environ.get("S2_API_KEY")
+    return {"x-api-key": key} if key else {}
+
+
 def openalex_params():
     key = os.environ.get("OPENALEX_API_KEY")
     return f"&api_key={key}" if key else ""

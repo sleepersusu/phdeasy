@@ -16,7 +16,7 @@ from urllib.parse import quote
 from pipeline.fetch import citation_pdf_urls, match_inbox, needs_fulltext, osf_guid, osf_pdfs, missing_report, pdf_relpath, sha256_file, zotero_pdf_paths
 from pipeline.fulltext import SkipSource, run_chain
 from pipeline.index import find_existing, load_index, save_index
-from pipeline.http import get, get_json
+from pipeline.http import get, get_json, s2_headers
 from pipeline.works import _similar
 
 ZOTERO = "http://127.0.0.1:23119/api/users/0"
@@ -102,7 +102,7 @@ def r_ncbi_efetch(w):
 def r_s2(w):
     if not w.get("doi"):
         return []
-    d = get_json(f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(w['doi'])}?fields=openAccessPdf,externalIds", min_interval=1.1, retry_429=(5, 15, 30, 60))
+    d = get_json(f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(w['doi'])}?fields=openAccessPdf,externalIds", min_interval=1.1, retry_429=(5, 15, 30, 60), headers=s2_headers())
     urls = []
     if (d.get("openAccessPdf") or {}).get("url"):
         urls.append(d["openAccessPdf"]["url"])

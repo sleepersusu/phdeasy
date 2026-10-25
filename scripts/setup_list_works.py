@@ -18,7 +18,7 @@ from pipeline.crosscheck import (
     pubmed_records,
     s2_records,
 )
-from pipeline.http import get, get_json, openalex_params
+from pipeline.http import get, get_json, openalex_params, s2_headers
 from pipeline.works import dedupe, normalize_work, strip_prefix
 
 SELECT = "id,doi,title,display_name,publication_year,type,primary_location,best_oa_location,locations,authorships,abstract_inverted_index,primary_topic,is_retracted,ids"
@@ -75,9 +75,9 @@ def crosscheck(author_rec, name, affil, works, a, b, log):
     def s2():
         known = {w["doi"] for w in works if w["doi"]}
         cands = {}
-        for c in get_json(f"https://api.semanticscholar.org/graph/v1/author/search?query={quote(name)}&limit=5")["data"]:
+        for c in get_json(f"https://api.semanticscholar.org/graph/v1/author/search?query={quote(name)}&limit=5", min_interval=1.1, retry_429=(5, 15, 30), headers=s2_headers())["data"]:
             cands[c["authorId"]] = get_json(
-                f"https://api.semanticscholar.org/graph/v1/author/{c['authorId']}/papers?fields=title,year,externalIds&limit=500"
+                f"https://api.semanticscholar.org/graph/v1/author/{c['authorId']}/papers?fields=title,year,externalIds&limit=500", min_interval=1.1, retry_429=(5, 15, 30), headers=s2_headers()
             )["data"]
         pick = pick_s2_author(cands, known)
         return s2_records(cands[pick], a, b) if pick else []

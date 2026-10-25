@@ -142,3 +142,11 @@ def test_is_preprint_url():
     assert is_preprint_url("https://www.researchsquare.com/article/rs-123/v1.pdf")
     assert is_preprint_url("https://arxiv.org/pdf/2401.01234")
     assert not is_preprint_url("https://cardio.jmir.org/2026/1/e82817/PDF")
+
+
+def test_s2_headers_use_env_key(monkeypatch):
+    from pipeline.http import s2_headers
+    monkeypatch.delenv("S2_API_KEY", raising=False)
+    assert s2_headers() == {}
+    monkeypatch.setenv("S2_API_KEY", "k123")
+    assert s2_headers() == {"x-api-key": "k123"}
