@@ -39,6 +39,8 @@ uv run pytest
 3. 開著的時候每 3 分鐘同步一次；另一台電腦正在用時，這台只看資料、不同步。
 4. 關掉那個黑色視窗（或按 Ctrl+C）會最後同步一次並釋放「使用中」。
 
+**Windows 安裝版**：到 GitHub 的 [Releases](https://github.com/sleepersusu/phdeasy/releases) 下載 `PhdeasyProfessorFiles-Setup.exe` 安裝，不用裝 Python 或 uv。先裝 Google Drive 電腦版並登入；打開後會把 `我的雲端硬碟/phdeasy教授檔案` 同步到 `使用者\phdeasy\runs` 再顯示。安裝版只看資料、不重建網頁（網頁由跑流水線的那台建好後經雲端同步過來）。發新版：推一個 `v*` 版號，GitHub Actions 只打包 Windows。
+
 建新教授、停 1／停 2 的確認仍在 Claude Code 裡做（「幫我建教授檔案：<姓名>，<學校>」）。
 
 你的資料放在 `runs/_me/me.json`（不進 git，經雲端硬碟同步）。

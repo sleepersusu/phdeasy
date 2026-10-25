@@ -1,0 +1,89 @@
+name: Build Windows installer
+
+# 推 v* 版號才會跑（只打包 Windows；Mac 用 repo 裡的 開啟教授檔案.command 就好，不打包）
+# 產出 PhdeasyProfessorFiles-Setup.exe，發佈到這個 repo 的 Releases
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  PYTHONUTF8: '1'
+  PYTHONIOENCODING: utf-8
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install build tools
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Tests (app and sync)
+        run: |
+          python -m pip install pytest
+          python -m pytest -q -p no:warnings tests/test_app.py tests/test_drive_sync.py
+
+      - name: Build exe
+        run: >
+          python -m PyInstaller --noconfirm --onedir --console --name PhdeasyProfessorFiles
+          --paths scripts scripts/app.py
+
+      - name: Rename exe
+        shell: pwsh
+        run: Rename-Item "dist/PhdeasyProfessorFiles/PhdeasyProfessorFiles.exe" "教授研究檔案.exe"
+
+      - name: Smoke test (serve a sample page)
+        shell: pwsh
+        run: |
+          $runs = Join-Path $env:RUNNER_TEMP "runs"
+          New-Item -ItemType Directory -Force $runs | Out-Null
+          Set-Content -Path (Join-Path $runs "index.html") -Value "<html>phdeasy ok</html>" -Encoding utf8
+          $p = Start-Process -FilePath "dist/PhdeasyProfessorFiles/教授研究檔案.exe" -ArgumentList "`"$runs`"","--no-browser","--port","8799" -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 30; $i++) {
+            Start-Sleep -Seconds 2
+            try { $r = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8799/; if ($r.Content -match "phdeasy ok") { $ok = $true; break } } catch {}
+          }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { Write-Output "::error::打包後的程式沒有正常開出網頁"; exit 1 }
+          Write-Output "網頁正常"
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: |
+          try { Invoke-WebRequest -UseBasicParsing "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseTraditional.isl" -OutFile "tools/ChineseTraditional.isl" } catch { Write-Output "沒有繁體中文語言檔，用英文" }
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          $env:APP_VERSION = "${{ github.ref_name }}".TrimStart("v")
+          & $iscc "tools\installer.iss"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          Get-Item dist/PhdeasyProfessorFiles-Setup.exe
+
+      - name: Installer test (silent install and uninstall)
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "dist/PhdeasyProfessorFiles-Setup.exe" -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/CURRENTUSER" -PassThru
+          if (-not $p.WaitForExit(300000)) { Write-Output "安裝超過 5 分鐘"; exit 1 }
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\PhdeasyProfessorFiles\教授研究檔案.exe"
+          if (-not (Test-Path $exe)) { Write-Output "::error::沒有裝到預期的位置"; exit 1 }
+          $u = Start-Process -FilePath (Join-Path $env:LOCALAPPDATA "Programs\PhdeasyProfessorFiles\unins000.exe") -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES" -PassThru
+          $u.WaitForExit(120000) | Out-Null
+          Write-Output "安裝、解除安裝都正常"
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/PhdeasyProfessorFiles-Setup.exe
+          body: |
+            Windows 下載 PhdeasyProfessorFiles-Setup.exe 安裝。
+            第一次打開前，請先安裝 Google Drive 電腦版並登入；教授檔案會從「我的雲端硬碟/phdeasy教授檔案」同步到 使用者\phdeasy\runs。
+            建新教授仍要在裝了 Claude Code 的電腦做。
