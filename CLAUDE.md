@@ -57,6 +57,7 @@
 | cards | `cards.py todo／check／diff／check-refute／assemble` |
 | profile | `profile.py facts／check／assemble`、`basic_info.py`（教授首頁基本資訊：ORCID 職稱與系所、OpenAlex 指標） |
 | match | `match.py inputs／check／check-refute／assemble` → `out/match.json`（首頁教授卡片讀它） |
+| 討論文獻 | `library.py add-doi／add-pdf／process／zotero／ris／draft-inputs／draft-check／draft-assemble`（skill `prof-library`）：教授給的文獻放 `runs/<slug>/library/`（結構同教授批次，同一套腳本處理），勾選擬的初稿放 `runs/<slug>/drafts/`；Zotero 只讀，匯出 RIS 由本人匯入 |
 | verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
 | 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |
 | 應用程式 | `app.py`（Windows 安裝版／雙擊 `開啟教授檔案.command`）：伺服 `web/`（做好的 HTML／JS）與 `runs/` 的 JSON；首頁可建新教授、停點回覆、繼續，由 `pipeline/jobs.py` 在背景叫 Claude Code（dontAsk＋限定工具）；打開、每 3 分鐘、關掉時同步雲端 |

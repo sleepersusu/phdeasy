@@ -149,6 +149,35 @@ def _recommend(run, owner):
     return {**m, "stale": bool(owner) and m.get("fingerprint") != me_fingerprint(owner)}
 
 
+def _library(run):
+    """討論文獻（runs/<slug>/library/，結構同教授批次）：給教授頁清單與單篇頁用，形狀跟 works 一樣。"""
+    import csv
+    from .library import lib_entry_paths
+    lib = run / "library"
+    works = _j(lib / "work" / "works.json", []) or []
+    idx = {}
+    if (lib / "pdfs" / "index.csv").exists():
+        with open(lib / "pdfs" / "index.csv", newline="") as f:
+            idx = {r["id"]: r for r in csv.DictReader(f)}
+    ing = _j(lib / "work" / "ingest.json", {}) or {}
+    out = []
+    for w in sorted(works, key=lambda w: ((w.get("library") or {}).get("added") or "", w["id"]), reverse=True):
+        r, ex = idx.get(w["id"], {}), _paper_extras(lib, w)
+        out.append({"id": w["id"], "title": w.get("title"), "year": w.get("year"), "venue": w.get("venue"), "doi": w.get("doi"),
+                    "type": w.get("type"), "kind": "full", "abstract": w.get("abstract"), "library": w.get("library") or {},
+                    "authors": [{"name": a.get("name")} for a in w.get("authors") or []],
+                    "fulltext": r.get("status") or "pending", "text_source": (ing.get(w["id"]) or {}).get("source_type"),
+                    "pdf_href": f"../../library/{r['path']}" if r.get("status") == "ok" and r.get("path") else None,
+                    "card": {"exists": False, "fields": []}, **ex, "figures": lib_entry_paths(ex["figures"])})
+    return out
+
+
+def _drafts(run):
+    """勾選討論文獻擬的初稿（runs/<slug>/drafts/<id>/final.json），新的在前。"""
+    out = [_j(p) for p in (run / "drafts").glob("*/final.json")] if (run / "drafts").exists() else []
+    return sorted([d for d in out if d], key=lambda d: d.get("id") or "", reverse=True)
+
+
 def _basic(wd, grants):
     """教授首頁頂端的基本資訊：basic_info.py 抓的 ORCID／OpenAlex（沒有就空），加上目前期間內的經費。"""
     from .propose import active_grants
@@ -251,6 +280,7 @@ def build_site_data(run):
         "match_docs": match_docs(wlist, grants),
         "me_query": _me_query(owner),
         "basic": _basic(wd, grants),
+        "library": _library(run), "drafts": _drafts(run),
         "joint_proposal": (owner or {}).get("proposal") if (owner or {}).get("proposal_with") == run.name else None,
         "proposal_draft": _proposal(run, owner, grants),
         "recommend": _recommend(run, owner),

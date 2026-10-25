@@ -54,6 +54,16 @@ def prompt_match(slug):
             "依 runs/_me/me.json 目前的研究興趣與 CV（不含與教授共同討論的研究計畫）重新跑 2.1–2.5，完成後回報 DONE 那一行。" + UNATTENDED)
 
 
+def prompt_library_process(slug):
+    return (f"處理 runs/{slug} 的討論文獻：照 .claude/skills/prof-library/SKILL.md 的 A 段（drive_sync → library.py process → 整理者與研究方法拆解 → "
+            "digest check（只修一輪）→ assemble → ris → build_site），完成後回報 DONE 那一行。" + UNATTENDED)
+
+
+def prompt_library_draft(slug, ids):
+    return (f"用 runs/{slug} 的討論文獻擬初稿：照 .claude/skills/prof-library/SKILL.md 的 B 段，勾選的文獻是 {','.join(ids)}；"
+            "只能引這幾篇與她的文章，完成後回報 DONE 那一行。" + UNATTENDED)
+
+
 def prompt_propose(slug):
     return (f"幫 runs/{slug} 擬研究構想草稿：先跑 drive_sync；已有 work/proposal/draft.json 就先移到 work/proposal/_old/（不要刪）；"
             "照 .claude/skills/prof-propose/SKILL.md 跑 inputs → 擬稿 → check（只修一輪）→ assemble → build_site，"

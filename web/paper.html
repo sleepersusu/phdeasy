@@ -79,12 +79,16 @@ const pairList = (items, ordered) => {
 
 function render(d, w){
   document.title = w.title;
-  $("#back").href = `professor.html?p=${encodeURIComponent(SLUG)}&v=papers`;
-  $("#prof").textContent = d.professor.name + " 的文章";
-  $("#t-en").textContent = w.title; $("#t-zh").textContent = w.title_zh || "（還沒有中文標題）";
-  $("#meta").innerHTML = [w.year, esc(w.venue || "期刊來源未提及"), (ROLE[w.target_position] || "作者序不明") + (w.target_corresponding ? "＋通訊作者" : ""),
+  const lib = w.library;  // 討論文獻：教授給的，不是她的文章
+  $("#back").href = `professor.html?p=${encodeURIComponent(SLUG)}&v=${lib ? "library" : "papers"}`;
+  $("#prof").textContent = d.professor.name + (lib ? " 的討論文獻" : " 的文章");
+  $("#t-en").textContent = w.title; $("#t-zh").textContent = w.title_zh || (lib ? "" : "（還沒有中文標題）");
+  $("#meta").innerHTML = (lib ? [w.year, esc(w.venue || ""), (w.authors || []).slice(0, 3).map(a => esc(a.name)).join(", "),
+      [lib.given_by && `${esc(lib.given_by)} 給的`, lib.discussion && `${esc(lib.discussion)} 討論`].filter(Boolean).join("，"),
+      w.digest ? (w.text_source === "abstract" ? "依摘要整理" : "依全文整理") : "還在處理"]
+    : [w.year, esc(w.venue || "期刊來源未提及"), (ROLE[w.target_position] || "作者序不明") + (w.target_corresponding ? "＋通訊作者" : ""),
     w.card && w.card.exists ? (w.text_source === "abstract" ? "依摘要解析" : w.text_source === "none" ? "只有標題" : "依全文解析") : "還沒解析",
-    w.exceptions.some(e => e.kind === "preprint_text") ? "全文是預印本版本" : ""].filter(Boolean).join("｜");
+    (w.exceptions || []).some(e => e.kind === "preprint_text") ? "全文是預印本版本" : ""]).filter(Boolean).join("｜");
   $("#links").innerHTML = (w.pdf_href ? `<a class="btn btn-green" href="${esc(w.pdf_href)}" target="_blank" rel="noopener">開啟全文 PDF</a>` : `<span class="btn btn-red" aria-disabled="true">沒有全文檔</span>`) +
     (w.doi ? `<a class="btn btn-green" href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">期刊頁（DOI）</a>` : "");
 
@@ -126,7 +130,7 @@ function render(d, w){
       ${f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)}（${esc(f.loc || "原文")}）">` : (f.table_html ? "" : `<div class="small muted" style="margin-top:6px">這張圖沒有拿到圖檔。</div>`)}</div>`;
   });
   // 4. 解析卡其他欄位（左英右中）
-  h += `<h2>完整解析</h2>`;
+  if ((w.card.fields || []).length) h += `<h2>完整解析</h2>`;  // 討論文獻沒有解析卡：不放空標題
   const claimField = (key, ordered) => {
     const f = F[key]; if (!f) return "";
     const items = (f.claims || []).map(c => ({en: c.text_en, zh: c.text, citations: c.citations}));
@@ -154,8 +158,9 @@ function render(d, w){
     const r = await fetch(new URL("data.json", base), {cache: "no-store"});
     if (!r.ok) throw new Error(`讀不到資料（${r.status}）`);
     const d = await r.json();
-    const w = d.works.find(x => x.id === ID);
-    if (!w) throw new Error(`這位教授沒有 ${ID} 這篇`);
+    const LIB = new URLSearchParams(location.search).get("lib") === "1";  // 討論文獻（教授給的文獻）
+    const w = (LIB ? d.library || [] : d.works).find(x => x.id === ID);
+    if (!w) throw new Error(LIB ? `討論文獻裡沒有 ${ID} 這篇` : `這位教授沒有 ${ID} 這篇`);
     const fix = h => h && !/^(https?:|#|mailto:)/.test(h) ? new URL(h, base).href : h;
     w.pdf_href = fix(w.pdf_href);
     (w.figures || []).forEach(f => { f.image = fix(f.image); });

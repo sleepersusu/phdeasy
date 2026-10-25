@@ -1,0 +1,235 @@
+"""討論文獻（教授頁「討論文獻」）：教授丟給本人的文獻，跟她的文章走同一套處理。
+
+  uv run python scripts/library.py add-doi runs/<slug> --doi 10.2196/xxx [--given-by Liliana] [--discussion 2026-11-03] [--note …] [--source zotero]
+  uv run python scripts/library.py add-pdf runs/<slug> --pdf runs/<slug>/library/inbox/<上傳的檔> [--given-by …] [--discussion …]
+  uv run python scripts/library.py process runs/<slug>      # 找全文 → 轉文字 → 抓圖表 → 列出待寫重點（AI 重點由 prof-library 派 agent）
+  uv run python scripts/library.py zotero runs/<slug> [--collection KEY]   # 讀本機 Zotero（唯讀）：列資料夾或資料夾裡的文獻
+  uv run python scripts/library.py ris runs/<slug>          # → library/out/zotero/library.ris（本人自己匯入 Zotero）
+  uv run python scripts/library.py draft-inputs runs/<slug> --ids W1,L2   # 勾選擬初稿 → drafts/<id>/inputs.json
+  uv run python scripts/library.py draft-check runs/<slug> --draft <id>
+  uv run python scripts/library.py draft-assemble runs/<slug> --draft <id>
+
+runs/<slug>/library/ 的結構跟教授批次一樣，所以 setup_fulltext.py、ingest.py、figures.py、digest.py 都直接對它跑。
+"""
+import argparse
+import hashlib
+import json
+import subprocess
+import sys
+from datetime import datetime
+from pathlib import Path
+from urllib.parse import quote
+
+from pipeline.export import paper_dir_name
+from pipeline.http import get_json, openalex_params
+from pipeline.library import check_lib_draft, doi_from_text, parse_zotero_items, ris_export, tag_item
+from pipeline.propose import active_grants
+from pipeline.state import append_progress, init_run, load_state
+from pipeline.works import normalize_work
+
+ZOTERO = "http://127.0.0.1:23119/api/users/0"
+SCRIPTS = Path(__file__).resolve().parent
+
+
+def _j(p, d=None):
+    return json.loads(p.read_text()) if p.exists() else d
+
+
+def lib_dir(run):
+    lib = run / "library"
+    if not (lib / "state.json").exists():
+        st = load_state(run)
+        init_run(lib, professor=st["professor"])
+        s = load_state(lib)
+        s.update({"stage": "library", "author_id": st.get("author_id")})
+        (lib / "state.json").write_text(json.dumps(s, ensure_ascii=False, indent=2))
+    (lib / "work").mkdir(exist_ok=True)
+    (lib / "inbox").mkdir(exist_ok=True)
+    if not (lib / "work" / "works.json").exists():
+        (lib / "work" / "works.json").write_text("[]")
+    return lib
+
+
+def _save(lib, works):
+    (lib / "work" / "works.json").write_text(json.dumps(works, ensure_ascii=False, indent=2))
+
+
+def _meta(a):
+    return dict(given_by=a.given_by, discussion=a.discussion, note=a.note, today=datetime.now().date().isoformat())
+
+
+def add_doi(lib, doi, source, **meta):
+    from setup_list_works import SELECT
+    works = json.loads((lib / "work" / "works.json").read_text())
+    doi = doi.strip().lower().removeprefix("https://doi.org/")
+    if any(w.get("doi") == doi for w in works):
+        print(f"SKIP {doi} 已在討論文獻")
+        return None
+    raw = get_json(f"https://api.openalex.org/works/doi:{quote(doi)}?select={SELECT}{openalex_params()}")
+    w = tag_item(normalize_work(raw, load_state(lib).get("author_id")), source=source, **meta)
+    works.append(w)
+    _save(lib, works)
+    print(f"ADD {w['id']} {w.get('year')} {w['title'][:70]}")
+    return w
+
+
+def add_pdf(lib, pdf, **meta):
+    import pymupdf
+    pdf = Path(pdf)
+    doc = pymupdf.open(pdf)
+    head = "\n".join(doc[i].get_text() for i in range(min(2, doc.page_count)))
+    doi = doi_from_text(head)
+    w = None
+    if doi:
+        try:
+            w = add_doi(lib, doi, "pdf", **meta)
+        except RuntimeError as e:
+            print(f"WARN OpenAlex 查不到 {doi}（{e}），改用 PDF 本身的標題")
+    if w is None and not doi:  # 沒有 DOI：用 PDF 的標題查 OpenAlex，標題字詞對得上第一頁才採用
+        from pipeline.textify import title_matches
+        guess = (doc.metadata or {}).get("title") or next((l.strip() for l in head.splitlines() if len(l.strip()) > 20), "")
+        try:
+            hits = get_json(f"https://api.openalex.org/works?search={quote(guess[:200])}&per-page=3{openalex_params()}").get("results") or []
+        except RuntimeError:
+            hits = []
+        hit = next((h for h in hits if h.get("doi") and title_matches(head, h.get("title") or "", threshold=0.8)), None)
+        if hit:
+            w = add_doi(lib, hit["doi"], "pdf", **meta)
+    if w is None:
+        works = json.loads((lib / "work" / "works.json").read_text())
+        if doi and any(x.get("doi") == doi for x in works):
+            w = next(x for x in works if x.get("doi") == doi)
+        else:
+            title = (doc.metadata or {}).get("title") or next((l.strip() for l in head.splitlines() if len(l.strip()) > 20), pdf.stem)
+            h = hashlib.sha256(pdf.read_bytes()).hexdigest()[:8]
+            w = tag_item({"id": f"L{h}", "title": title, "year": None, "type": "article", "doi": doi, "authors": [], "abstract": None,
+                          "venue": None}, source="pdf", **meta)
+            works.append(w)
+            _save(lib, works)
+            print(f"ADD {w['id']}（沒有 DOI，標題取自 PDF）{title[:70]}")
+    dest = lib / "inbox" / f"{w['id']}_{pdf.name}"
+    if pdf.resolve() != dest.resolve():
+        pdf.rename(dest)  # 檔名帶文章 id，找全文時 inbox 一定對得上
+    return w
+
+
+def run_step(*args):
+    r = subprocess.run([sys.executable, *map(str, args)], cwd=SCRIPTS.parent)
+    if r.returncode:
+        sys.exit(r.returncode)
+
+
+def process(lib):
+    run_step(SCRIPTS / "setup_fulltext.py", lib)
+    run_step(SCRIPTS / "ingest.py", lib)
+    run_step(SCRIPTS / "figures.py", "extract", lib)
+    run_step(SCRIPTS / "digest.py", "todo", lib)
+
+
+def zotero(collection=None):
+    if collection:
+        items = get_json(f"{ZOTERO}/collections/{collection}/items/top?limit=100", min_interval=0)
+        return {"items": parse_zotero_items(items)}
+    cols = get_json(f"{ZOTERO}/collections?limit=100", min_interval=0)
+    return {"collections": [{"key": c["key"], "name": (c.get("data") or {}).get("name")} for c in cols]}
+
+
+def ris(lib):
+    works = json.loads((lib / "work" / "works.json").read_text())
+    idx = {}
+    if (lib / "pdfs" / "index.csv").exists():
+        import csv
+        idx = {r["id"]: r for r in csv.DictReader(open(lib / "pdfs" / "index.csv"))}
+    digests = {w["id"]: _j(lib / "out" / "papers" / paper_dir_name(w) / "重點.json") or {} for w in works}
+    pdfs = {i: str((lib / r["path"]).resolve()) for i, r in idx.items() if r.get("status") == "ok" and r.get("path")}
+    out = lib / "out" / "zotero"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "library.ris").write_text(ris_export(works, digests, pdfs))
+    print(f"DONE library/out/zotero/library.ris：{len(works)} 篇")
+
+
+def draft_inputs(run, lib, ids):
+    me = _j(run.parent / "_me" / "me.json") or {}
+    lw = {w["id"]: w for w in json.loads((lib / "work" / "works.json").read_text())}
+    pw = {w["id"]: w for w in _j(run / "work" / "works.json", [])}
+    bad = [i for i in ids if i not in lw and i not in pw]
+    if bad:
+        print(f"BLOCKED 沒有這些文獻：{', '.join(bad)}")
+        sys.exit(1)
+
+    def brief(root, w):
+        dg = _j(root / "out" / "papers" / paper_dir_name(w) / "重點.json") or {}
+        return {"id": w["id"], "title": w.get("title"), "year": w.get("year"), "library": w.get("library"),
+                "key_points": dg.get("key_points"), "design": dg.get("design"), "method": dg.get("method"),
+                "abstract": None if dg else (w.get("abstract") or "")[:1500]}
+    sel = [brief(lib, lw[i]) if i in lw else brief(run, pw[i]) for i in ids]
+    act = active_grants(_j(run / "work" / "grants" / "grants_final.json", []) or [])
+    did = datetime.now().strftime("%Y%m%d-%H%M%S")
+    dd = run / "drafts" / did
+    dd.mkdir(parents=True)
+    joint = me.get("proposal") or {}
+    (dd / "inputs.json").write_text(json.dumps({
+        "selected": sel, "selected_ids": ids,
+        "professor_papers": [{"id": w["id"], "year": w.get("year"), "title": w.get("title")} for w in pw.values()],
+        "active_grants": act, "template_sections": joint.get("document") or [],
+        "joint_proposal_with_this_professor": joint if me.get("proposal_with") == run.name else None,
+        "me_cv": {k: me.get(k) for k in ("summary", "interests", "education", "publications", "projects", "capabilities")},
+    }, ensure_ascii=False, indent=1))
+    print(f"DONE drafts/{did}/inputs.json：勾選 {len(ids)} 篇")
+
+
+def draft_check(run, lib, did, assemble=False):
+    dd = run / "drafts" / did
+    inp, d = _j(dd / "inputs.json"), _j(dd / "draft.json")
+    if not inp or d is None:
+        print(f"BLOCKED drafts/{did} 少了 inputs.json 或 draft.json")
+        sys.exit(1)
+    act = {g["key"]: g for g in inp["active_grants"]}
+    fails = check_lib_draft(d, set(inp["selected_ids"]), {p["id"] for p in inp["professor_papers"]}, act)
+    for f in fails:
+        print(f"FAIL {f['path']} {f['why']}")
+    if fails:
+        sys.exit(1)
+    if not assemble:
+        print("PASS 初稿各段中英齊全、只引勾選的文獻與她的文章、每段說法都有出處")
+        return
+    out = {**d, "id": did, "selected_ids": inp["selected_ids"], "built": datetime.now().astimezone().isoformat(timespec="seconds")}
+    (dd / "final.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))
+    append_progress(run, "library", f"用勾選的 {len(inp['selected_ids'])} 篇擬初稿 drafts/{did}")
+    print(f"DONE drafts/{did}/final.json")
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("cmd", choices=["add-doi", "add-pdf", "process", "zotero", "ris", "draft-inputs", "draft-check", "draft-assemble"])
+    ap.add_argument("run")
+    ap.add_argument("--doi")
+    ap.add_argument("--pdf")
+    ap.add_argument("--source", default="doi")
+    ap.add_argument("--given-by")
+    ap.add_argument("--discussion")
+    ap.add_argument("--note")
+    ap.add_argument("--collection")
+    ap.add_argument("--ids")
+    ap.add_argument("--draft")
+    a = ap.parse_args()
+    run = Path(a.run)
+    lib = lib_dir(run)
+    if a.cmd == "add-doi":
+        add_doi(lib, a.doi, a.source, **_meta(a))
+    elif a.cmd == "add-pdf":
+        add_pdf(lib, a.pdf, **_meta(a))
+    elif a.cmd == "process":
+        process(lib)
+    elif a.cmd == "zotero":
+        print(json.dumps(zotero(a.collection), ensure_ascii=False, indent=1))
+    elif a.cmd == "ris":
+        ris(lib)
+    elif a.cmd == "draft-inputs":
+        draft_inputs(run, lib, [i.strip() for i in (a.ids or "").split(",") if i.strip()])
+    else:
+        draft_check(run, lib, a.draft, assemble=a.cmd == "draft-assemble")
+
+
+if __name__ == "__main__":
+    main()

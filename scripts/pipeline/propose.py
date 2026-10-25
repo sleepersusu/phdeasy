@@ -74,12 +74,13 @@ def _bi(path, it, work_ids, active, fails, need_prof=False, need_cv=False):
             fails.append({"path": path, "why": f"overclaim:{w}"})
     refs = it.get("refs") or []
     for r in refs:
+        if r in work_ids:
+            continue
         if r.startswith("cv:"):
             if r not in ME_REFS:
                 fails.append({"path": path, "why": f"unknown_cv_ref:{r}"})
-        elif r.startswith("W"):
-            if r not in work_ids:
-                fails.append({"path": path, "why": f"unknown_paper:{r}"})
+        elif r.startswith(("W", "L")):  # 她的文章（W…）或討論文獻（W… 或沒有 DOI 的 L…）
+            fails.append({"path": path, "why": f"unknown_paper:{r}"})
         elif r not in active:
             fails.append({"path": path, "why": f"grant_not_active:{r}"})
     if need_prof and not any(not r.startswith("cv:") for r in refs):

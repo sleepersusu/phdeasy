@@ -26,6 +26,7 @@ import sys
 import threading
 import time
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
@@ -33,7 +34,7 @@ from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
 from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, prompt_continue,
-                           prompt_exception, prompt_match, prompt_propose, prompt_new)
+                           prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
 FROZEN = getattr(sys, "frozen", False)  # Windows 安裝版（PyInstaller）
@@ -346,7 +347,78 @@ class App:
         dst.write_bytes(data)
         return {"ok": True, "saved": dst.relative_to(self.runs).as_posix()}
 
+    def lib_script(self, *args):
+        """跑討論文獻的腳本（加文獻、讀 Zotero）：用工作區的流水線，跟 Claude Code 跑的是同一支。"""
+        uv = find_uv()
+        if not uv:
+            raise ValueError("這台還沒有 uv，先到「設定」安裝")
+        r = subprocess.run([uv, "run", "python", "scripts/library.py", *args], cwd=str(self.workspace), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300)
+        if r.returncode:
+            raise ValueError((r.stdout + r.stderr).strip()[-400:] or "加入失敗")
+        return r.stdout.strip()
+
+    def _lib_slug(self, slug):
+        import re as _re
+        if not _re.fullmatch(r"[a-z0-9-]+", slug or "") or not (self.runs / slug / "state.json").exists():
+            raise ValueError(f"沒有這位教授：{slug}")
+        return slug
+
+    @staticmethod
+    def _lib_meta(m):
+        out = []
+        for k, flag in (("given_by", "--given-by"), ("discussion", "--discussion"), ("note", "--note")):
+            v = (m.get(k) or "").strip()
+            if v:
+                out += [flag, v[:200]]
+        return out
+
+    def library_upload(self, slug, data, meta, limit=200 * 1024 * 1024):
+        """討論文獻：本人上傳教授給的 PDF。存進 runs/<slug>/library/inbox/（只新增），再查 DOI／OpenAlex 建檔。"""
+        slug = self._lib_slug(slug)
+        if len(data) > limit or b"%PDF-" not in data[:1024]:
+            raise ValueError("這不是 PDF 檔（或超過 200 MB）")
+        inbox = self.runs / slug / "library" / "inbox"
+        inbox.mkdir(parents=True, exist_ok=True)
+        dst = inbox / f"_upload_{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.pdf"
+        dst.write_bytes(data)
+        out = self.lib_script("add-pdf", f"runs/{slug}", "--pdf", str(dst.relative_to(self.workspace)) if dst.is_relative_to(self.workspace) else str(dst),
+                              *self._lib_meta(meta))
+        self._rebuild_site(slug)
+        return {"ok": True, "result": out}
+
+    def _rebuild_site(self, slug):
+        """加了文獻：重建這位教授的 data.json，清單馬上看得到（「待處理」）。"""
+        uv = find_uv()
+        if uv:
+            subprocess.run([uv, "run", "python", "scripts/build_site.py", f"runs/{slug}"], cwd=str(self.workspace), capture_output=True, timeout=300)
+
     def post(self, path, body):
+        if path in ("library-add", "zotero"):
+            slug = self._lib_slug(body.get("slug"))
+            if path == "zotero":
+                args = ["zotero", f"runs/{slug}"] + (["--collection", body["collection"]] if body.get("collection") else [])
+                return json.loads(self.lib_script(*args))
+            import re as _re
+            dois = [d.strip() for d in body.get("dois") or [] if d.strip()]
+            bad = [d for d in dois if not _re.fullmatch(r"(https?://(dx\.)?doi\.org/)?10\.\d{4,9}/\S+", d, _re.I)]
+            if bad or not dois:
+                raise ValueError(f"這不是 DOI：{', '.join(bad) or '（空的）'}")
+            src = "zotero" if body.get("source") == "zotero" else "doi"
+            res = [self.lib_script("add-doi", f"runs/{slug}", "--doi", d, "--source", src, *self._lib_meta(body)) for d in dois]
+            self._rebuild_site(slug)
+            return {"ok": True, "result": res}
+        if path in ("library-process", "library-draft"):
+            if self.blocked:
+                raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
+            slug = self._lib_slug(body.get("slug"))
+            if path == "library-process":
+                return self.jobs.start("library", prompt_library_process(slug), f"討論文獻：{slug}", slug=slug)
+            import re as _re
+            ids = [i for i in body.get("ids") or [] if i]
+            if not ids or not all(_re.fullmatch(r"[WL][0-9a-f]+", i) for i in ids):
+                raise ValueError("先勾選要用的文獻")
+            return self.jobs.start("library-draft", prompt_library_draft(slug, ids), f"用 {len(ids)} 篇擬初稿：{slug}", slug=slug)
         if path == "account":
             acct = body.get("account")
             if self.need_account.is_set() and not self.account_chosen.is_set():  # 第一次選：背景的啟動同步正在等
@@ -464,6 +536,15 @@ def make_handler(app):
         def do_POST(self):
             if not self.path.startswith("/api/") or self.headers.get("X-Phdeasy-App") != "1":  # 擋其他網站偷送請求
                 return self._json(403, {"error": "forbidden"})
+            if self.path.startswith("/api/library-upload/"):
+                try:
+                    u = urlparse(self.path)
+                    from urllib.parse import parse_qs
+                    q = {k: v[0] for k, v in parse_qs(u.query).items()}
+                    n = int(self.headers.get("Content-Length") or 0)
+                    return self._json(200, app.library_upload(unquote(u.path.rsplit("/", 1)[-1]), self.rfile.read(n), q))
+                except (ValueError, RuntimeError) as e:
+                    return self._json(400, {"error": str(e)})
             if self.path.startswith("/api/upload/"):
                 try:
                     _, slug, wid = urlparse(self.path).path.rsplit("/", 2)

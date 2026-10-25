@@ -208,3 +208,25 @@ def test_site_data_has_basic_info_and_current_grants(tmp_path):
     assert isinstance(d["basic"]["active_grants"], list)
     (run / "work" / "basic.json").unlink()
     assert build_site_data(run)["basic"] == {"active_grants": build_site_data(run)["basic"]["active_grants"]}
+
+
+def test_site_data_lists_library_papers_and_drafts(tmp_path):
+    run = make_run(tmp_path)
+    lib = run / "library"
+    (lib / "work").mkdir(parents=True)
+    w = {"id": "L1", "title": "Given paper", "year": 2024, "type": "article", "kind": "full", "authors": [{"name": "Ann Lee"}],
+         "library": {"given_by": "Liliana", "discussion": "2026-11-03", "added": "2026-11-04"}}
+    (lib / "work" / "works.json").write_text(json.dumps([w]))
+    from pipeline.export import paper_dir_name
+    folder = lib / "out" / "papers" / paper_dir_name(w)
+    folder.mkdir(parents=True)
+    (folder / "重點.json").write_text(json.dumps({"key_points": [{"zh": "重點", "en": "Point"}],
+                                                 "figures": [{"label": "Figure 1", "image": f"../papers/{paper_dir_name(w)}/figures/figure-1.png"}]}))
+    (run / "drafts" / "d1").mkdir(parents=True)
+    (run / "drafts" / "d1" / "final.json").write_text(json.dumps({"id": "d1", "title": {"zh": "初稿", "en": "Draft"}, "selected_ids": ["L1"]}))
+    (run / "drafts" / "d2").mkdir(parents=True)  # 還沒組裝的不列
+    d = build_site_data(run)
+    [e] = d["library"]
+    assert e["library"]["given_by"] == "Liliana" and e["digest"]["key_points"][0]["zh"] == "重點"
+    assert e["figures"][0]["image"].startswith("../../library/out/papers/")
+    assert [x["id"] for x in d["drafts"]] == ["d1"]

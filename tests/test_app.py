@@ -137,3 +137,45 @@ def test_propose_route_refuses_finalized_professor(tmp_path):
     app.blocked = None
     with pytest.raises(ValueError, match="定案"):
         app.post("propose", {"slug": "doe-jane"})
+
+
+def _lib_app(tmp_path):
+    from app import App
+    app = App(tmp_path)
+    (tmp_path / "runs" / "doe-jane").mkdir(parents=True)
+    (tmp_path / "runs" / "doe-jane" / "state.json").write_text("{}")
+    app.blocked = None
+    calls = []
+    app.lib_script = lambda *a: calls.append(a) or "ADD W1 2024 Paper"
+    app._rebuild_site = lambda slug: None
+    app.jobs.start = lambda kind, prompt, title, slug=None: calls.append(("job", kind, slug, prompt)) or {"ok": True}
+    return app, calls
+
+
+def test_library_upload_saves_pdf_then_adds_with_who_gave_it(tmp_path):
+    import pytest
+    app, calls = _lib_app(tmp_path)
+    with pytest.raises(ValueError):
+        app.library_upload("doe-jane", b"not a pdf", {})
+    r = app.library_upload("doe-jane", b"%PDF-1.7 ...", {"given_by": "Jane", "discussion": "2026-11-03"})
+    saved = list((tmp_path / "runs" / "doe-jane" / "library" / "inbox").glob("*.pdf"))
+    assert len(saved) == 1 and r["ok"]
+    args = calls[0]
+    assert args[0] == "add-pdf" and "--given-by" in args and "Jane" in args and "2026-11-03" in args
+
+
+def test_library_add_doi_and_jobs(tmp_path):
+    import pytest
+    app, calls = _lib_app(tmp_path)
+    app.post("library-add", {"slug": "doe-jane", "dois": ["10.1234/a", " "], "given_by": "Jane", "source": "zotero"})
+    assert [c[0] for c in calls if c[0] != "build"] == ["add-doi"] and "10.1234/a" in calls[0] and "zotero" in calls[0]
+    with pytest.raises(ValueError):
+        app.post("library-add", {"slug": "doe-jane", "dois": ["not-a-doi"]})
+    app.post("library-process", {"slug": "doe-jane"})
+    assert calls[-1][:3] == ("job", "library", "doe-jane") and "prof-library" in calls[-1][3]
+    with pytest.raises(ValueError):
+        app.post("library-draft", {"slug": "doe-jane", "ids": []})
+    app.post("library-draft", {"slug": "doe-jane", "ids": ["W1", "L1abc"]})
+    assert calls[-1][1] == "library-draft" and "W1,L1abc" in calls[-1][3]
+    with pytest.raises(ValueError):
+        app.post("library-draft", {"slug": "doe-jane", "ids": ["W1; rm -rf"]})
