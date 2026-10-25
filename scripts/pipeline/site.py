@@ -225,7 +225,7 @@ def build_site_data(run):
     return {
         "generated": st.get("updated"),
         "professor": {"name": st["professor"].get("name"), "author_id": st.get("author_id"), "orcid": me.get("orcid"),
-                      "institution": flog.get("institution") or "; ".join(me.get("institutions") or []) or st["professor"].get("institution"),
+                      "institution": st["professor"].get("institution") or flog.get("institution") or "; ".join(me.get("institutions") or []),
                       "country": flog.get("country"), "years": "2022–2026"},
         "pipeline": {"stage": st["stage"], "halted": st["stage"] == "halted", "circuit": st.get("circuit"),
                      "stages": [{"key": s, "label": STAGE_LABELS.get(s, s), "state": "done" if i < done_idx else ("current" if i == done_idx else "todo")}

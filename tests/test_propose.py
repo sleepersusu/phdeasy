@@ -86,3 +86,15 @@ def test_overclaiming_words_are_caught():
     v["contribution"] = t("A groundbreaking, first-ever system.", "首創的系統。")
     w = whys(check_version(v, WORKS, ACT))
     assert "overclaim:groundbreaking" in w and "overclaim:首創" in w
+
+
+def test_version_may_say_no_grant_fits_instead_of_forcing_one():
+    # 期間內有經費但都不對題時，不能硬套：標 no_fitting_grant，且信心不能是「高」
+    v = version()
+    v["resources"] = {**t("No current grant covers this; funding to be discussed.", "目前期間內的經費都不涵蓋這個方向，經費要跟她討論。"), "no_fitting_grant": True}
+    assert check_version(v, WORKS, ACT) == []
+    v["confidence"]["level"] = "high"
+    assert "high_confidence_without_her_grant" in whys(check_version(v, WORKS, ACT))
+    v["confidence"]["level"] = "medium"
+    v["resources"]["refs"] = ["NIH:NOW"]  # 說不對題又引經費：自相矛盾
+    assert "no_fitting_grant_but_cites_grant" in whys(check_version(v, WORKS, ACT))

@@ -189,3 +189,12 @@ def test_site_data_carries_recommendations_and_staleness(tmp_path):
     (run / "out" / "match.json").write_text(json.dumps({"fingerprint": "old", "targets": [], "read_first": []}))
     d = build_site_data(run)
     assert d["recommend"]["targets"] == [] and d["recommend"]["stale"] in (True, False)
+
+
+def test_header_uses_institution_confirmed_at_stop1(tmp_path):
+    # OpenAlex／計畫查詢記到的機構可能是兼任單位（例：UTS），頁首用本人在停 1 確認的機構
+    run = make_run(tmp_path)
+    (run / "work" / "grants").mkdir(parents=True, exist_ok=True)
+    (run / "work" / "grants" / "fetch_log.json").write_text(json.dumps({"institution": "Other University", "country": "US"}))
+    d = build_site_data(run)
+    assert d["professor"]["institution"] == "UCSF" and d["professor"]["country"] == "US"

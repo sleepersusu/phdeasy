@@ -611,7 +611,7 @@ function versionHTML(v){
        <div class="small" style="margin-top:6px"><strong>目的</strong>${para(st.aim)}<strong>設計與方法</strong>${para(st.methods)}<strong>分析</strong>${para(st.analysis)}</div></div>`).join("")}
     ${sec("4. 預期貢獻｜Expected Contribution", v.contribution)}
     ${sec("5. 時程｜Timeline", v.timeline)}
-    ${sec("6. 資源與經費｜Resources and Funding", v.resources)}
+    ${sec("6. 資源與經費｜Resources and Funding", v.resources)}${(v.resources || {}).no_fitting_grant ? `<div class="row">${pill("r", "目前期間內沒有對題的經費")}<span class="small muted">經費來源要跟她討論</span></div>` : ""}
     <h3>我做得到的／可能做得到的</h3>
     <div class="mgrid"><div class="item"><div class="row">${pill("g", "已經會、做過")}</div><ul>${((v.fit || {}).can_do || []).map(x => `<li>${para(x)}</li>`).join("")}</ul></div>
       <div class="item"><div class="row">${pill("y", "要再學、可能做得到")}</div><ul>${((v.fit || {}).could_do || []).map(x => `<li>${para(x)}</li>`).join("")}</ul></div></div>

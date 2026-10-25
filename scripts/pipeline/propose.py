@@ -117,7 +117,10 @@ def check_version(v, work_ids, active):
         for i, it in enumerate(items):
             _bi(f"fit.{k}[{i}]", it, work_ids, active, fails, need_cv=True)
     res = [r for r in ((v.get("resources") or {}).get("refs") or []) if r in active]
-    if active and not res:
+    no_fit = bool((v.get("resources") or {}).get("no_fitting_grant"))  # 期間內的經費都不對題：照實寫，不硬套
+    if no_fit and res:
+        fails.append({"path": "resources", "why": "no_fitting_grant_but_cites_grant"})
+    if active and not res and not no_fit:
         fails.append({"path": "resources", "why": "resources_must_cite_active_grant"})
     if conf.get("level") == "high" and not any(active[r].get("status") == "confirmed" for r in res):
         fails.append({"path": "confidence.level", "why": "high_confidence_without_her_grant"})
