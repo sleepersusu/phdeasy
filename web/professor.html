@@ -519,8 +519,8 @@ let OFFLINE = false;
 const VIEW = () => new URLSearchParams(location.search).get("v") || (location.hash.startsWith("#paper-") ? "papers" : "");
 const viewHref = v => `professor.html?p=${encodeURIComponent(new URLSearchParams(location.search).get("p") || "")}${v ? "&v=" + v : ""}`;
 const VIEWS = [
-  ["proposal", "研究計畫書", "跟她討論過的計畫書；或依她的方向與經費、你做得到的事擬的幾個版本（附信心程度）",
-   d => [d.joint_proposal ? "討論過的版本" : "", draftVersions(d).length ? `草稿 ${draftVersions(d).length} 版${d.proposal_draft.stale ? "（過期）" : ""}` : ""].filter(Boolean).join("＋") || "還沒有"],
+  ["proposal", "研究計畫書", "跟她定案的計畫書；還沒有的話，依她的方向與經費、你做得到的事擬的幾個版本（附信心程度）",
+   d => [d.joint_proposal ? "已定案" : "", draftVersions(d).length ? `草稿 ${draftVersions(d).length} 版${d.proposal_draft.stale ? "（過期）" : ""}` : ""].filter(Boolean).join("＋") || "還沒有"],
   ["match", "與我的研究比對", "依你的興趣推薦先看哪幾篇、哪個計畫", d => d.recommend ? `${d.recommend.read_first.length} 篇先看` : "還沒比對"],
   ["profile", "教授總覽", "研究主線、演變、合作、可以問的問題", d => `${(d.profile || []).length} 章`],
   ["papers", "文章解析", "每篇的大意、設計、樣本、缺口、發現、限制", d => `${d.counts.works} 篇`],
@@ -532,6 +532,44 @@ const VIEWS = [
   ["exceptions", "例外紀錄", "找不到全文等，可以按按鈕請 AI 再處理", d => `未解決 ${d.counts.exceptions_open}`],
   ["files", "檔案", "報告、CSV、Zotero 匯入檔", d => ""],
 ];
+const GSTAT = {confirmed: ["g", "她主持"], pending: ["y", "待確認"], other: ["y", "合作者主持"]};
+function basicHTML(){
+  /* 教授首頁頂端：職稱、系所、學校（ORCID）、學術指標（OpenAlex）、近五年角色、領域、合作者、期間內的經費 */
+  const b = D.basic || {}, pos = b.position, m = b.metrics || {}, r = D.roles || {};
+  const n = x => x == null ? "—" : Number(x).toLocaleString();
+  const links = [b.sources && b.sources.orcid && b.sources.orcid.startsWith("http") ? ["ORCID", b.sources.orcid] : null,
+                 b.sources && b.sources.openalex && b.sources.openalex.startsWith("http") ? ["OpenAlex", b.sources.openalex] : null,
+                 ...(b.urls || []).map(u => [u.name || "網站", u.url])].filter(Boolean);
+  const subs = ((D.topics || {}).subfield || []).slice(0, 4).map(([t, c]) => `${esc(t)}（${c}）`).join("、");
+  const co = (D.coauthors || []).slice(0, 4).map(c => `${esc(c.name)}（${c.n} 篇）`).join("、");
+  const ag = b.active_grants || [];
+  const hist = (b.employments || []).filter(e => e !== undefined);
+  return `<section class="card" aria-label="基本資訊" style="margin-top:12px">
+    <h2 style="margin-top:0">${esc(D.professor.name)}</h2>
+    <div style="font-size:1.05rem">${pos ? `<strong>${esc(pos.title || "職稱未提及")}</strong>${pos.department ? "｜" + esc(pos.department) : ""}｜${esc(pos.institution || "")}${pos.since ? `（${esc(pos.since)} 起）` : ""}`
+      : `${esc(D.professor.institution || "")} <span class="small muted">（ORCID 沒有寫職稱）</span>`}</div>
+    ${links.length ? `<div class="row small" style="margin-top:6px">${links.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join("")}</div>` : ""}
+    ${b.bio ? `<p class="small" style="margin-top:8px">${esc(b.bio)}</p>` : ""}
+    <div class="mgrid" style="margin-top:12px">
+      <div class="kpi"><div class="n">${n(m.works_count)}</div><div class="l">全部發表（OpenAlex）</div></div>
+      <div class="kpi"><div class="n">${n(m.cited_by_count)}</div><div class="l">被引用次數</div></div>
+      <div class="kpi"><div class="n">${n(m.h_index)}</div><div class="l">h-index${m.i10_index != null ? `｜i10 ${n(m.i10_index)}` : ""}</div></div>
+      <div class="kpi"><div class="n">${n(r.total)}</div><div class="l">${esc(D.professor.years || "近五年")} 文章：第一作者 ${n(r.first)}、最後作者 ${n(r.last)}、通訊 ${n(r.corresponding)}</div></div>
+    </div>
+    ${m.as_of ? `<div class="small muted">學術指標資料日期 ${esc(m.as_of)}</div>` : ""}
+    <dl class="small" style="margin-top:12px;display:grid;grid-template-columns:max-content 1fr;gap:6px 12px">
+      ${subs ? `<dt><strong>主要領域</strong></dt><dd style="margin:0">${subs}</dd>` : ""}
+      ${(m.topics || []).length ? `<dt><strong>研究主題</strong></dt><dd style="margin:0">${m.topics.slice(0, 5).map(esc).join("、")}</dd>` : ""}
+      ${(b.keywords || []).length ? `<dt><strong>關鍵字（ORCID）</strong></dt><dd style="margin:0">${b.keywords.map(esc).join("、")}</dd>` : ""}
+      ${co ? `<dt><strong>最常合作</strong></dt><dd style="margin:0">${co}</dd>` : ""}
+      <dt><strong>期間內的經費</strong></dt><dd style="margin:0">${ag.length ? ag.map(g => `<div>${pill(...(GSTAT[g.status] || ["", g.status]))} ${esc(g.title || g.funder || g.key)} <span class="muted">（${esc(g.period || "")}）</span></div>`).join("") : "目前查不到"}</dd>
+      ${hist.length > 1 ? `<dt><strong>經歷（ORCID）</strong></dt><dd style="margin:0">${hist.map(e => `<div>${esc([e.title, e.department, e.institution].filter(Boolean).join("｜"))}${e.since || e.until ? `（${esc(e.since || "?")}–${esc(e.until || "今")}）` : ""}</div>`).join("")}</dd>` : ""}
+      ${(b.educations || []).length ? `<dt><strong>學歷（ORCID）</strong></dt><dd style="margin:0">${b.educations.map(e => `<div>${esc([e.title, e.institution].filter(Boolean).join("｜"))}${e.until ? `（${esc(e.until)}）` : ""}</div>`).join("")}</dd>` : ""}
+    </dl>
+    ${!b.position && !b.metrics ? `<div class="small muted">基本資訊還沒抓：跑 <code>uv run python scripts/basic_info.py runs/${esc(SLUG || "")}</code></div>` : ""}
+  </section>`;
+}
+
 function setupViews(){
   const v = VIEW(), main = document.querySelector("main");
   const nav = document.querySelector("nav.sections .wrap");
@@ -542,7 +580,7 @@ function setupViews(){
   if (!v){
     const hub = document.createElement("section");
     hub.id = "hub";
-    hub.innerHTML = `<p class="muted">選一個想看的部分，按進去就只顯示那一塊；上方的列可以隨時切換。</p>
+    hub.innerHTML = basicHTML() + `<p class="muted" style="margin-top:16px">選一個想看的部分，按進去就只顯示那一塊；上方的列可以隨時切換。</p>
       <div class="mgrid">${VIEWS.map(([id, label, hint, n]) => `<a class="card" href="${viewHref(id)}" style="text-decoration:none;display:block;border:2px solid var(--fg);border-radius:10px;padding:16px">
         <div class="row" style="justify-content:space-between"><strong style="font-size:1.1rem">${label}</strong><span class="pill">${esc(n(D) || "看")}</span></div>
         <div class="small muted" style="margin-top:6px">${hint}</div></a>`).join("")}</div>`;
@@ -590,7 +628,7 @@ function jointHTML(p){
       <div style="margin-top:8px;white-space:pre-line">${bi(s.zh || "", s.en, "div")}</div></details>`).join("")
     : `<h3>研究缺口</h3><ol>${(p.gaps || []).map(g => `<li>${bi(g.zh, g.en, "div")}</li>`).join("")}</ol>
        ${(p.studies || []).map(st => `<div class="item"><strong>${bi(st.name_zh, st.name, "div")}</strong><div class="small" style="margin-top:4px">${bi(st.detail_zh, st.detail, "div")}</div></div>`).join("")}`;
-  return `<div class="card"><div class="row">${pill("g", "跟她討論過")}<span class="small muted">出處：${esc(p.document_src || p.src || "研究計畫書")}</span></div>
+  return `<div class="card"><div class="row">${pill("g", "已定案")}<span class="small muted">出處：${esc(p.document_src || p.src || "研究計畫書")}</span></div>
     <h3 style="margin-top:10px">${bi(p.title_zh, p.title, "div")}</h3><div class="small muted">${esc(p.subtitle || "")}</div><div class="small">${esc(p.supervisor || "")}</div>
     ${doc.length ? "" : `<div style="margin-top:8px">${bi(p.synopsis_zh, p.synopsis, "div")}</div>`}</div>${secs}`;
 }
@@ -632,10 +670,8 @@ function proposalView(){
       <div class="row" role="tablist" style="margin-top:10px;flex-wrap:wrap">${vs.map(v => { const c = CONF[(v.confidence || {}).level] || ["", "?"];
         return `<button class="btn ${v.id === cur.id ? "btn-green" : ""}" role="tab" aria-selected="${v.id === cur.id}" data-ver="${esc(v.id)}">${esc(v.id)}｜${esc((v.direction || {}).zh || "")} ${pill(c[0], c[1])}</button>`; }).join("")}</div>
       <div style="margin-top:12px">${versionHTML(cur)}</div>`;
-  } else if (p) {
-    html += `<h3 style="margin-top:28px">AI 草稿：延伸方向</h3><div class="empty">還沒有依這份計畫延伸的草稿。${proposeButton(!!d)}</div>`;
   }
-  if (vs.length) html += proposeButton(true);
+  if (vs.length && !p) html += proposeButton(true);  // 跟她討論過的計畫書已定案：不再擬版本
   el.innerHTML = html;
 }
 

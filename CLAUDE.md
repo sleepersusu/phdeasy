@@ -55,7 +55,7 @@
 | network | `network.py build／check` |
 | grants | `grants.py fetch／check-mentions／merge／apply-refute` |
 | cards | `cards.py todo／check／diff／check-refute／assemble` |
-| profile | `profile.py facts／check／assemble` |
+| profile | `profile.py facts／check／assemble`、`basic_info.py`（教授首頁基本資訊：ORCID 職稱與系所、OpenAlex 指標） |
 | match | `match.py inputs／check／check-refute／assemble` → `out/match.json`（首頁教授卡片讀它） |
 | verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
 | 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |

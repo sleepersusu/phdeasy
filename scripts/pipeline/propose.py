@@ -23,6 +23,11 @@ NEED_PROF_REF = {"rationale"}
 OVERCLAIM = ["groundbreaking", "revolutionary", "first-ever", "unprecedented", "game-changing", "transformative", "guarantee",
              "首創", "革命性", "前所未有", "顛覆", "保證", "劃時代"]
 
+def finalized_with(me, slug):
+    """本人跟這位教授討論出來的計畫書已定案（本人 2026-10-26）：只放定案版，不再擬 AI 版本。"""
+    return bool(me) and bool(me.get("proposal")) and me.get("proposal_with") == slug
+
+
 def active_grants(grants, today=None, recent_years=5):
     """目前期間內的經費：有起訖日的看迄日是否還沒到；沒有起訖日的看公告／申請年度是否在近 5 年（標「期間不明」）。
     只算本人主持（confirmed）、待確認（pending）、合作者主持（other）；論文致謝提及的不算她的經費。"""

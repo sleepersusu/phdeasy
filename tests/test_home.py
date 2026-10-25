@@ -93,3 +93,12 @@ def test_professors_index_lists_runs(tmp_path):
     runs = runs_with_prof(tmp_path)
     idx = professors_index(runs)
     assert [p["slug"] for p in idx] == ["demo"] and idx[0]["data"] == "demo/out/site/data.json"
+
+
+def test_finalized_joint_proposal_hides_drafts(tmp_path):
+    runs = runs_with_prof(tmp_path)
+    me = json.loads((runs / "_me" / "me.json").read_text())
+    (runs / "_me" / "me.json").write_text(json.dumps({**me, "proposal_with": "demo"}))
+    (runs / "demo" / "out" / "proposal.json").write_text(json.dumps({"versions": [{"id": "v1"}], "fingerprint": "x"}))
+    d = build_site_data(runs / "demo")
+    assert d["joint_proposal"]["title"] == "When to Ask" and d["proposal_draft"] is None

@@ -31,8 +31,9 @@ uv run python scripts/state_cli.py show runs/<slug>
 1. **彙整事實與匯出**
    ```bash
    uv run python scripts/profile.py facts runs/<slug>
+   uv run python scripts/basic_info.py runs/<slug>   # 教授首頁的基本資訊（ORCID 職稱／系所、OpenAlex 指標）
    ```
-   會寫三樣東西：
+   facts 會寫三樣東西：
    - `work/profile/facts.json`
    - `out/papers/<年_作者_標題_id>/解析.md`：每篇一個資料夾，放解析、圖表頁（figures/）與 AI 重點（重點.json）
    - `out/zotero/<slug>.ris`：Zotero 匯入檔，每篇附解析卡大意當筆記

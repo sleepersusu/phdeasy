@@ -133,9 +133,9 @@ def _paper_extras(run, w):
 
 def _proposal(run, owner, grants):
     """prof-propose 的研究構想草稿（out/proposal.json）；本人 CV 或她期間內的經費變了就標 stale。"""
-    from .propose import active_grants, fingerprint
+    from .propose import active_grants, finalized_with, fingerprint
     p = _j(run / "out" / "proposal.json")
-    if not p:
+    if not p or finalized_with(owner, run.name):
         return None
     return {**p, "stale": bool(owner) and p.get("fingerprint") != fingerprint(owner, active_grants(grants))}
 
@@ -147,6 +147,13 @@ def _recommend(run, owner):
     if not m:
         return None
     return {**m, "stale": bool(owner) and m.get("fingerprint") != me_fingerprint(owner)}
+
+
+def _basic(wd, grants):
+    """教授首頁頂端的基本資訊：basic_info.py 抓的 ORCID／OpenAlex（沒有就空），加上目前期間內的經費。"""
+    from .propose import active_grants
+    act = [{k: g.get(k) for k in ("key", "title", "funder", "status", "role", "period")} for g in active_grants(grants)]
+    return {**(_j(wd / "basic.json") or {}), "active_grants": act}
 
 
 def _me_query(owner):
@@ -243,6 +250,7 @@ def build_site_data(run):
         "grants": grants, "grants_reviewed": grants_reviewed,
         "match_docs": match_docs(wlist, grants),
         "me_query": _me_query(owner),
+        "basic": _basic(wd, grants),
         "joint_proposal": (owner or {}).get("proposal") if (owner or {}).get("proposal_with") == run.name else None,
         "proposal_draft": _proposal(run, owner, grants),
         "recommend": _recommend(run, owner),

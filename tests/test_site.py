@@ -198,3 +198,13 @@ def test_header_uses_institution_confirmed_at_stop1(tmp_path):
     (run / "work" / "grants" / "fetch_log.json").write_text(json.dumps({"institution": "Other University", "country": "US"}))
     d = build_site_data(run)
     assert d["professor"]["institution"] == "UCSF" and d["professor"]["country"] == "US"
+
+
+def test_site_data_has_basic_info_and_current_grants(tmp_path):
+    run = make_run(tmp_path)
+    (run / "work" / "basic.json").write_text(json.dumps({"position": {"title": "Professor", "institution": "UCSF"}, "metrics": {"h_index": 3}}))
+    d = build_site_data(run)
+    assert d["basic"]["position"]["title"] == "Professor" and d["basic"]["metrics"]["h_index"] == 3
+    assert isinstance(d["basic"]["active_grants"], list)
+    (run / "work" / "basic.json").unlink()
+    assert build_site_data(run)["basic"] == {"active_grants": build_site_data(run)["basic"]["active_grants"]}

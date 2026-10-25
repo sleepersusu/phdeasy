@@ -402,6 +402,10 @@ class App:
             slug = (body.get("slug") or "").strip()
             if not slug or not (self.runs / slug / "state.json").exists():
                 raise ValueError(f"沒有這位教授：{slug}")
+            from pipeline.propose import finalized_with
+            mep = self.runs / "_me" / "me.json"
+            if finalized_with(json.loads(mep.read_text()) if mep.exists() else {}, slug):
+                raise ValueError("跟這位教授的計畫書已定案，不再產生 AI 版本")
             return self.jobs.start("propose", prompt_propose(slug), f"研究構想草稿：{slug}", slug=slug)
         if path == "reply":
             last = self.jobs.latest()

@@ -98,3 +98,11 @@ def test_version_may_say_no_grant_fits_instead_of_forcing_one():
     v["confidence"]["level"] = "medium"
     v["resources"]["refs"] = ["NIH:NOW"]  # 說不對題又引經費：自相矛盾
     assert "no_fitting_grant_but_cites_grant" in whys(check_version(v, WORKS, ACT))
+
+
+def test_finalized_with_professor_means_no_drafts():
+    # 本人與 Liliana 的計畫書已定案（2026-10-26）：她不再擬 AI 版本
+    from pipeline.propose import finalized_with
+    me = {"proposal_with": "laranjo-liliana", "proposal": {"title": "x"}}
+    assert finalized_with(me, "laranjo-liliana") and not finalized_with(me, "fukuoka-yoshimi")
+    assert not finalized_with({}, "laranjo-liliana")

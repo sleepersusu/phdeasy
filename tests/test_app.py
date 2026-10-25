@@ -123,3 +123,17 @@ def test_propose_route_starts_job_for_known_professor(tmp_path):
     import pytest
     with pytest.raises(ValueError):
         app.post("propose", {"slug": "nobody"})
+
+
+def test_propose_route_refuses_finalized_professor(tmp_path):
+    import json, pytest
+    from app import App
+    app = App(tmp_path)
+    (tmp_path / "runs" / "_me").mkdir(parents=True)
+    (tmp_path / "runs" / "_me" / "me.json").write_text(json.dumps({"proposal_with": "doe-jane", "proposal": {"title": "x"}}))
+    (tmp_path / "runs" / "doe-jane").mkdir()
+    (tmp_path / "runs" / "doe-jane" / "state.json").write_text("{}")
+    app.jobs.start = lambda *a, **k: pytest.fail("不該開工")
+    app.blocked = None
+    with pytest.raises(ValueError, match="定案"):
+        app.post("propose", {"slug": "doe-jane"})

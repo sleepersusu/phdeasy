@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from pipeline.export import paper_dir_name
-from pipeline.propose import active_grants, check_draft, check_version, fingerprint
+from pipeline.propose import finalized_with, active_grants, check_draft, check_version, fingerprint
 from pipeline.state import append_progress
 
 
@@ -36,6 +36,9 @@ def main():
     pd = run / "work" / "proposal"
     pd.mkdir(parents=True, exist_ok=True)
     me, works, grants, act = load(run)
+    if finalized_with(me, run.name):
+        print("SKIP 跟這位教授的計畫書已定案，不再擬 AI 版本")
+        return
     if a.cmd == "inputs":
         match = _j(run / "out" / "match.json") or {}
         papers = []
