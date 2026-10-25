@@ -94,6 +94,27 @@ def _card(run, wid, kind, source_type):
             "title_zh": (tr or {}).get("title_zh"), "keywords_zh": (tr or {}).get("keywords_zh") or [], "keywords_en": (tr or {}).get("keywords_en") or []}
 
 
+def match_docs(works, grants):
+    """首頁與教授頁共用的比對文件：每篇文章與每筆計畫一段文字（中英都放）。"""
+    docs = []
+    for w in works:
+        f = {x["key"]: x for x in w["card"]["fields"]}
+        parts = [w["title"], w.get("title_zh"), *w.get("keywords_zh", []), *w.get("keywords_en", []),
+                 (w.get("topic") or {}).get("name"), (w.get("topic") or {}).get("subfield"), (w.get("topic") or {}).get("field")]
+        for k in ("summary", "design", "sample"):
+            if k in f:
+                parts += [f[k].get("text"), f[k].get("text_en")]
+        for k in ("gap", "solves", "findings"):
+            for c in (f.get(k) or {}).get("claims") or []:
+                parts += [c.get("text"), c.get("text_en")]
+        docs.append({"id": w["id"], "kind": "paper", "text": " ".join(p for p in parts if p)})
+    for g in grants:
+        if g.get("status") != "other":
+            docs.append({"id": g["key"], "kind": "grant", "text": " ".join(p for p in (g.get("title"), g.get("title_zh"), g.get("summary_en"),
+                                                                                        g.get("summary_zh"), g.get("funder"), g.get("funder_zh")) if p)})
+    return docs
+
+
 def _ex_state(e):
     return "resolved" if e.get("resolved") else ("info" if e["kind"] in INFO_KINDS else "open")
 
@@ -159,6 +180,7 @@ def build_site_data(run):
         decisions.append({"kind": "pdf", "text": f"{len(missing)} 篇找不到免費全文，目前只依摘要解析",
                           "action": "從圖書館下載 PDF 放進 inbox/，重跑即可升級成全文解析", "works": [w["id"] for w in missing]})
 
+    owner = _j(run.parent / "_me" / "me.json")  # 本人（使用者）資料，不是教授
     full = [w for w in wlist if w["kind"] == "full"]
     done_idx = STAGES.index(st["stage"]) if st["stage"] in STAGES else -1
     return {
@@ -180,6 +202,9 @@ def build_site_data(run):
         "roles": net.get("roles") or {}, "years": net.get("years") or {}, "topics": net.get("topics") or {},
         "coauthors": net.get("coauthors") or [], "possible_splits": net.get("possible_splits") or [],
         "grants": grants, "grants_reviewed": grants_reviewed,
+        "match_docs": match_docs(wlist, grants),
+        "me_query": (owner or {}).get("match"),
+        "home_href": "../../../index.html",
         "profile": (_j(wd / "profile" / "final.json") or {}).get("sections", []),
         "works": wlist, "exceptions": ex_list, "decisions": decisions,
         "files": [

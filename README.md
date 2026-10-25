@@ -30,6 +30,17 @@ uv sync
 uv run pytest
 ```
 
+## 看結果
+
+```bash
+uv run python scripts/build_home.py runs
+```
+```bash
+cd runs && python3 -m http.server 8790 --bind 127.0.0.1
+```
+
+瀏覽器開 http://127.0.0.1:8790/ ：首頁是你的 CV 與研究計畫，往下是教授比對，點進去是教授詳細資料。你的資料放在 `runs/_me/me.json`（只存本機）。
+
 ## 資料夾結構
 
 ```

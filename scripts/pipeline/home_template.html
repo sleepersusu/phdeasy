@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的博士申請首頁</title>
+<style>
+:root{
+  --fg:#000;--bg:#fff;--muted:#3f3f3f;--line:#cfcfcf;--soft:#f4f4f4;
+  --green:#15803d;--on-green:#fff;--yellow:#facc15;--on-yellow:#000;--red:#b91c1c;--on-red:#fff;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-padding-top:64px}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.6}
+a{color:var(--fg);text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.wrap{max-width:1100px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+header.top{border-bottom:2px solid var(--fg);padding:20px 0 12px}
+header.top .wrap{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-end}
+header.top h1{margin:0;font-size:1.7rem;line-height:1.3}
+.meta{color:var(--muted);font-size:.95rem;margin-top:4px}
+nav.sections{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+nav.sections .wrap{display:flex;gap:4px;overflow-x:auto;padding-top:6px;padding-bottom:6px}
+nav.sections a{display:inline-flex;align-items:center;min-height:44px;padding:0 12px;text-decoration:none;white-space:nowrap;border-radius:6px;font-weight:600}
+nav.sections a:hover{background:var(--soft);text-decoration:underline}
+section{padding:28px 0 8px;border-bottom:1px solid var(--line)}
+section h2{font-size:1.3rem;margin:0 0 12px}
+h3{font-size:1.05rem;margin:18px 0 8px}
+.muted{color:var(--muted)}
+.small{font-size:.9rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 14px;border-radius:8px;border:2px solid transparent;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;transition:filter .15s}
+.btn:hover{filter:brightness(.92)}
+.btn-green{background:var(--green);color:var(--on-green)}
+.btn-yellow{background:var(--yellow);color:var(--on-yellow)}
+.btn-red{background:var(--red);color:var(--on-red)}
+.btn[aria-pressed="false"]{background:var(--bg);color:var(--fg);border-color:var(--green)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.85rem;font-weight:600;border:1px solid var(--fg);background:var(--bg)}
+.pill.g{background:var(--green);color:var(--on-green);border-color:var(--green)}
+.pill.y{background:var(--yellow);color:var(--on-yellow);border-color:#a16207}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.grid>*{min-width:0}
+.card{border:1px solid var(--line);border-radius:8px;padding:14px;overflow-wrap:anywhere}
+.prof{border:2px solid var(--fg);border-radius:10px;padding:16px;display:grid;gap:10px}
+.prof h3{margin:0;font-size:1.25rem}
+.kpis{display:flex;flex-wrap:wrap;gap:16px}
+.kpi .n{font-size:1.4rem;font-weight:700;font-variant-numeric:tabular-nums}
+.kpi .l{color:var(--muted);font-size:.85rem}
+.bar{height:8px;width:100px;background:var(--soft);border:1px solid var(--line);border-radius:3px;display:inline-block;vertical-align:middle}
+.bar>span{display:block;height:100%;background:var(--fg)}
+.empty{padding:16px;border:1px dashed var(--fg);border-radius:8px}
+ol.studies{padding-left:1.2em;display:grid;gap:10px}
+.src{font-size:.8rem;color:var(--muted)}
+body.lang-zh .t-en,body.lang-en .t-zh{display:none}
+body.lang-both .t-en{display:block;color:var(--muted);font-size:.93em}
+body.lang-both span.t-en{display:inline}
+footer{padding:24px 0 48px;color:var(--muted);font-size:.9rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body class="lang-both">
+<header class="top"><div class="wrap">
+  <div><h1 id="name"></h1><div class="meta" id="headline"></div><div class="meta small" id="contact"></div></div>
+  <div class="row" role="group" aria-label="內容語言">
+    <button class="btn btn-green" data-lang="zh">中文</button>
+    <button class="btn btn-green" data-lang="en">English</button>
+    <button class="btn btn-green" data-lang="both">雙語</button>
+  </div>
+</div></header>
+<nav class="sections" aria-label="區段"><div class="wrap">
+  <a href="#me">我是誰</a><a href="#proposal">我的研究計畫</a><a href="#capabilities">我能做到的事</a><a href="#professors">教授比對</a>
+</div></nav>
+<main class="wrap">
+  <section id="me" aria-labelledby="h-me"><h2 id="h-me">我是誰</h2><div class="body"></div></section>
+  <section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">我的研究計畫</h2><div class="body"></div></section>
+  <section id="capabilities" aria-labelledby="h-cap"><h2 id="h-cap">我能做到的事</h2><div class="body"></div></section>
+  <section id="professors" aria-labelledby="h-prof"><h2 id="h-prof">教授比對</h2><div class="body"></div></section>
+</main>
+<footer class="wrap">這一頁只存在你的電腦（runs/ 不進版本控制）。內容摘自你的 CV 與研究計畫書，每段標了出處；比對只呈現主題重疊與證據，不是「適不適合」的判斷。</footer>
+<script>
+const H = __DATA__;
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const bi = (zh, en, tag = "span") => (zh ? `<${tag} class="t-zh">${esc(zh)}</${tag}>` : "") + (tag === "span" && zh && en ? " " : "") + (en ? `<${tag} class="t-en" lang="en">${esc(en)}</${tag}>` : "");
+const body = id => $(`#${id} .body`);
+const STATUS = {confirmed: ["g", "本人主持"], pending: ["y", "待確認"], acknowledged: ["", "論文致謝提及"], other: ["", "合作者主持"]};
+
+function setLang(l){
+  document.body.className = "lang-" + l;
+  document.querySelectorAll("[data-lang]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === l)));
+  try { localStorage.setItem("phdeasy:home:lang", l); } catch (e) {}
+}
+
+function renderMe(m){
+  $("#name").textContent = m.name + (m.name_zh ? `（${m.name_zh}）` : "");
+  $("#headline").innerHTML = bi(m.headline_zh, m.headline);
+  const c = m.contact || {};
+  $("#contact").innerHTML = [c.location && esc(c.location), c.email && esc(c.email), c.github && `<a href="https://${esc(c.github)}" target="_blank" rel="noopener">${esc(c.github)}</a>`].filter(Boolean).join("｜");
+  body("me").innerHTML = `
+    <div class="card">${bi(m.summary_zh, m.summary, "div")}<div class="src">出處：${esc(m.summary_src || "CV")}</div></div>
+    <h3>研究興趣</h3><div class="chips">${(m.interests || []).map(i => `<span class="pill">${bi(i.zh, i.en)}</span>`).join("")}</div>
+    <div class="grid" style="margin-top:16px">
+      <div class="card"><h3 style="margin-top:0">學歷</h3><ul>${(m.education || []).map(e => `<li><strong>${esc(e.degree)}</strong>，${esc(e.school)}（${esc(e.years)}）${e.note ? `<div class="small muted">${esc(e.note)}</div>` : ""}</li>`).join("")}</ul></div>
+      <div class="card"><h3 style="margin-top:0">發表</h3><ul>${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul>
+        <h3>專案</h3><ul>${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul></div>
+    </div>`;
+}
+
+function renderProposal(p){
+  if (!p){ body("proposal").innerHTML = `<div class="empty">還沒有研究計畫資料。</div>`; return; }
+  body("proposal").innerHTML = `
+    <div class="card">
+      <h3 style="margin-top:0">${bi(p.title_zh, p.title, "div")}</h3>
+      <div class="small muted">${esc(p.subtitle || "")}</div>
+      <div class="small" style="margin-top:6px">${esc(p.supervisor || "")}</div>
+      <div style="margin-top:10px">${bi(p.synopsis_zh, p.synopsis, "div")}</div>
+      <div class="src">出處：${esc(p.src || "研究計畫書")}</div>
+    </div>
+    <h3>研究缺口</h3><ol>${(p.gaps || []).map(g => `<li>${bi(g.zh, g.en, "div")}</li>`).join("")}</ol>
+    <h3>三個研究</h3><div class="grid">${(p.studies || []).map(s => `<div class="card"><strong>${bi(s.name_zh, s.name, "div")}</strong><div class="small" style="margin-top:6px">${bi(s.detail_zh, s.detail, "div")}</div></div>`).join("")}</div>`;
+}
+
+function renderCaps(cs){
+  body("capabilities").innerHTML = `<p class="muted small">整理自你的 CV，每一區都附出處，方便你面談時直接對應到具體經驗。</p>
+    <div class="grid">${(cs || []).map(c => `<div class="card"><h3 style="margin-top:0">${bi(c.area_zh, c.area, "div")}</h3>
+      <ul>${c.items.map((it, i) => `<li>${bi((c.items_zh || [])[i], it, "div")}</li>`).join("")}</ul><div class="src">出處：${esc(c.src)}</div></div>`).join("")}</div>`;
+}
+
+function renderProfs(ps){
+  const el = body("professors");
+  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有教授檔案。跟 Claude 說「幫我建教授檔案：姓名，學校」就會開始建立。</div>`; return; }
+  el.innerHTML = `<p class="muted">每位教授都已經用你的研究計畫與興趣比對過。點「查看教授詳細資料」可以看完整的文章解析、合作者、計畫，並在那裡調整比對內容。</p>` +
+    ps.map(p => {
+      const c = p.counts || {};
+      return `<article class="prof">
+        <div class="row" style="justify-content:space-between"><h3>${esc(p.name)}</h3>${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">查看教授詳細資料 →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}</div>
+        <div class="muted small">${esc(p.institution || "")}</div>
+        <div class="kpis">
+          <div class="kpi"><div class="n">${c.works ?? "–"}</div><div class="l">篇文章（2022–2026）</div></div>
+          <div class="kpi"><div class="n">${p.n_strong}</div><div class="l">篇與你的計畫高度重疊<br><span class="small">（共 ${p.n_overlap_papers} 篇有任一重疊）</span></div></div>
+          <div class="kpi"><div class="n">${c.grants_pi ?? "–"}</div><div class="l">個本人主持計畫</div></div>
+          <div class="kpi"><div class="n">${c.coauthors ?? "–"}</div><div class="l">位合作者</div></div>
+        </div>
+        ${p.shared_terms.length ? `<div><strong>重疊的主題</strong><div class="chips" style="margin-top:6px">${p.shared_terms.map(t => `<span class="pill">${esc(t)}</span>`).join("")}</div></div>` : `<div class="empty">和你的計畫沒有找到明顯重疊。</div>`}
+        ${p.top_papers.length ? `<div><strong>最相關的文章</strong><ol>${p.top_papers.map(w => `<li><span class="bar" aria-hidden="true"><span style="width:${w.pct}%"></span></span> ${w.year}｜<a href="${esc(p.href)}#paper-${esc(w.id)}">${bi(w.title_zh, w.title)}</a><div class="small muted">命中：${w.terms.map(esc).join("、")}</div></li>`).join("")}</ol></div>` : ""}
+        ${p.top_grants.length ? `<div><strong>相關的研究計畫</strong><ul>${p.top_grants.map(g => `<li>${STATUS[g.status] ? `<span class="pill ${STATUS[g.status][0]}">${STATUS[g.status][1]}</span>` : ""} ${bi(g.title_zh, g.title)} <span class="small muted">${esc(g.award_id || "")}${g.end ? "，至 " + esc(g.end) : ""}</span></li>`).join("")}</ul></div>` : ""}
+        ${p.design_overlap.length ? `<div><strong>你計畫用的研究設計</strong><ul>${p.design_overlap.map(d => `<li>${esc(d.method)}：她有 <strong>${d.n}</strong> 篇</li>`).join("")}</ul></div>` : ""}
+        <div class="small muted">比對只看主題與用詞的重疊程度，不是「適不適合」的判斷。</div>
+      </article>`;
+    }).join("");
+}
+
+(function init(){
+  let l = "both"; try { l = localStorage.getItem("phdeasy:home:lang") || "both"; } catch (e) {}
+  setLang(l);
+  document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+  if (!H.me){
+    $("#name").textContent = "我的博士申請首頁";
+    body("me").innerHTML = `<div class="empty">還沒有你的個人資料。請把 CV 與研究計畫交給 Claude，它會整理成 runs/_me/me.json。</div>`;
+    renderProposal(null); renderCaps([]);
+  } else {
+    renderMe(H.me); renderProposal(H.me.proposal); renderCaps(H.me.capabilities);
+  }
+  renderProfs(H.professors);
+})();
+</script>
+</body>
+</html>

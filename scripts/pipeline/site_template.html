@@ -110,7 +110,7 @@ header.top .wrap{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-betw
 </head>
 <body>
 <a class="sr" href="#papers">跳到文章解析</a>
-<header class="top"><div class="wrap"><div><h1 id="title"></h1><div class="meta" id="meta"></div></div>
+<header class="top"><div class="wrap"><div><a class="btn btn-green" href="../../../index.html" style="margin-bottom:8px">← 回我的首頁</a><h1 id="title"></h1><div class="meta" id="meta"></div></div>
   <div class="langs" role="group" aria-label="內容語言">
     <button class="btn btn-green" data-lang="zh" aria-pressed="false">中文</button>
     <button class="btn btn-green" data-lang="en" aria-pressed="false">English</button>
@@ -171,26 +171,16 @@ function setLang(l){
 const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升中年女性的身體活動與心血管健康知識，特別是少數族群。",
                  tags: "chatbot、physical activity、women、cardiovascular、health disparities", methods: ["pilot-rct", "quasi-experimental"]};
 
-function matchDocs(){
-  const docs = D.works.map(w => {
-    const f = Object.fromEntries(w.card.fields.map(x => [x.key, x]));
-    const claims = k => ((f[k] && f[k].claims) || []).map(c => `${c.text} ${c.text_en || ""}`).join(" ");
-    return {id: w.id, kind: "paper", text: [w.title, w.title_zh, ...w.keywords_zh, ...w.keywords_en, w.topic.name, w.topic.subfield, w.topic.field,
-      f.summary && f.summary.text, f.summary && f.summary.text_en, f.design && f.design.text, f.design && f.design.text_en,
-      f.sample && f.sample.text, f.sample && f.sample.text_en, claims("gap"), claims("solves"), claims("findings")].filter(Boolean).join(" ")};
-  });
-  const gdocs = D.grants.filter(g => g.status !== "other").map(g => ({id: g.key, kind: "grant",
-    text: [g.title, g.title_zh, g.summary_en, g.summary_zh, g.funder, g.funder_zh].filter(Boolean).join(" ")}));
-  return buildIndex(docs.concat(gdocs));
-}
+function matchDocs(){ return buildIndex(D.match_docs); }
 let MIDX = null;
 
 function match(){
   const el = body("match");
-  const saved = store.get("match") || {};
+  const saved = store.get("match") || D.me_query || {};
   const designs = [...new Set(D.works.map(w => (w.card.fields.find(x => x.key === "design") || {}).facts).filter(Boolean).map(f => f["設計類型"]).filter(Boolean))];
   if (!$("#mf")){
     el.innerHTML = `
+      ${D.me_query && !store.get("match") ? `<div class="item" style="margin-bottom:12px">${pill("g", "已套用")} 已自動帶入你首頁的研究計畫與興趣，可以直接修改後重新比對。</div>` : ""}
       <p class="muted">輸入你想做的研究，頁面會在你的瀏覽器裡跟這位教授的文章、計畫、合作者與方法比對，列出重疊之處和證據。比對只看主題與用詞的重疊程度，<strong>不是</strong>「適不適合」的判斷；你輸入的內容只存在這台電腦的瀏覽器。</p>
       <form id="mf" class="match-form">
         <div><label for="m-goal">我想做的研究 <span class="hint">（中文或英文都可以；寫族群、介入方式、想看的結果會更準）</span></label>

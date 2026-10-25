@@ -2,7 +2,9 @@
 // 中文用雙字詞、英文用詞幹；SYN 把常見研究詞中英互相帶出，讓中文輸入也比得到英文文章。
 // 比對分數只是重疊程度，不是「適不適合」的判斷。
 
-const STOP_EN = new Set("the a an and or of for to in on at by with from into as is are was were be been this that these those it its we our you your they their study studies research use using used based among between within via than more most also can may will would should could about over under after before during each per new two one".split(" "));
+const STOP_EN = new Set(("the a an and or of for to in on at by with from into as is are was were be been this that these those it its we our you your they their study studies research use using used based among between within via than more most also can may will would should could about over under after before during each per new two one " +
+  // 健康研究裡到處都有、不代表主題的詞
+  "health intervention disease patient clinical controlled information evaluation outcome data program care risk approach adult participant result method analysis effect associated increase").split(" "));
 const STOP_ZH_BI = new Set("研究 本研 究分 分析 析結 結果 果顯 顯示 示目 目的 方法 我們 進行 相關 影響 探討 本文 以及 透過 可能 其中 發現 顯著 提升 增加 包括 主要 使用 參與 參與者 與者 此研 這項".split(" "));
 const STOP_ZH_CHARS = "的我你他她想做用和與在是了也就都很及或為並於等這那些個要能可以會把被讓對從到".split("");
 
@@ -105,7 +107,7 @@ function displayTerms(query, matched) {
   const hit = new Set(matched);
   const low = String(query || "").toLowerCase();
   const edge = new RegExp("^[" + STOP_ZH_CHARS.join("") + "]+|[" + STOP_ZH_CHARS.join("") + "]+$", "g");
-  const cands = new Set(String(query || "").split(/[、，,;；。\s]+/).map(x => x.trim().replace(edge, "")).filter(x => x && x.length <= 30));
+  const cands = new Set(String(query || "").split(/[、，,;；。\s]+/).map(x => x.trim().replace(/[.,;:!?()]+$/, "").replace(edge, "")).filter(x => x && x.length <= 30));
   for (const group of SYN) if (group.some(t => low.includes(t.toLowerCase()))) group.forEach(t => cands.add(t));
   const out = [];
   for (const c of cands) {

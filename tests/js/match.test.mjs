@@ -41,4 +41,9 @@ assert.ok(!gen.includes("研究") && !gen.includes("分析") && !gen.includes("�
 const shown = M.displayTerms("我想做身體活動、chatbot", ["身體", "體活", "活動", "physical", "activity", "chatbot", "聊天"]);
 assert.ok(shown.includes("身體活動") && shown.includes("chatbot") && shown.includes("physical activity"));
 assert.ok(!shown.includes("體活") && !shown.includes("身體"));
+// 一般性健康研究用詞不算主題命中
+const g2 = M.tokenize("Health interventions for patients with disease: clinical information evaluation");
+assert.deepEqual(g2, []);
+// 顯示詞去掉標點
+assert.ok(!M.displayTerms("chatbot evaluation.", ["chatbot"]).some(t => /[.,;]$/.test(t)));
 console.log("ok");

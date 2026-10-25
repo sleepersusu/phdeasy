@@ -55,7 +55,8 @@
 | grants | `grants.py fetch／check-mentions／merge／apply-refute` |
 | cards | `cards.py todo／check／diff／check-refute／assemble` |
 | profile | `profile.py facts／check／assemble` |
-| verify | `e2e.py`、`build_site.py`（前端，任何階段後都可重跑） |
+| verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
+| 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁；本人資料在 `runs/_me/me.json`（只存本機） |
 
 ## 腳本與測試
 
