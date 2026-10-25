@@ -6,6 +6,7 @@ import csv
 import json
 from pathlib import Path
 
+from .grants import currency
 from .state import STAGES, load_state
 
 CARD_FIELDS = [
@@ -134,7 +135,7 @@ def build_site_data(run):
     grants = final if final is not None else (_j(wd / "grants" / "grants.json", []) or [])
     gtr = _j(wd / "grants" / "i18n.json", {}) or {}
     grants = [{**g, "title_zh": (gtr.get(g["key"]) or {}).get("title_zh"), "summary_en": (gtr.get(g["key"]) or {}).get("summary_en"),
-               "summary_zh": (gtr.get(g["key"]) or {}).get("summary_zh"), "funder_zh": (gtr.get(g["key"]) or {}).get("funder_zh")} for g in grants]
+               "summary_zh": (gtr.get(g["key"]) or {}).get("summary_zh"), "funder_zh": (gtr.get(g["key"]) or {}).get("funder_zh"), "currency": currency(g)} for g in grants]
     grants_reviewed = final is not None
     exc = st.get("exceptions", [])
 

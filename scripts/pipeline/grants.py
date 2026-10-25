@@ -294,6 +294,16 @@ def _money(v):
         return 0.0
 
 
+def currency(g):
+    """金額幣別：NIH／NSF 是美元，NHMRC／ARC 是澳幣；其他來源不知道就不寫。"""
+    src = (g.get("source") or "").lower()
+    if src in ("nhmrc", "arc"):
+        return "AUD"
+    if src in ("nih", "nih_lookup", "nsf") or (g.get("key") or "").startswith(("NIH:", "NSF:")):
+        return "USD"
+    return None
+
+
 def nhmrc_projects(rows, target_name, target_inst, round_year):
     """NHMRC 各年度 Summary of results（欄名每年不同，以關鍵字找欄）。CIA 吻合＝pi；其他 CI 欄吻合＝co_pi。"""
     out = []
@@ -311,10 +321,13 @@ def nhmrc_projects(rows, target_name, target_inst, round_year):
         inst = str(_col(r, "admin") or "")
         app = str(_col(r, "app id", "application id", "app_id", "grant id") or "").split(".")[0]
         start = _col(r, "start")
+        ann = _col(r, "announced")
+        scheme = " – ".join(str(x).strip() for x in (_col(r, "scheme", "grant type"), _col(r, "sub type")) if x and str(x).strip()) or None
         out.append({"key": f"ID:NHMRC{app}", "award_id": f"NHMRC {app}", "funder": "NHMRC",
                     "title": _col(r, "title"), "pi_names": [cia] + [x for x in others_names if x != cia][:8], "org": inst,
                     "target_role": role, "status": "confirmed" if inst_match(inst, target_inst) else "pending",
-                    "scheme": _col(r, "scheme", "grant type", "type"), "start": str(start).split(".")[0] if start else None,
+                    "scheme": scheme, "announced": str(ann)[:10] if ann else None,
+                    "start": str(start).split(".")[0] if start else None,
                     "end": None, "round": str(round_year), "total_award": _money(_col(r, "total", "budget", "amount")),
                     "abstract": _col(r, "summary", "plain", "abstract")})
     return out

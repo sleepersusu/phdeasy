@@ -278,3 +278,21 @@ def test_merge_splits_multiple_award_ids_in_one_mention():
     m = [{"work_id": "W1", "funder": "NHMRC", "award_id": "2022036, 2022566; 2044237", "quote": "grants 2022036, 2022566 and 2044237", "loc": "p.1", "check": "ok"}]
     keys = sorted(g["key"] for g in merge_grants([], [], m))
     assert keys == ["ID:NHMRC2022036", "ID:NHMRC2022566", "ID:NHMRC2044237"]
+
+
+def test_nhmrc_keeps_announced_date_and_sub_type():
+    import datetime
+    from pipeline.grants import nhmrc_projects
+    rows = [{"APP ID": 2017642, "Date Announced": datetime.datetime(2022, 10, 12), "CIA Name": "Dr Liliana Laranjo",
+             "Grant Type": "Investigator Grants", "Sub Type": "Emerging Leadership 1 ", "Grant Title": "Digital health",
+             "Admin Institution": "University of Sydney", "Total": 636434.15, "Plain Description": "Apps."}]
+    p = nhmrc_projects(rows, "Liliana Laranjo", "The University of Sydney", "2022")[0]
+    assert p["announced"] == "2022-10-12" and p["scheme"] == "Investigator Grants – Emerging Leadership 1"
+    assert p["abstract"] == "Apps." and p["start"] is None
+
+
+def test_currency_by_source():
+    from pipeline.grants import currency
+    assert currency({"source": "nhmrc"}) == "AUD" and currency({"source": "arc"}) == "AUD"
+    assert currency({"key": "NIH:HL114180"}) == "USD" and currency({"source": "nsf"}) == "USD"
+    assert currency({"source": "openalex"}) is None

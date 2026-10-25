@@ -343,7 +343,9 @@ function grants(){
       <div class="row">${grantPill(g)} <strong>${g.title ? bi(g.title_zh, g.title) : bi(g.funder_zh, g.funder)}</strong></div>
       ${g.summary_zh || g.summary_en ? `<div class="small">${bi(g.summary_zh, g.summary_en, "div")}</div>` : ""}
       <div class="small">補助單位：${esc(g.funder || "來源未提及")}｜編號：${esc(g.award_id || "無編號")}${g.pi_names && g.pi_names.length ? `｜主持人：${esc(g.pi_names.join("、"))}` : ""}</div>
-      <div class="small">期間：${esc(g.start || "來源未提及")} – ${esc(g.end || "來源未提及")}${g.total_award ? `｜金額合計 US$${Number(g.total_award).toLocaleString()}` : ""}</div>
+      ${g.scheme ? `<div class="small">類別：${esc(g.scheme)}</div>` : ""}
+      <div class="small">期間：${g.start || g.end ? `${esc(g.start || "來源未提及")} – ${esc(g.end || "來源未提及")}` : "來源未提及"}${g.announced ? `｜公告日 ${esc(g.announced)}` : (g.round ? `｜申請年度 ${esc(g.round)}` : "")}${g.total_award ? `｜金額合計 ${g.currency ? esc(g.currency) + " " : ""}${Number(g.total_award).toLocaleString()}` : ""}</div>
+      <div class="small muted">資料來源：${esc({nhmrc: "NHMRC 公告名單", arc: "ARC Data Portal", nih_lookup: "NIH RePORTER", nih: "NIH RePORTER", nsf: "NSF"}[g.source] || (g.status === "acknowledged" ? "論文致謝" : "OpenAlex 補助標註／論文致謝"))}</div>
       ${g.works.length ? `<div class="small">相關文章：${g.works.map(id => `<a href="#paper-${id}">${id}</a>`).join(" ")}</div>` : ""}
       ${(g.evidence || []).filter(e => e.quote).slice(0, 2).map(e => `<blockquote>"${esc(e.quote)}" <span class="loc">[${esc(e.work_id)}, ${esc(e.loc)}]</span></blockquote>`).join("")}
       ${g.refute && g.refute.reason ? `<div class="small muted">檢查結果：${esc(g.refute.reason)}</div>` : ""}

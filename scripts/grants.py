@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from pipeline.exceptions import add_exception
-from pipeline.grants import ack_snippets, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match
+from pipeline.grants import ack_snippets, currency, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match
 from pipeline.http import get_json, openalex_params
 from pipeline.state import load_state
 
@@ -291,10 +291,10 @@ def apply_refute(run):
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w", newline="") as f:
         wr = csv.writer(f)
-        wr.writerow(["key", "status", "target_role", "funder", "award_id", "title", "pi_names", "start", "end", "total_award", "works", "evidence_types", "refute", "refute_reason"])
+        wr.writerow(["key", "status", "target_role", "funder", "award_id", "title", "pi_names", "start", "end", "announced", "scheme", "total_award", "currency", "works", "evidence_types", "refute", "refute_reason"])
         for g in final:
             wr.writerow([g["key"], g["status"], g["target_role"], g.get("funder") or "", g.get("award_id") or "", g.get("title") or "",
-                         "; ".join(g.get("pi_names") or []), g.get("start") or "", g.get("end") or "", g.get("total_award") or "",
+                         "; ".join(g.get("pi_names") or []), g.get("start") or "", g.get("end") or "", g.get("announced") or "", g.get("scheme") or "", g.get("total_award") or "", currency(g) or "",
                          " ".join(g["works"]), " ".join(sorted({e["type"] for e in g["evidence"]})), g["refute"]["verdict"], g["refute"]["reason"] or ""])
     by = {}
     for g in final:
