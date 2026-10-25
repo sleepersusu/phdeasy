@@ -74,3 +74,9 @@ def test_facts_distinguish_full_cards_from_fulltext():
     f = build_facts({"name": "Y F"}, WORKS, NET, CARDS, GRANTS, fulltext_ok=1)
     assert f["n_full_cards"] == 2 and f["n_fulltext"] == 1
     assert "n_full" not in f
+
+
+def test_ref_to_named_item_must_mention_name():
+    d = {"sections": [{"key": "c", "title": "x", "claims": [{"text": "Bob Smith 合作 2 篇。", "refs": ["fact:top_coauthors[0]"]}]}]}
+    fails = check_draft(d, facts(), {"W1"})
+    assert any(f["why"] == "ref_name_mismatch:Ann Lee" for f in fails)

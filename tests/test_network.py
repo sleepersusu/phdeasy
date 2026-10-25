@@ -161,3 +161,24 @@ def test_name_merge_blocked_when_orcids_differ():
 def test_competition_rank_for_ties():
     from pipeline.network import competition_ranks
     assert competition_ranks([10, 9, 4, 4, 4, 3]) == [1, 2, 3, 3, 3, 6]
+
+
+def test_owner_aliases_merge_ids():
+    works = [
+        {"id": "W1", "year": 2022, "kind": "full", "authors": [au("A1", "Thomas J. Hoffmann"), au(T, "Y F")], "topic": {}},
+        {"id": "W2", "year": 2023, "kind": "full", "authors": [au("A9", "Thomas J. Hoffmann"), au(T, "Y F")], "topic": {}},
+    ]
+    stats = coauthor_stats(works, T, "Fukuoka", aliases={"A9": "A1"})
+    assert len(stats) == 1 and stats[0]["key"] == "A1" and stats[0]["n"] == 2
+    assert stats[0]["owner_merged_ids"] == ["A9"]
+    md = author_lists_md(works, T, "Fukuoka", aliases={"A9": "A1"})
+    assert "Thomas J. Hoffmann (A1，本人決定合併 A9)" in md
+
+
+def test_possible_splits_skips_owner_merged():
+    from pipeline.network import possible_splits
+    works = [
+        {"id": "W1", "year": 2022, "kind": "full", "authors": [au("A1", "Thomas J. Hoffmann"), au(T, "Y F")], "topic": {}},
+        {"id": "W2", "year": 2023, "kind": "full", "authors": [au("A9", "Thomas J. Hoffmann"), au(T, "Y F")], "topic": {}},
+    ]
+    assert possible_splits(coauthor_stats(works, T, "Fukuoka", aliases={"A9": "A1"})) == []

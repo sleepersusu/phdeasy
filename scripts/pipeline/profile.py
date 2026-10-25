@@ -74,6 +74,8 @@ def check_draft(draft, facts, work_ids, cards=None, works=None):
                         fails.append({"path": path, "why": f"unknown_ref:{r}", "text": cl.get("text")})
                     else:
                         backing |= _nums(v)
+                        if isinstance(v, dict) and v.get("name") and v["name"].split()[-1] not in (cl.get("text") or ""):
+                            fails.append({"path": path, "why": f"ref_name_mismatch:{v['name']}", "text": cl.get("text")})
                 elif r in work_ids:
                     if cards and r in cards:
                         backing |= _nums(cards[r])

@@ -44,8 +44,10 @@ def _is_target(a, target_id, surname):
     return surname.lower() in _norm_name(a.get("name")).lower().split()
 
 
-def coauthor_stats(works, target_id, surname):
-    acc = defaultdict(lambda: {"names": Counter(), "merged": set(), "works": [], "years": Counter(), "insts": Counter(), "first": 0, "last": 0, "corr": 0})
+def coauthor_stats(works, target_id, surname, aliases=None):
+    """aliases：本人在停 2 決定合併的作者 id {別名 id: 主 id}。"""
+    aliases = aliases or {}
+    acc = defaultdict(lambda: {"names": Counter(), "merged": set(), "owner_ids": set(), "works": [], "years": Counter(), "insts": Counter(), "first": 0, "last": 0, "corr": 0})
     links = _name_links(works, target_id, surname)
     for w in works:
         seen = set()
@@ -54,10 +56,14 @@ def coauthor_stats(works, target_id, surname):
                 continue
             name = _norm_name(a.get("name"))
             k = _key(a) if a.get("id") else links.get(name, _key(a))
+            alias_of = k if k in aliases else None
+            k = aliases.get(k, k)
             if k in seen:
                 continue
             seen.add(k)
             s = acc[k]
+            if alias_of:
+                s["owner_ids"].add(alias_of)
             if a.get("id") or not k.startswith("A"):
                 s["names"][name] += 1
             else:
@@ -78,6 +84,7 @@ def coauthor_stats(works, target_id, surname):
                 "name": name,
                 "linked": not k.startswith("name:"),
                 "merged_names": sorted(s["merged"]),
+                "owner_merged_ids": sorted(s["owner_ids"]),
                 "n": len(s["works"]),
                 "works": sorted(s["works"]),
                 "years": dict(sorted(s["years"].items())),
@@ -112,8 +119,9 @@ def year_counts(works):
     return dict(sorted(Counter(w.get("year") for w in works).items()))
 
 
-def author_lists_md(works, target_id, surname):
+def author_lists_md(works, target_id, surname, aliases=None):
     """給計數 agent 的輸入：每篇一節，列出所有作者與用來計數的 id。不附任何統計結果。"""
+    aliases = aliases or {}
     links = _name_links(works, target_id, surname)
     lines = ["# 作者清單", ""]
     for w in sorted(works, key=lambda w: w["id"]):
@@ -122,6 +130,8 @@ def author_lists_md(works, target_id, surname):
             name = _norm_name(a.get("name"))
             if _is_target(a, target_id, surname):
                 tag = "本人"
+            elif a.get("id") in aliases:
+                tag = f"{aliases[a['id']]}，本人決定合併 {a['id']}"
             elif a.get("id"):
                 tag = a["id"]
             elif name in links:

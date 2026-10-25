@@ -32,7 +32,10 @@ def build(run):
     st = load_state(run)
     works = json.loads((run / "work" / "works.json").read_text())
     surname = st["professor"]["name"].split()[-1]
-    stats = coauthor_stats(works, st["author_id"], surname)
+    owner = json.loads((run / "work" / "owner_decisions.json").read_text()) if (run / "work" / "owner_decisions.json").exists() else {}
+    aliases = owner.get("author_aliases") or {}
+    keep_sep = [set(g) for g in owner.get("keep_separate") or []]
+    stats = coauthor_stats(works, st["author_id"], surname, aliases=aliases)
     net = {
         "target": {"author_id": st["author_id"], "name": st["professor"]["name"]},
         "works_total": len(works),
@@ -41,14 +44,15 @@ def build(run):
         "topics": topic_counts(works),
         "coauthors_total": len(stats),
         "coauthors_linked": sum(s["linked"] for s in stats),
-        "possible_splits": possible_splits(stats),
+        "possible_splits": [g for g in possible_splits(stats) if set(g["keys"]) not in keep_sep],
+        "owner_decisions": owner,
         "coauthors": stats,
     }
     for g in net["possible_splits"]:
         add_exception(run, "split:" + "+".join(g["keys"]), "network", "possible_author_split",
                       f"可能同一人被拆成多個 id：{' / '.join(f'{n}（{k}，{c} 篇）' for n, k, c in zip(g['names'], g['keys'], g['counts']))}；合併後最多 {g['combined_n_max']} 篇，停 2 由本人決定")
     (run / "work" / "network.json").write_text(json.dumps(net, ensure_ascii=False, indent=2))
-    (run / "work" / "author_lists.md").write_text(author_lists_md(works, st["author_id"], surname))
+    (run / "work" / "author_lists.md").write_text(author_lists_md(works, st["author_id"], surname, aliases=aliases))
 
     ing = json.loads((run / "work" / "ingest.json").read_text()) if (run / "work" / "ingest.json").exists() else {}
     idx = load_index(run)
