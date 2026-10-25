@@ -54,3 +54,16 @@ def test_jobs_records_session_result_and_calls_hook(tmp_path):
     assert saved["session"] == "abc" and saved["result"] == "請確認身分" and saved["status"] == "done" and saved["cost_usd"] == 1.5
     assert any("到停 1 了" in l for l in j.log_tail(job["id"]))
     assert seen and seen[0]["id"] == job["id"]
+
+
+def test_exception_prompts_by_action():
+    from pipeline.jobs import exception_actions, prompt_exception
+    assert {a for a, _ in exception_actions("abstract_only")} == {"retry_fulltext"}
+    assert {a for a, _ in exception_actions("grant_unresolved")} == {"grant_yes", "grant_no"}
+    p = prompt_exception("laranjo", {"id": "W1", "kind": "abstract_only", "detail": "只有摘要"}, "retry_fulltext", "")
+    assert "W1" in p and "setup_fulltext.py runs/laranjo --only W1 --retry-missing" in p and "prof-cards" in p
+    g = prompt_exception("laranjo", {"id": "ID:CL1", "kind": "grant_unresolved", "detail": "x"}, "grant_no", "不是她的")
+    assert "ID:CL1" in g and "不是她的" in g and "本人決定" in g
+    import pytest
+    with pytest.raises(ValueError):
+        prompt_exception("laranjo", {"id": "W1", "kind": "abstract_only"}, "grant_yes", "")

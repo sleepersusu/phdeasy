@@ -54,6 +54,45 @@ def prompt_match(slug):
             "依 runs/_me/me.json 目前的研究興趣與研究計畫重新跑 2.1–2.5，完成後回報 DONE 那一行。" + UNATTENDED)
 
 
+FULLTEXT_KINDS = {"abstract_only", "title_only", "no_source", "no_text", "title_mismatch", "not_main_text", "unreadable", "wrong_file"}
+REJUDGE_KINDS = {"dual_track_unresolved", "field_unresolved", "no_card"}
+
+
+def exception_actions(kind):
+    """例外紀錄上可以按的按鈕：[(動作, 按鈕文字)]。每個都會開一個 Claude Code 背景工作。"""
+    if kind in FULLTEXT_KINDS:
+        return [("retry_fulltext", "讓 AI 再找一次全文")]
+    if kind == "grant_unresolved":
+        return [("grant_yes", "是她的計畫"), ("grant_no", "不是，拿掉")]
+    if kind == "possible_author_split":
+        return [("split_merge", "是同一人，合併"), ("split_keep", "不同人，分開")]
+    if kind in REJUDGE_KINDS:
+        return [("rejudge", "請 AI 重新判")]
+    return []
+
+
+def prompt_exception(slug, exc, action, note=""):
+    if action != "note" and action not in {a for a, _ in exception_actions(exc.get("kind"))}:
+        raise ValueError(f"{exc.get('kind')} 沒有「{action}」這個動作")
+    head = f"runs/{slug} 的例外紀錄：{exc.get('id')}（{exc.get('kind')}：{exc.get('detail', '')}）。"
+    extra = f"本人補充：{note.strip()}。" if note and note.strip() else ""
+    tail = ("做完把這筆例外標為已解決（state_cli／pipeline.exceptions.resolve_exception，寫明怎麼解決），"
+            "跑 build_home.py runs，最後用兩三句話回報結果。" + UNATTENDED)
+    if action == "retry_fulltext":
+        return (head + extra + f"請再找一次這篇的全文：先跑 drive_sync，再跑 `uv run python scripts/setup_fulltext.py runs/{slug} --only {exc['id']} --retry-missing`"
+                "（本人放進 inbox/ 的 PDF 也會被用上），接著跑 ingest。如果這篇改成有全文：照 prof-cards 只重做這一篇（甲、乙、核對、裁決、推翻、組裝），"
+                "重翻這篇的 i18n，跑 profile.py facts 與 assemble。如果還是找不到，就保留例外、在回報裡寫清楚試了哪些來源。" + tail)
+    if action in ("grant_yes", "grant_no"):
+        verdict = "這筆計畫是她的（請依計畫實際資料把狀態改為 confirmed，角色照來源判斷）" if action == "grant_yes" else "這筆計畫不是她的，請移到 out/rejected.md"
+        return (head + extra + f"本人決定：{verdict}。記進 work/owner_decisions.json 與 protocol.md 的例外，照 prof-grants 的規則重跑 apply-refute 與 grants.csv。" + tail)
+    if action in ("split_merge", "split_keep"):
+        verdict = "這幾個作者 id 是同一人，請合併（寫進 work/owner_decisions.json 的 author_aliases）" if action == "split_merge" else "這幾個作者 id 是不同人，請維持分開（寫進 keep_separate）"
+        return (head + extra + f"本人決定：{verdict}。照 prof-network 重跑 build 與 Haiku 計數 check，總覽受影響的句子照 prof-profile 修正一輪。" + tail)
+    if action == "rejudge":
+        return (head + extra + "請照 prof-cards 的規則，只針對這一篇重新做會出這個例外的那一步（雙軌裁決或重新寫卡），再組裝。" + tail)
+    return head + extra + "照本人的補充處理這筆例外，遵守 CLAUDE.md 與對應 skill 的規則。" + tail
+
+
 def describe(event):
     """stream-json 的一行 → 給本人看的一行文字（看不懂的事件回 None）。"""
     t = event.get("type")

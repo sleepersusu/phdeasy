@@ -75,3 +75,17 @@ def test_account_chosen_in_window(tmp_path):
     assert a.status()["need_account"] is True
     a.post("account", {"account": "b@x.com"})
     assert a.account_chosen.is_set() and '"b@x.com"' in (tmp_path / "runs" / "_me" / "drive.json").read_text()
+
+
+def test_upload_saves_pdf_into_inbox_without_overwrite(tmp_path):
+    import pytest
+    from app import App
+    a = App(tmp_path)
+    (tmp_path / "runs" / "prof").mkdir(parents=True)
+    (tmp_path / "runs" / "prof" / "state.json").write_text("{}")
+    assert a.upload("prof", "W1", b"%PDF-1.7 x")["saved"] == "prof/inbox/W1.pdf"
+    assert a.upload("prof", "W1", b"%PDF-1.7 y")["saved"] == "prof/inbox/W1-2.pdf"
+    with pytest.raises(ValueError):
+        a.upload("prof", "W1", b"<html>not pdf")
+    with pytest.raises(ValueError):
+        a.upload("../etc", "W1", b"%PDF-1.7")

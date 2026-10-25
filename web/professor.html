@@ -435,17 +435,56 @@ function papers(){
 }
 
 let exFilter = "open";
+let APP = null;  /* 在應用程式裡打開時是 /api/status 的內容：例外可以按按鈕請 Claude Code 處理 */
+const APIX = (path, body, raw) => fetch("/api/" + path, {method: "POST", headers: {"X-Phdeasy-App": "1", "Content-Type": raw ? "application/pdf" : "application/json"},
+  body: raw || JSON.stringify(body)}).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; });
+const SLUG = new URLSearchParams(location.search).get("p");
+
+function exActions(e){
+  if (!APP || e.state !== "open") return "";
+  const acts = (APP.exception_actions || {})[e.kind] || [];
+  const isPaper = /^W\d+$/.test(e.id);
+  const pdfKinds = ["abstract_only", "title_only", "no_source", "no_text", "title_mismatch", "not_main_text", "unreadable", "wrong_file"];
+  return `<div class="row">${acts.map(([a, label]) => `<button class="btn ${a === "grant_no" || a === "split_keep" ? "btn-yellow" : "btn-green"}" data-exa="${esc(a)}" data-id="${esc(e.id)}" data-kind="${esc(e.kind)}">${esc(label)}</button>`).join("")}
+    ${isPaper && pdfKinds.includes(e.kind) ? `<label class="btn btn-green" style="cursor:pointer">我有 PDF，上傳<input type="file" accept="application/pdf" data-upload="${esc(e.id)}" data-kind="${esc(e.kind)}" hidden></label>` : ""}
+    <button class="btn btn-yellow" data-exa="note" data-id="${esc(e.id)}" data-kind="${esc(e.kind)}">其他指示…</button></div>`;
+}
+
+async function startException(id, kind, action, note){
+  if (APP.running) throw new Error("已經有一個工作在跑，等它跑完再按");
+  await APIX("exception", {slug: SLUG, id, kind, action, note: note || ""});
+  alert("已請 Claude Code 在背景處理。進度在首頁的「建新教授」區；做完這一頁重新整理就會更新。");
+}
+
 function exceptions(){
   const el = body("exceptions");
   const n = s => D.exceptions.filter(e => e.state === s).length;
   const btn = (k, cls, label) => `<button class="btn ${cls}" aria-pressed="${exFilter === k}" data-x="${k}">${label}（${n(k)}）</button>`;
   const list = D.exceptions.filter(e => e.state === exFilter);
-  el.innerHTML = `<p class="muted">自動段無法完成而被隔離的項目。未解決的例外超過 30% 時流水線會停下來。</p>
+  const ops = APP && exFilter === "open";
+  el.innerHTML = `<p class="muted">自動段無法完成而被隔離的項目。未解決的例外超過 30% 時流水線會停下來。${ops ? "每一筆可以請 AI 再處理一次，或上傳你自己下載的 PDF。" : (APP ? "" : "在應用程式裡打開這一頁，未解決的例外會有處理按鈕。")}</p>
     <div class="row" role="group" aria-label="例外篩選">${btn("open", "btn-red", "未解決")}${btn("info", "btn-yellow", "註記")}${btn("resolved", "btn-green", "已解決")}</div>
-    <div class="tablebox" style="margin-top:12px"><table><thead><tr><th>狀態</th><th>項目</th><th>階段</th><th>類型</th><th>說明</th></tr></thead><tbody>
-    ${list.map(e => `<tr><td>${exPill(e)}</td><td>${/^W\d+$/.test(e.id) ? `<a href="#paper-${e.id}">${e.id}</a>` : esc(e.id)}</td><td>${esc(e.stage)}</td><td>${esc(e.kind)}</td><td class="small">${esc(e.detail)}${e.resolved ? `<div class="muted">解決：${esc(e.resolved)}</div>` : ""}</td></tr>`).join("") || `<tr><td colspan="5">這一類沒有紀錄。</td></tr>`}
+    ${APP && APP.running ? `<div class="card" style="margin-top:8px" role="status">${pill("y", "執行中")} 已經有一個工作在跑：${esc((APP.job || {}).title || "")}。<a href="index.html#pipeline">看進度</a></div>` : ""}
+    <div class="tablebox" style="margin-top:12px"><table><thead><tr><th>狀態</th><th>項目</th><th>階段</th><th>類型</th><th>說明${ops ? "與處理" : ""}</th></tr></thead><tbody>
+    ${list.map(e => `<tr><td>${exPill(e)}</td><td>${/^W\d+$/.test(e.id) ? `<a href="#paper-${e.id}">${e.id}</a>` : esc(e.id)}</td><td>${esc(e.stage)}</td><td>${esc(e.kind)}</td><td class="small">${esc(e.detail)}${e.resolved ? `<div class="muted">解決：${esc(e.resolved)}</div>` : ""}${ops ? `<div style="margin-top:8px">${exActions(e)}</div>` : ""}</td></tr>`).join("") || `<tr><td colspan="5">這一類沒有紀錄。</td></tr>`}
     </tbody></table></div>`;
   el.querySelectorAll("[data-x]").forEach(b => b.onclick = () => { exFilter = b.dataset.x; exceptions(); el.querySelector(`[data-x="${exFilter}"]`).focus(); });
+  el.querySelectorAll("[data-exa]").forEach(b => b.onclick = async () => {
+    let note = "";
+    if (b.dataset.exa === "note"){ note = prompt("要 Claude Code 怎麼處理這筆？（例：這篇的正式版在 PubMed Central 有全文，請再找一次）"); if (!note) return; }
+    else if (!confirm(`請 Claude Code 處理 ${b.dataset.id}：「${b.textContent}」？`)) return;
+    b.disabled = true;
+    try { await startException(b.dataset.id, b.dataset.kind, b.dataset.exa, note); APP = await (await fetch("/api/status", {cache: "no-store"})).json(); exceptions(); }
+    catch (err) { alert(err.message); b.disabled = false; }
+  });
+  el.querySelectorAll("[data-upload]").forEach(inp => inp.onchange = async () => {
+    const f = inp.files[0]; if (!f) return;
+    try {
+      const r = await APIX(`upload/${encodeURIComponent(SLUG)}/${encodeURIComponent(inp.dataset.upload)}`, null, await f.arrayBuffer());
+      if (confirm(`已存到 ${r.saved}。要請 Claude Code 用這個檔重做這篇嗎？`)) await startException(inp.dataset.upload, inp.dataset.kind, "retry_fulltext", "本人剛上傳了這篇的 PDF 到 inbox/");
+      APP = await (await fetch("/api/status", {cache: "no-store"})).json(); exceptions();
+    } catch (err) { alert(err.message); }
+  });
 }
 
 function files(){
@@ -503,6 +542,7 @@ async function loadData(){
   header(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
+  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); } } catch (e) {}  // 離線單檔版沒有 /api
 })();
 </script>
 </body>

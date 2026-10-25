@@ -31,7 +31,8 @@ from urllib.parse import unquote, urlparse
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
-from pipeline.jobs import UNATTENDED, Jobs, find_claude, prompt_continue, prompt_match, prompt_new
+from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, prompt_continue,
+                           prompt_exception, prompt_match, prompt_new)
 
 SYNC_EVERY = 180
 FROZEN = getattr(sys, "frozen", False)  # Windows 安裝版（PyInstaller）
@@ -197,7 +198,26 @@ class App:
                 "drive_choices": self.drive_choices,
                 "claude": find_claude(), "uv": find_uv(), "drive": str(dst) if dst and dst.parent.exists() else None,
                 "blocked": self.blocked or (other or {}).get("device"), "running": self.jobs.running(), "job": job,
-                "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs)}
+                "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
+                "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})}}
+
+    def upload(self, slug, wid, data, limit=200 * 1024 * 1024):
+        """本人從畫面上放進來的全文 PDF：存進 runs/<slug>/inbox/（只新增、不覆蓋），之後「再找一次」會用上。"""
+        import re as _re
+        if not _re.fullmatch(r"[a-z0-9-]+", slug) or not _re.fullmatch(r"W\d+", wid):
+            raise ValueError("教授或文章 id 不對")
+        if not (self.runs / slug / "state.json").exists():
+            raise ValueError(f"沒有這位教授：{slug}")
+        if len(data) > limit or b"%PDF-" not in data[:1024]:
+            raise ValueError("這不是 PDF 檔（或超過 200 MB）")
+        inbox = self.runs / slug / "inbox"
+        inbox.mkdir(exist_ok=True)
+        dst, i = inbox / f"{wid}.pdf", 1
+        while dst.exists():
+            i += 1
+            dst = inbox / f"{wid}-{i}.pdf"
+        dst.write_bytes(data)
+        return {"ok": True, "saved": str(dst.relative_to(self.runs))}
 
     def post(self, path, body):
         if path == "account":
@@ -207,7 +227,7 @@ class App:
             save_account(self.runs, acct)
             self.account_chosen.set()
             return {"ok": True}
-        if path in ("new", "continue", "reply", "match") and self.blocked:
+        if path in ("new", "continue", "reply", "match", "exception") and self.blocked:
             raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
         if path == "new":
             name, inst = (body.get("name") or "").strip(), (body.get("institution") or "").strip()
@@ -219,6 +239,17 @@ class App:
             if not (self.runs / slug / "state.json").exists():
                 raise ValueError(f"沒有這位教授：{slug}")
             return self.jobs.start("continue", prompt_continue(slug), f"繼續：{slug}", slug=slug)
+        if path == "exception":
+            slug = (body.get("slug") or "").strip()
+            stp = self.runs / slug / "state.json"
+            if not stp.exists():
+                raise ValueError(f"沒有這位教授：{slug}")
+            exc = next((e for e in json.loads(stp.read_text()).get("exceptions", [])
+                        if e["id"] == body.get("id") and e["kind"] == body.get("kind") and not e.get("resolved")), None)
+            if not exc:
+                raise ValueError("找不到這筆未解決的例外（可能已經處理過，重新整理看看）")
+            return self.jobs.start("exception", prompt_exception(slug, exc, body.get("action"), body.get("note") or ""),
+                                   f"例外：{slug} {exc['id']}", slug=slug)
         if path == "match":
             slug = (body.get("slug") or "").strip()
             if not (self.runs / slug / "state.json").exists():
@@ -244,6 +275,11 @@ def make_handler(app):
     class Handler(http.server.SimpleHTTPRequestHandler):
         def log_message(self, *args):
             pass
+
+        def end_headers(self):
+            if "/api/" not in self.path:
+                self.send_header("Cache-Control", "no-cache")  # 更新版本或重建資料後，畫面不要用舊的快取
+            super().end_headers()
 
         def _json(self, code, obj):
             data = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -276,6 +312,13 @@ def make_handler(app):
         def do_POST(self):
             if not self.path.startswith("/api/") or self.headers.get("X-Phdeasy-App") != "1":  # 擋其他網站偷送請求
                 return self._json(403, {"error": "forbidden"})
+            if self.path.startswith("/api/upload/"):
+                try:
+                    _, slug, wid = urlparse(self.path).path.rsplit("/", 2)
+                    n = int(self.headers.get("Content-Length") or 0)
+                    return self._json(200, app.upload(unquote(slug), unquote(wid), self.rfile.read(n)))
+                except (ValueError, RuntimeError) as e:
+                    return self._json(400, {"error": str(e)})
             try:
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
