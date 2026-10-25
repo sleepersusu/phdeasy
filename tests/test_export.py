@@ -52,3 +52,10 @@ def test_render_paper_md_has_all_fields_and_citations():
     assert '"We enrolled 92 women" [W1, p.2]' in md
     assert "來源未提及" in md and "判不出來" in md and "推論（非作者原話）" in md
     assert paper_md_name(w) == "2024_Lee_Study-A_W1.md"
+
+
+def test_render_paper_md_states_basis_incl_preprint_and_title_only():
+    from pipeline.export import render_paper_md
+    w = {"id": "W1", "title": "T", "year": 2026, "authors": []}
+    assert "預印本" in render_paper_md(w, {"basis": "fulltext", "preprint_text": True, "fields": {}})
+    assert "只有標題" in render_paper_md(w, {"basis": "title_only", "fields": {}})

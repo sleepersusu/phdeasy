@@ -378,7 +378,7 @@ function paperHtml(w){
   return `<details class="paper" id="paper-${w.id}">
     <summary>
       <span class="t">${bi(w.title_zh, w.title)}</span>
-      <span class="row small">${w.year}｜${esc(TYPE[w.type] || w.type)}｜${esc(w.venue || "期刊來源未提及")}｜${esc(role(w.target_position, w.target_corresponding))} ${fulltextPill(w)} ${w.card.exists ? pill("g", "✓ 已解析") : pill("y", "解析未產生")} ${w.exceptions.some(e => e.state === "open") ? pill("r", "有例外") : ""}</span>
+      <span class="row small">${w.year}｜${esc(TYPE[w.type] || w.type)}｜${esc(w.venue || "期刊來源未提及")}｜${esc(role(w.target_position, w.target_corresponding))} ${fulltextPill(w)} ${w.card.exists ? pill("g", "✓ 已解析") : pill("y", "解析未產生")} ${w.exceptions.some(e => e.kind === "preprint_text") ? pill("y", "預印本全文") : ""} ${w.exceptions.some(e => e.state === "open") ? pill("r", "有例外") : ""}</span>
     </summary>
     <div class="inner">
       <div class="row" style="margin:12px 0">

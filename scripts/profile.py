@@ -13,7 +13,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from pipeline.export import paper_md_name, render_paper_md, to_ris
+from pipeline.export import basis_label, paper_md_name, render_paper_md, to_ris
 from pipeline.profile import build_facts, check_draft, render_profile_md
 from pipeline.state import load_state
 
@@ -47,7 +47,7 @@ def facts(run):
             (papers / paper_md_name(w)).write_text(render_paper_md(w, cards[w["id"]]))
     with open(run / "pdfs" / "index.csv", newline="") as fh:
         index = {r["id"]: r for r in csv.DictReader(fh)}
-    notes = {wid: "phdeasy 解析｜大意：" + ((c.get("fields") or {}).get("summary") or {}).get("text", "") for wid, c in cards.items()}
+    notes = {wid: "phdeasy 解析｜依據：" + basis_label(c) + "｜大意：" + (((c.get("fields") or {}).get("summary") or {}).get("text") or "來源未提及") for wid, c in cards.items()}
     (run / "out" / "zotero" / f"{run.name}.ris").write_text(to_ris(works, index, run, tags=[f"phdeasy:{run.name}"], notes=notes))
     print(f"DONE facts：{len(works)} 篇、卡片 {len(cards)}、單篇 md {len(cards)}、RIS 已加筆記；設計類型 {f['design_types']}；本人計畫 {len(f['grants_pi'])}")
 

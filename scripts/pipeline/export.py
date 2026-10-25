@@ -64,13 +64,20 @@ def paper_md_name(w):
     return f"{w['year']}_{rest[:-3]}_{wid}.md"
 
 
+def basis_label(card):
+    b = card.get("basis")
+    if b == "fulltext":
+        return "全文（預印本版本，頁碼是預印本的頁碼）" if card.get("preprint_text") else "全文"
+    return {"title_only": "只有標題（沒有全文也沒有摘要）"}.get(b, "只有摘要")
+
+
 def render_paper_md(w, card):
     cite = lambda cs: "".join(f'\n  > "{c["quote"]}" [{w["id"]}, {c["loc"]}]' for c in cs or [])
     L = [f"# {w['title']}", "",
          f"- {w['year']}｜{w.get('venue') or '期刊來源未提及'}｜DOI {w.get('doi') or '無'}｜文章 id {w['id']}",
          f"- 作者：{'、'.join(a.get('name') or '' for a in w.get('authors') or [])}",
          f"- 教授角色：{ROLE.get(w.get('target_position'), '作者序不明')}{'＋通訊作者' if w.get('target_corresponding') else ''}",
-         f"- 解析依據：{'全文' if card.get('basis') == 'fulltext' else '只有摘要'}", ""]
+         f"- 解析依據：{basis_label(card)}", ""]
     f = card.get("fields") or {}
     for key, label in LABELS:
         v = f.get(key) or {"status": "not_in_source"}

@@ -151,6 +151,7 @@ def _rejected(run, title, reason, evidence):
 
 def assemble_all(run, limit=0.3):
     works = _works(run)
+    ing = _j(run / "work" / "ingest.json") or {}
     done, missing, n_rej, n_unres = 0, [], 0, 0
     for w in works:
         d = run / "work" / "cards" / w["id"]
@@ -168,6 +169,7 @@ def assemble_all(run, limit=0.3):
         if ref:
             card, rej_refute = apply_refute(card, ref.get("verdicts", []))
         card, rej_check = assemble(card, _text(run, w["id"]))
+        card["preprint_text"] = "preprint_text" in ((ing.get(w["id"]) or {}).get("exceptions") or [])
         card["kind"], card["verified"] = w["kind"], {"judged": bool(judge), "refuted": bool(ref), "dual_track": (d / "b.json").exists()}
         (d / "card.json").write_text(json.dumps(card, ensure_ascii=False, indent=2))
         stamp = d / ".rejected_logged"
