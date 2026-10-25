@@ -89,3 +89,22 @@ def test_upload_saves_pdf_into_inbox_without_overwrite(tmp_path):
         a.upload("prof", "W1", b"<html>not pdf")
     with pytest.raises(ValueError):
         a.upload("../etc", "W1", b"%PDF-1.7")
+
+
+def test_settings_reports_keys_without_values_and_switches_account(tmp_path, monkeypatch):
+    import app as appmod
+    a = appmod.App(tmp_path)
+    (tmp_path / "runs" / "_me").mkdir(parents=True)
+    (tmp_path / "runs" / "_me" / "secrets.env").write_text("S2_API_KEY=secret-value\n")
+    monkeypatch.setattr(appmod, "find_drives", lambda: [("a@x.com", tmp_path / "a"), ("b@x.com", tmp_path / "b")])
+    monkeypatch.setattr(appmod, "target", lambda runs, *k: None)
+    st = a.settings()
+    assert st["keys"]["S2_API_KEY"] is True and "secret-value" not in str(st) and st["drives"] == ["a@x.com", "b@x.com"]
+    started = []
+    monkeypatch.setattr(appmod.App, "resync", lambda self: started.append(1) or {"ok": True})
+    a.syncing = False
+    a.post("account", {"account": "b@x.com"})
+    assert started and '"b@x.com"' in (tmp_path / "runs" / "_me" / "drive.json").read_text()
+    import pytest
+    with pytest.raises(ValueError):
+        a.post("account", {"account": "nobody@x.com"})

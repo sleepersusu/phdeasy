@@ -33,6 +33,8 @@ async function pipelinePanel(){
   try { st = await API("status"); } catch (e) { return; }  // 不是在應用程式裡：不顯示
   document.getElementById("pipeline").hidden = false;
   document.getElementById("nav-pipeline").hidden = false;
+  document.getElementById("settings").hidden = false;
+  document.getElementById("nav-settings").hidden = false;
   window.APP_REMATCH = true;  // 教授卡片顯示「重新比對」按鈕
   renderProfs(H.professors);
   document.getElementById("professors").addEventListener("click", async ev => {
@@ -45,8 +47,9 @@ async function pipelinePanel(){
   });
   appBanner(st);
   renderPipeline(st);
+  renderSettings(st);
   clearInterval(pollTimer);
-  pollTimer = setInterval(async () => { try { const s = await API("status"); appBanner(s); renderPipeline(s); } catch (e) {} }, wasSyncing ? 1500 : 3000);
+  pollTimer = setInterval(async () => { try { const s = await API("status"); appBanner(s); renderPipeline(s); renderSettings(s); } catch (e) {} }, wasSyncing ? 1500 : 3000);
 }
 
 function check(ok, good, bad){ return `<li>${ok ? `<span class="pill g">✓</span> ${good}` : `<span class="pill r">✗</span> ${bad}`}</li>`; }
@@ -132,5 +135,62 @@ function renderPipeline(st){
   el.querySelector("#install-uv")?.addEventListener("click", act(async () => {
     if (!confirm("從 uv 官方網站（astral.sh）下載並安裝 uv 到你的使用者資料夾，不需要管理員權限。要安裝嗎？")) return;
     const r = await API("install-uv", {}); alert(r.ok ? "uv 已安裝" : "安裝失敗：" + (r.error || ""));
+  }));
+}
+
+
+/* 設定：Google 雲端硬碟帳號（切換、立刻同步）、Claude Code（測試、登入）、金鑰檔、uv */
+let lastSettings = "";
+function renderSettings(st){
+  const el = document.querySelector("#settings .body");
+  const g = st.settings || {};
+  const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, uv: st.uv, running: st.running});
+  if (shape === lastSettings) return;
+  lastSettings = shape;
+  const t = g.claude_test;
+  el.innerHTML = `
+    <div class="grid">
+      <div class="card"><h3 style="margin-top:0">Google 雲端硬碟</h3>
+        ${g.drives && g.drives.length ? `<p class="small">教授檔案放在：<br><span class="muted">${esc(g.folder || "（還沒選帳號）")}</span></p>
+          <div class="small" style="margin-bottom:6px">這台電腦登入的帳號（按一下就換成這個帳號）：</div>
+          <div class="row">${g.drives.map(a => a === g.account ? `<span class="pill g">✓ ${esc(a)}（使用中）</span>`
+            : `<button class="btn btn-yellow" data-switch="${esc(a)}" ${st.running || st.syncing ? "disabled" : ""}>換成 ${esc(a)}</button>`).join("")}</div>
+          <p class="small muted">要加別的帳號：在 Google Drive 電腦版的設定裡「新增帳戶」，再重開這個程式。換帳號後會從那個帳號的雲端重新同步，不會刪掉任何一邊的檔案。</p>
+          <div class="row"><button class="btn btn-green" id="sync-now" ${st.syncing ? "disabled" : ""}>${st.syncing ? "同步中…" : "立刻同步"}</button>
+          ${st.blocked ? `<span class="pill y">另一台（${esc(st.blocked)}）正在用：只拉不推</span>` : ""}</div>`
+        : `<p><span class="pill r">✗</span> 這台電腦找不到 Google 雲端硬碟。</p>
+          <ol class="small"><li>安裝 <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive 電腦版</a></li><li>用你的 Google 帳號登入</li><li>重開這個程式</li></ol>`}
+      </div>
+      <div class="card"><h3 style="margin-top:0">AI（Claude Code）</h3>
+        ${st.claude ? `<p class="small"><span class="pill g">✓</span> 已安裝：<span class="muted">${esc(st.claude)}</span></p>
+          ${t ? `<p class="small">${t.ok ? `<span class="pill g">✓ 可以用</span>` : `<span class="pill r">✗ 不能用</span>`} ${esc(t.msg)}</p>` : `<p class="small muted">還沒測試過能不能用。</p>`}
+          <div class="row"><button class="btn btn-green" id="claude-test">測試能不能用</button><button class="btn btn-yellow" id="claude-login">登入／換帳號</button></div>
+          <p class="small muted">「登入／換帳號」會開一個終端機視窗跑 Claude Code：照畫面登入（瀏覽器會跳出 Claude 的登入頁）；要換帳號就在裡面輸入 <code>/logout</code> 再登入。完成後關掉那個視窗，回來按「測試能不能用」。</p>`
+        : `<p><span class="pill r">✗</span> 這台還沒裝 Claude Code（只看資料不需要；要建新教授、處理例外才需要）。</p>
+          <ol class="small"><li>到 <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a> 照說明安裝</li><li>重開這個程式，再回來按「登入」</li></ol>`}
+      </div>
+      <div class="card"><h3 style="margin-top:0">金鑰</h3>
+        <p class="small">Semantic Scholar：${g.keys && g.keys.S2_API_KEY ? `<span class="pill g">✓ 已設定</span>` : `<span class="pill y">沒設定</span>（不設也能用，只是常被限流）`}</p>
+        <button class="btn btn-green" id="open-secrets">打開金鑰檔</button>
+        <p class="small muted">金鑰檔在你的雲端硬碟裡，每台電腦都會同步到；程式不會顯示金鑰內容。打開後在等號後面貼上 key、存檔即可。</p>
+      </div>
+      <div class="card"><h3 style="margin-top:0">流水線工具（uv）</h3>
+        ${st.uv ? `<p class="small"><span class="pill g">✓</span> 已安裝：<span class="muted">${esc(st.uv)}</span></p>`
+          : `<p class="small"><span class="pill r">✗</span> 沒有 uv（要建新教授才需要）。</p><button class="btn btn-yellow" id="install-uv2">安裝 uv</button>`}
+        <p class="small muted">流水線放在：${esc(g.workspace || "")}</p>
+      </div>
+    </div>`;
+  const act = fn => async ev => { const b = ev.currentTarget; b.disabled = true; try { await fn(); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); b.disabled = false; } };
+  el.querySelectorAll("[data-switch]").forEach(b => b.onclick = act(async () => {
+    if (!confirm(`換成 ${b.dataset.switch} 的雲端硬碟？會從那個帳號重新同步教授檔案。`)) throw new Error("已取消");
+    await API("account", {account: b.dataset.switch});
+  }));
+  el.querySelector("#sync-now")?.addEventListener("click", act(() => API("sync", {})));
+  el.querySelector("#claude-test")?.addEventListener("click", act(async () => { el.querySelector("#claude-test").textContent = "測試中（最多 3 分鐘）…"; await API("test-claude", {}); }));
+  el.querySelector("#claude-login")?.addEventListener("click", act(() => API("login-claude", {})));
+  el.querySelector("#open-secrets")?.addEventListener("click", act(() => API("open-secrets", {})));
+  el.querySelector("#install-uv2")?.addEventListener("click", act(async () => {
+    if (!confirm("從 uv 官方網站（astral.sh）下載並安裝 uv 到你的使用者資料夾，不需要管理員權限。要安裝嗎？")) throw new Error("已取消");
+    const r = await API("install-uv", {}); if (!r.ok) throw new Error("安裝失敗：" + (r.error || ""));
   }));
 }

@@ -17,6 +17,7 @@ import functools
 import http.server
 import json
 import os
+import shlex
 import shutil
 import signal
 import socket
@@ -183,6 +184,7 @@ class App:
         self.syncing = True
         self.need_account, self.account_chosen = threading.Event(), threading.Event()
         self.drive_choices = []
+        self.claude_test = None
 
     def after_job(self, job):
         try:
@@ -199,7 +201,90 @@ class App:
                 "claude": find_claude(), "uv": find_uv(), "drive": str(dst) if dst and dst.parent.exists() else None,
                 "blocked": self.blocked or (other or {}).get("device"), "running": self.jobs.running(), "job": job,
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
-                "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})}}
+                "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})},
+                "settings": self.settings()}
+
+    def settings(self):
+        """設定頁要顯示的：雲端帳號（這台偵測到的全部）、Claude Code 測試結果、金鑰有沒有設（不顯示內容）。"""
+        p = self.runs / "_me" / "drive.json"
+        conf = json.loads(p.read_text()) if p.exists() else {}
+        drives = [d[0] for d in find_drives()]
+        dst = target(self.runs)
+        sec = self.runs / "_me" / "secrets.env"
+        keys = {}
+        if sec.exists():
+            for line in sec.read_text(encoding="utf-8").splitlines():
+                k, eq, v = line.partition("=")
+                if eq and not line.lstrip().startswith("#"):
+                    keys[k.strip()] = bool(v.strip().strip('"').strip("'"))
+        return {"drives": drives, "account": conf.get("account") or (drives[0] if len(drives) == 1 else None),
+                "folder": str(dst) if dst else None, "claude_test": self.claude_test,
+                "keys": {"S2_API_KEY": keys.get("S2_API_KEY", False) or bool(os.environ.get("S2_API_KEY"))},
+                "workspace": str(self.workspace)}
+
+    def switch_account(self, acct):
+        """換雲端帳號：先放開舊雲端的使用中，記下新帳號，在背景重新同步（新雲端當第一次同步：只合併不刪）。"""
+        if acct not in [d[0] for d in find_drives()]:
+            raise ValueError("這台電腦沒有登入這個 Google 帳號")
+        old = target(self.runs)
+        if old and old.exists():
+            release(old)
+        save_account(self.runs, acct)
+        self.account_chosen.set()
+        self.resync()
+        return {"ok": True}
+
+    def resync(self):
+        if self.syncing:
+            return {"ok": True, "already": True}
+        self.syncing, self.blocked = True, None
+        threading.Thread(target=startup, args=(self, False), daemon=True).start()
+        return {"ok": True}
+
+    def test_claude(self):
+        """跑一個極小的工作確認 Claude Code 裝好、也登入了（不碰任何檔案）。"""
+        claude = find_claude()
+        if not claude:
+            self.claude_test = {"ok": False, "msg": "找不到 Claude Code"}
+            return self.claude_test
+        try:
+            r = subprocess.run([claude, "-p", "只回覆兩個字：可以", "--output-format", "json", "--permission-mode", "dontAsk"],
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180, cwd=str(self.workspace))
+            out = json.loads(r.stdout or "{}") if r.stdout.strip().startswith("{") else {}
+            ok = r.returncode == 0 and not out.get("is_error")
+            msg = (out.get("result") or r.stderr or r.stdout or "").strip()[:300]
+        except (subprocess.TimeoutExpired, OSError, ValueError) as e:
+            ok, msg = False, str(e)[:300]
+        self.claude_test = {"ok": ok, "msg": msg if ok else (msg or "沒有回應") + "（多半是還沒登入：按「登入 Claude Code」）", "t": int(time.time())}
+        return self.claude_test
+
+    def login_claude(self):
+        """開一個終端機視窗跑 claude，照畫面登入（瀏覽器會跳出 Anthropic 的登入頁）；登入完關掉那個視窗即可。"""
+        claude = find_claude()
+        if not claude:
+            raise ValueError("找不到 Claude Code：請先安裝（https://claude.com/claude-code）")
+        if os.name == "nt":
+            subprocess.Popen(["cmd", "/c", "start", "Claude Code 登入", "cmd", "/k", claude], cwd=str(self.workspace))
+        elif sys.platform == "darwin":
+            subprocess.Popen(["osascript", "-e", f'tell application "Terminal" to do script "cd {shlex.quote(str(self.workspace))} && {shlex.quote(claude)}"',
+                              "-e", 'tell application "Terminal" to activate'])
+        else:
+            raise ValueError("這個系統請自己在終端機執行 claude 登入")
+        return {"ok": True}
+
+    def open_secrets(self):
+        """用系統的文字編輯器打開金鑰檔讓本人自己貼（程式不經手金鑰內容）；沒有就先建空白範本。"""
+        p = self.runs / "_me" / "secrets.env"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        if not p.exists():
+            p.write_text("# phdeasy 金鑰（只在你的 Google 雲端硬碟同步，不進 GitHub）\n# 在等號後面貼上 key，存檔即可\nS2_API_KEY=\n", encoding="utf-8")
+        if os.name == "nt":
+            subprocess.Popen(["notepad", str(p)])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-e", str(p)])
+        else:
+            subprocess.Popen(["xdg-open", str(p)])
+        return {"ok": True, "path": str(p)}
 
     def upload(self, slug, wid, data, limit=200 * 1024 * 1024):
         """本人從畫面上放進來的全文 PDF：存進 runs/<slug>/inbox/（只新增、不覆蓋），之後「再找一次」會用上。"""
@@ -222,11 +307,23 @@ class App:
     def post(self, path, body):
         if path == "account":
             acct = body.get("account")
-            if acct not in self.drive_choices:
-                raise ValueError("沒有這個帳號")
-            save_account(self.runs, acct)
-            self.account_chosen.set()
-            return {"ok": True}
+            if self.need_account.is_set() and not self.account_chosen.is_set():  # 第一次選：背景的啟動同步正在等
+                if acct not in self.drive_choices:
+                    raise ValueError("沒有這個帳號")
+                save_account(self.runs, acct)
+                self.account_chosen.set()
+                return {"ok": True}
+            if self.jobs.running():
+                raise ValueError("有工作在跑，等它跑完再換帳號")
+            return self.switch_account(acct)
+        if path == "sync":
+            return self.resync()
+        if path == "test-claude":
+            return self.test_claude()
+        if path == "login-claude":
+            return self.login_claude()
+        if path == "open-secrets":
+            return self.open_secrets()
         if path in ("new", "continue", "reply", "match", "exception") and self.blocked:
             raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
         if path == "new":
