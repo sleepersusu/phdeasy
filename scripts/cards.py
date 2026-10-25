@@ -13,7 +13,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from pipeline.cards import apply_judge, apply_refute, assemble, check_card, diff_fixed, missing_refute_paths, validate_card
+from pipeline.cards import apply_judge, apply_refute, assemble, check_card, diff_fixed, missing_refute_paths, title_only_card, validate_card
 from pipeline.exceptions import add_exception, check_circuit
 from pipeline.state import append_progress
 
@@ -37,7 +37,22 @@ def _cd(run, wid):
     return d
 
 
+def write_title_only(run):
+    """ingest 判為無內容（title_only）的短卡由腳本產生，不派 agent。"""
+    ing = _j(run / "work" / "ingest.json") or {}
+    n = 0
+    for w in _works(run):
+        e = ing.get(w["id"]) or {}
+        d = run / "work" / "cards" / w["id"]
+        if "title_only" in (e.get("exceptions") or []) and not (d / "a.json").exists():
+            _cd(run, w["id"])
+            (d / "a.json").write_text(json.dumps(title_only_card(w["id"]), ensure_ascii=False, indent=2))
+            n += 1
+    return n
+
+
 def todo(run):
+    write_title_only(run)
     rows = []
     for w in _works(run):
         d = run / "work" / "cards" / w["id"]

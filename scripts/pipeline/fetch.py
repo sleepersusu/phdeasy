@@ -106,6 +106,14 @@ def is_supplementary_url(url):
     return bool(SUPPL_URL.search(url or ""))
 
 
+PREPRINT_URL = re.compile(r"(medrxiv\.org|biorxiv\.org|researchsquare\.com|arxiv\.org|osf\.io/preprints|preprints\.org|ssrn\.com|jmir\.org/preprint)", re.I)
+
+
+def is_preprint_url(url):
+    """全文來自預印本平台（正式版無免費全文時才會用到）。"""
+    return bool(PREPRINT_URL.search(url or ""))
+
+
 def needs_fulltext(w):
     return w["kind"] == "full" or w.get("short_reason") == "not_led"
 

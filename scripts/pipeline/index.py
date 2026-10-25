@@ -43,7 +43,8 @@ def reject_file(run, work_id, index, hashes):
     src = run / row["path"]
     dest = run / "pdfs" / "_rejected" / src.name
     dest.parent.mkdir(parents=True, exist_ok=True)
-    src.replace(dest)
+    if src.exists() or not dest.exists():  # 已經移過（例：重跑 --reject）就不再搬
+        src.replace(dest)
     rel = str(dest.relative_to(run))
     if row["path"] in hashes:
         hashes[rel] = hashes.pop(row["path"])

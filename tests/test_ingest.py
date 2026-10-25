@@ -84,3 +84,23 @@ def test_short_card_without_any_source_is_title_only(tmp_path):
 def test_title_only_does_not_count_toward_circuit(tmp_path):
     from pipeline.exceptions import INFO_KINDS
     assert "title_only" in INFO_KINDS
+
+
+def test_preprint_text_for_published_article_is_flagged(tmp_path):
+    _pdf(tmp_path / "g.pdf", "AI HeartBot to Increase Women's Awareness of Heart Attack\n" + "word " * 600)
+    row = {"status": "ok", "path": "g.pdf", "ext": "pdf", "url": "https://www.medrxiv.org/content/10.1101/x.full.pdf"}
+    text, stype, exc = convert(tmp_path, {**W, "type": "article"}, row)
+    assert stype == "pdf" and [k for k, _ in exc] == ["preprint_text"]
+
+
+def test_file_moved_by_reject_keeps_its_hash(tmp_path):
+    (tmp_path / "pdfs" / "2024").mkdir(parents=True)
+    (tmp_path / "pdfs" / "_rejected").mkdir()
+    (tmp_path / "inbox").mkdir()
+    f = tmp_path / "pdfs" / "2024" / "W1_x.xml"
+    f.write_bytes(b"<article>supp</article>")
+    hashes = {"pdfs/2024/W1_x.xml": sha256_file(f)}
+    f.rename(tmp_path / "pdfs" / "_rejected" / "W1_x.xml")
+    assert verify_hashes(tmp_path, hashes) == [] and "pdfs/_rejected/W1_x.xml" in hashes
+    (tmp_path / "pdfs" / "_rejected" / "W1_x.xml").write_bytes(b"tampered")
+    assert verify_hashes(tmp_path, hashes) == ["pdfs/_rejected/W1_x.xml"]

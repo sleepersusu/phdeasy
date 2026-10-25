@@ -31,7 +31,7 @@ NUM = re.compile(r"\d*\.\d+|\d+")
 def validate_card(c, kind):
     errs = []
     f = c.get("fields") or {}
-    need = FIELDS if kind == "full" else ["summary"]
+    need = FIELDS  # 完整卡與短卡都要 7 欄（驗收判準 3）；短卡用不到的寫 not_applicable
     for k in need:
         if k not in f:
             errs.append(f"{k}：缺欄位")
@@ -63,11 +63,27 @@ def numbers_in(s):
     return NUM.findall(s)
 
 
+_ONES = {w: i for i, w in enumerate("zero one two three four five six seven eight nine ten eleven twelve thirteen "
+                                    "fourteen fifteen sixteen seventeen eighteen nineteen".split())}
+_TENS = {w: 10 * i for i, w in enumerate("_ _ twenty thirty forty fifty sixty seventy eighty ninety".split()) if i >= 2}
+WORD_NUM = re.compile(r"\b(?:(" + "|".join(_TENS) + r")(?:[-\s](" + "|".join(k for k in _ONES if k != "zero") + r"))?|("
+                      + "|".join(_ONES) + r"))\b", re.I)
+
+
+def word_numbers(s):
+    """英文拼出來的數字（摘要常寫 Twenty-four studies），只到 99。"""
+    out = []
+    for t, o, single in WORD_NUM.findall(s or ""):
+        out.append(_TENS[t.lower()] + (_ONES[o.lower()] if o else 0) if t else _ONES[single.lower()])
+    return out
+
+
 def _num_set(quotes):
     out = set()
     for q in quotes:
         for n in numbers_in(q):
             out.add(float(n))
+        out.update(float(n) for n in word_numbers(q))
     return out
 
 
@@ -269,4 +285,4 @@ def missing_refute_paths(c, verdicts):
 
 def title_only_card(work_id):
     """沒有任何內容可解析的短卡（會議摘要等）：只列標題，由腳本產生，不派 agent。"""
-    return {"id": work_id, "basis": "title_only", "fields": {"summary": {"status": "not_in_source", "citations": []}}}
+    return {"id": work_id, "basis": "title_only", "fields": {k: {"status": "not_in_source", "citations": []} for k in FIELDS}}

@@ -76,9 +76,11 @@ def test_bad_design_type_is_caught():
     assert any("design.type" in e for e in validate_card(c, kind="full"))
 
 
-def test_short_card_only_needs_summary():
-    c = {"id": "W2", "basis": "abstract", "fields": {"summary": {"status": "ok", "text": "會議摘要", "citations": [C("Few chatbot studies have targeted", "p.1")]}}}
-    assert validate_card(c, kind="short") == []
+def test_short_card_fills_other_fields_with_not_applicable():
+    from pipeline.cards import FIELDS
+    f = {k: {"status": "not_applicable", "citations": []} for k in FIELDS}
+    f["summary"] = {"status": "ok", "text": "會議摘要", "citations": [C("Few chatbot studies have targeted", "p.1")]}
+    assert validate_card({"id": "W2", "basis": "abstract", "fields": f}, kind="short") == []
 
 
 def test_check_card_passes_good_card():
@@ -251,3 +253,29 @@ def test_check_refute_honours_ids(tmp_path, capsys):
     (run / "work" / "cards" / "W1" / "refute.json").write_text(json.dumps({"verdicts": []}))
     cli.check_refute(run, {"W1"})
     assert "W2" not in capsys.readouterr().out
+
+
+def test_num_set_reads_english_number_words():
+    from pipeline.cards import _num_set
+    s = _num_set(["Twenty-four studies (2,378 participants) and Thirteen articles reporting on eleven studies; six RCTs"])
+    assert {24.0, 13.0, 11.0, 6.0, 2378.0} <= s
+
+
+def test_every_card_kind_needs_all_seven_fields():
+    from pipeline.cards import title_only_card, FIELDS
+    assert set(title_only_card("W9")["fields"]) == set(FIELDS)
+    assert any("缺欄位" in e for e in validate_card({"fields": {"summary": {"status": "not_in_source", "citations": []}}}, kind="short"))
+
+
+def test_assemble_writes_title_only_cards_for_contentless_short_works(tmp_path):
+    import json, sys
+    sys.path.insert(0, "scripts")
+    import cards as cli
+    run = tmp_path / "r"
+    (run / "work").mkdir(parents=True)
+    (run / "work" / "works.json").write_text(json.dumps([{"id": "W5", "kind": "short"}]))
+    (run / "work" / "ingest.json").write_text(json.dumps({"W5": {"source_type": "none", "kind": "short", "exceptions": ["title_only"]}}))
+    (run / "state.json").write_text(json.dumps({"slug": "r", "stage": "cards", "exceptions": [], "circuit": {"tripped": False}}))
+    cli.write_title_only(run)
+    a = json.loads((run / "work" / "cards" / "W5" / "a.json").read_text())
+    assert a["basis"] == "title_only" and len(a["fields"]) == 7

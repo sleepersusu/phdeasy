@@ -134,3 +134,11 @@ def test_get_falls_back_to_system_curl_on_cert_error(monkeypatch):
     monkeypatch.setattr(http.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=b"%PDF-1.7 x\n200", stderr=b""))
     data, status = http.get("https://linkinghub.example/x", min_interval=0)
     assert status == "ok" and data == b"%PDF-1.7 x"
+
+
+def test_is_preprint_url():
+    from pipeline.fetch import is_preprint_url
+    assert is_preprint_url("https://www.medrxiv.org/content/medrxiv/early/2025/07/03/2025.07.01.25330381.full.pdf")
+    assert is_preprint_url("https://www.researchsquare.com/article/rs-123/v1.pdf")
+    assert is_preprint_url("https://arxiv.org/pdf/2401.01234")
+    assert not is_preprint_url("https://cardio.jmir.org/2026/1/e82817/PDF")

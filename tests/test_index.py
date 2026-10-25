@@ -45,3 +45,11 @@ def test_reject_file_moves_and_keeps_hash(tmp_path):
     assert new_rel.startswith("pdfs/_rejected/")
     assert hashes == {new_rel: "abc"}
     assert "W7" not in index
+
+
+def test_reject_file_tolerates_already_moved(tmp_path):
+    from pipeline.index import reject_file
+    (tmp_path / "pdfs" / "_rejected").mkdir(parents=True)
+    (tmp_path / "pdfs" / "_rejected" / "W1_x.xml").write_text("x")
+    index = {"W1": {"path": "pdfs/2024/W1_x.xml"}}
+    assert reject_file(tmp_path, "W1", index, {}) == "pdfs/_rejected/W1_x.xml" and "W1" not in index

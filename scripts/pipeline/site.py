@@ -36,7 +36,7 @@ DESIGN_LABELS = {"rct": "隨機對照試驗", "pilot-rct": "先導隨機對照�
                  "cross-sectional": "橫斷研究", "case-control": "病例對照", "qualitative": "質性研究", "mixed-methods": "混合方法",
                  "systematic-review": "系統性回顧", "scoping-review": "範疇回顧", "meta-analysis": "統合分析", "secondary-analysis": "次級資料分析",
                  "protocol": "研究計畫書", "modeling": "模型研究", "machine-learning": "機器學習", "text-mining": "文字探勘", "other": "其他"}
-INFO_KINDS = {"year_mismatch", "author_not_linked", "owner_decision", "possible_author_split", "name_merge", "title_only"}
+INFO_KINDS = {"year_mismatch", "author_not_linked", "owner_decision", "possible_author_split", "name_merge", "title_only", "preprint_text"}
 
 
 def _j(p, default=None):

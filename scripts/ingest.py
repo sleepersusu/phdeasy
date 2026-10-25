@@ -16,13 +16,13 @@ import json
 from pathlib import Path
 
 from pipeline.exceptions import add_exception, check_circuit, open_exceptions, resolve_exception
-from pipeline.fetch import sha256_file
+from pipeline.fetch import is_preprint_url, sha256_file
 from pipeline.index import load_index
 from pipeline.state import append_progress, load_state, set_stage
 from pipeline.textify import abstract_to_marked, has_text, looks_like_supplement, pdf_to_marked, title_matches, units, xml_to_marked
 
 
-RULES_VERSION = 5  # 驗證規則改了就加一，舊結果會重驗（2：附錄／檢核表偵測；3：還原 \x02 負號；4：無內容短卡只列標題；5：還原編成 $ 的小數點）
+RULES_VERSION = 6  # 驗證規則改了就加一，舊結果會重驗（2：附錄／檢核表偵測；3：還原 \x02 負號；4：無內容短卡只列標題；5：還原編成 $ 的小數點；6：預印本全文標 preprint_text）
 
 
 def needs_redo(prev, src_hash, text_exists):
@@ -31,8 +31,13 @@ def needs_redo(prev, src_hash, text_exists):
 
 def verify_hashes(run, hashes):
     changed = []
-    for rel, h in hashes.items():
+    for rel, h in list(hashes.items()):
         p = run / rel
+        moved = run / "pdfs" / "_rejected" / p.name
+        if not p.exists() and moved.exists() and sha256_file(moved) == h:  # setup_fulltext.py --reject 移走的：跟著改路徑
+            del hashes[rel]
+            hashes[str(moved.relative_to(run))] = h
+            continue
         if not p.exists() or sha256_file(p) != h:
             changed.append(rel)
     for p in sorted((run / "inbox").glob("**/*")):
@@ -64,6 +69,8 @@ def convert(run, w, row):
         elif stype and not title_matches(text, w["title"]):
             exc.append(("title_mismatch", f"{row['path']} 前兩頁找不到文章標題，可能拿錯檔案，已隔離"))
         if not exc:
+            if is_preprint_url(row.get("url")) and w.get("type") != "preprint":  # 判斷規則：正式版無全文時用預印本，標 preprint_text
+                exc.append(("preprint_text", f"全文取自預印本（{row.get('url')}），可能與正式版不同"))
             return text, stype, exc
     if w.get("abstract"):
         if w["kind"] == "full":
