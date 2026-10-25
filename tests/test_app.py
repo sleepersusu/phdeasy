@@ -57,3 +57,21 @@ def test_post_requires_app_header(tmp_path):
         assert r.status == 404
     finally:
         srv.shutdown()
+
+
+def test_find_app_browser_prefers_edge(tmp_path):
+    from pipeline.window import find_app_browser
+    edge = tmp_path / "pf86" / "Microsoft" / "Edge" / "Application" / "msedge.exe"
+    edge.parent.mkdir(parents=True)
+    edge.write_text("")
+    assert find_app_browser({"ProgramFiles(x86)": str(tmp_path / "pf86")}).endswith("msedge.exe")
+
+
+def test_account_chosen_in_window(tmp_path):
+    from app import App
+    a = App(tmp_path)
+    a.drive_choices = ["a@x.com", "b@x.com"]
+    a.need_account.set()
+    assert a.status()["need_account"] is True
+    a.post("account", {"account": "b@x.com"})
+    assert a.account_chosen.is_set() and '"b@x.com"' in (tmp_path / "runs" / "_me" / "drive.json").read_text()

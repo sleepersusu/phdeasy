@@ -44,7 +44,7 @@ jobs:
 
       - name: Build exe
         run: >
-          python -m PyInstaller --noconfirm --onedir --console --name PhdeasyProfessorFiles
+          python -m PyInstaller --noconfirm --onedir --windowed --name PhdeasyProfessorFiles
           --paths scripts --add-data "pipeline_src;pipeline_src" scripts/app.py
 
       - name: Rename exe

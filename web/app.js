@@ -9,14 +9,34 @@ const STAGE_ZH = {setup: "找文章與全文", stop1: "停 1：等你確認", in
 const WAITING = new Set(["stop1", "stop2", "halted"]);
 let pollTimer = null;
 
+let wasSyncing = null;
+function appBanner(st){
+  /* 最上方的狀態列：第一次選雲端帳號、正在同步（同步完自動重新整理，資料才是最新的） */
+  let el = document.getElementById("app-banner");
+  if (!el){ el = document.createElement("div"); el.id = "app-banner"; el.className = "wrap"; document.querySelector("main").before(el); }
+  if (st.need_account){
+    el.innerHTML = `<div class="card" style="margin-top:12px;border:2px solid var(--fg)"><h3 style="margin-top:0">選擇放教授檔案的 Google 帳號</h3>
+      <p class="small">這台電腦登入了多個 Google 雲端硬碟帳號。選一次就好，之後會記住。</p>
+      <div class="row">${st.drive_choices.map(a => `<button class="btn btn-green" data-acct="${esc(a)}">${esc(a)}</button>`).join("")}</div></div>`;
+    el.querySelectorAll("[data-acct]").forEach(b => b.onclick = async () => { b.disabled = true; try { await API("account", {account: b.dataset.acct}); } catch (e) { alert(e.message); b.disabled = false; } });
+  } else if (st.syncing){
+    el.innerHTML = `<div class="card" style="margin-top:12px" role="status"><span class="pill y">同步中</span> 正在從 Google 雲端硬碟拉最新的教授檔案，第一次會比較久…完成後會自動重新整理。</div>`;
+  } else {
+    el.innerHTML = st.blocked ? `<div class="card" style="margin-top:12px"><span class="pill y">只能看</span> 另一台電腦（${esc(st.blocked)}）正在用：已拉下雲端的資料給你看，但這台先不推上去、不跑流水線。那台關掉後重開這個程式。</div>` : "";
+    if (wasSyncing) location.reload();
+  }
+  wasSyncing = st.syncing || st.need_account;
+}
+
 async function pipelinePanel(){
   let st;
   try { st = await API("status"); } catch (e) { return; }  // 不是在應用程式裡：不顯示
   document.getElementById("pipeline").hidden = false;
   document.getElementById("nav-pipeline").hidden = false;
+  appBanner(st);
   renderPipeline(st);
   clearInterval(pollTimer);
-  pollTimer = setInterval(async () => { try { renderPipeline(await API("status")); } catch (e) {} }, 3000);
+  pollTimer = setInterval(async () => { try { const s = await API("status"); appBanner(s); renderPipeline(s); } catch (e) {} }, wasSyncing ? 1500 : 3000);
 }
 
 function check(ok, good, bad){ return `<li>${ok ? `<span class="pill g">✓</span> ${good}` : `<span class="pill r">✗</span> ${bad}`}</li>`; }

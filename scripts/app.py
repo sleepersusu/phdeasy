@@ -23,12 +23,14 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
+from pipeline.window import AppWindow, find_app_browser
 from pipeline.jobs import UNATTENDED, Jobs, find_claude, prompt_continue, prompt_new
 
 SYNC_EVERY = 180
@@ -147,16 +149,23 @@ def choose_account(runs, drives=None, ask=input):
     drives = find_drives() if drives is None else drives
     if len(drives) <= 1:
         return drives[0][0] if drives else None
+    if ask is None:  # 視窗版：沒有主控台可以問，改在畫面上選（/api/account）
+        return None
     print("這台電腦登入了多個 Google 雲端硬碟帳號，要用哪一個放教授檔案？")
     for i, (label, path) in enumerate(drives, 1):
         print(f"  {i}. {label}")
     while True:
         ans = ask("輸入編號後按 Enter：").strip()
         if ans.isdigit() and 1 <= int(ans) <= len(drives):
-            acct = drives[int(ans) - 1][0]
-            p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(json.dumps({**conf, "account": acct}, ensure_ascii=False, indent=1))
-            return acct
+            return save_account(runs, drives[int(ans) - 1][0])
+
+
+def save_account(runs, acct):
+    p = runs / "_me" / "drive.json"
+    conf = json.loads(p.read_text()) if p.exists() else {}
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps({**conf, "account": acct}, ensure_ascii=False, indent=1))
+    return acct
 
 
 class App:
@@ -169,6 +178,10 @@ class App:
         self.jobs = Jobs(self.workspace, self.runs)
         self.jobs.on_done = self.after_job
         self.blocked = None
+        self.closer = None
+        self.syncing = True
+        self.need_account, self.account_chosen = threading.Event(), threading.Event()
+        self.drive_choices = []
 
     def after_job(self, job):
         try:
@@ -180,11 +193,20 @@ class App:
         dst = target(self.runs)
         job = self.jobs.latest()
         other = busy_elsewhere(dst, device_id()) if dst and dst.exists() else None
-        return {"claude": find_claude(), "uv": find_uv(), "drive": str(dst) if dst and dst.parent.exists() else None,
+        return {"syncing": self.syncing, "need_account": self.need_account.is_set() and not self.account_chosen.is_set(),
+                "drive_choices": self.drive_choices,
+                "claude": find_claude(), "uv": find_uv(), "drive": str(dst) if dst and dst.parent.exists() else None,
                 "blocked": self.blocked or (other or {}).get("device"), "running": self.jobs.running(), "job": job,
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs)}
 
     def post(self, path, body):
+        if path == "account":
+            acct = body.get("account")
+            if acct not in self.drive_choices:
+                raise ValueError("沒有這個帳號")
+            save_account(self.runs, acct)
+            self.account_chosen.set()
+            return {"ok": True}
         if path in ("new", "continue", "reply") and self.blocked:
             raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
         if path == "new":
@@ -260,14 +282,40 @@ def make_handler(app):
     return Handler
 
 
+def startup(app, choose=True):
+    """背景做：選帳號（必要時等畫面上選）→ 同步雲端 → 重建資料。視窗先開，畫面顯示進度。"""
+    try:
+        if choose and app.need_account.is_set():
+            app.account_chosen.wait()
+        print("從 Google 雲端硬碟同步…")
+        if drive_sync(app.runs, hold=True) == 2:
+            app.blocked = (busy_elsewhere(target(app.runs), device_id()) or {}).get("device") or "另一台電腦"
+            print("另一台電腦還在用：這台先只看資料（已拉下雲端的檔），不推上去，也先不要建新教授。")
+        else:
+            app.closer = Closer(app.runs)
+        print("更新教授資料…")
+        if not rebuild(app.workspace):
+            print("（沒有 uv：先用雲端同步下來的資料；要在這台建新教授，首頁會引導你安裝）")
+    except Exception as e:
+        print(f"啟動同步失敗：{e}")
+    finally:
+        app.syncing = False
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workspace", default=str(default_workspace()))
     ap.add_argument("--port", type=int, default=8790)
     ap.add_argument("--no-browser", action="store_true")
+    ap.add_argument("--browser", action="store_true", help="用一般瀏覽器開，不開成獨立視窗")
+    ap.add_argument("--window", action="store_true", help="Mac 也開成獨立視窗（用 Chrome）")
     a = ap.parse_args()
-    sys.stdout.reconfigure(line_buffering=True)  # 雙擊開的視窗要即時看到進度
     ws = Path(a.workspace)
+    ws.mkdir(parents=True, exist_ok=True)
+    if FROZEN and sys.stdout is None:  # 視窗版沒有主控台：訊息寫進 使用者\phdeasy\app.log
+        sys.stdout = sys.stderr = open(ws / "app.log", "a", encoding="utf-8", buffering=1)
+    else:
+        sys.stdout.reconfigure(line_buffering=True)
     if FROZEN:
         bundle = Path(getattr(sys, "_MEIPASS", ".")) / "pipeline_src"
         version = (bundle / "VERSION").read_text().strip() if (bundle / "VERSION").exists() else "dev"
@@ -276,68 +324,78 @@ def main():
     app = App(ws)
     app.runs.mkdir(parents=True, exist_ok=True)
     os.environ["PHDEASY_HOLD"] = "1"  # 子程序（重建、Claude Code）同步時不要放開這台的使用中
-    choose_account(app.runs)
-
-    print("從 Google 雲端硬碟同步…")
-    if drive_sync(app.runs, hold=True) == 2:
-        app.blocked = (busy_elsewhere(target(app.runs), device_id()) or {}).get("device") or "另一台電腦"
-        print("另一台電腦還在用：這台先只看資料、不同步，也先不要建新教授。那台關掉後重開這個程式。")
-        closer = None
-    else:
-        closer = Closer(app.runs)
-    print("更新教授資料…")
-    if not rebuild(ws):
-        print("（沒有 uv：先用雲端同步下來的資料；要在這台建新教授，首頁會引導你安裝）")
+    if not choose_account(app.runs, ask=None):
+        drives = find_drives()
+        if len(drives) > 1:
+            app.drive_choices = [d[0] for d in drives]
+            app.need_account.set()
+    threading.Thread(target=startup, args=(app,), daemon=True).start()
 
     port = free_port(a.port)
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{port}/web/index.html"
-    print(f"\n✅ 已打開：{url}\n   保持這個視窗開著；關掉視窗或按 Ctrl+C 就會同步並結束（正在跑的流水線也會停，之後可按「繼續跑」）。\n")
+    print(f"已打開：{url}")
 
+    def close_all(*_):
+        app.jobs.stop()
+        if app.closer:
+            app.closer()
+    atexit.register(close_all)
     stop = threading.Event()
-    if closer:
-        def close_all(*_):
-            app.jobs.stop()
-            closer()
-        atexit.register(close_all)
-        sigs = [signal.SIGINT, signal.SIGTERM] + [getattr(signal, n) for n in ("SIGHUP", "SIGBREAK") if hasattr(signal, n)]  # SIGBREAK：Windows 關視窗
 
-        def on_signal(*_):
-            if closer.done:  # 關閉中又收到訊號（例：uv 轉送一次）：不要打斷正在做的同步
-                return
-            for sg in sigs:
-                signal.signal(sg, signal.SIG_IGN)
-            close_all()
-            sys.exit(0)  # 訊號在主執行緒處理：結束 serve_forever
-        for sg in sigs:
-            signal.signal(sg, on_signal)
-        if os.name == "nt":  # Windows 按右上角 X 關視窗不會送 Python 訊號：用主控台事件接（約 5 秒內要做完）
-            import ctypes
-            HANDLER = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_uint)
+    def periodic():
+        while not stop.wait(SYNC_EVERY):
+            if app.syncing:
+                continue
+            try:
+                drive_sync(app.runs, hold=not app.blocked)
+            except Exception as e:
+                print(f"同步失敗：{e}")
+    threading.Thread(target=periodic, daemon=True).start()
 
-            def on_console(event):
-                if event in (2, 5, 6):  # CTRL_CLOSE / LOGOFF / SHUTDOWN
-                    close_all()
-                    return True
-                return False
-            main._console_handler = HANDLER(on_console)  # 留住參照，不然會被回收
-            ctypes.windll.kernel32.SetConsoleCtrlHandler(main._console_handler, True)
-
-        def periodic():
-            while not stop.wait(SYNC_EVERY):
-                try:
-                    drive_sync(app.runs, hold=not app.blocked)
-                except Exception as e:
-                    print(f"同步失敗：{e}")
-        threading.Thread(target=periodic, daemon=True).start()
-
+    exe = None if (a.browser or a.no_browser) else find_app_browser()
+    if exe and (FROZEN or os.name == "nt" or a.window):
+        win = AppWindow(exe, url, ws / ".window")
+        win.open()
+        win.wait_closed()  # 關掉視窗＝結束：最後同步、釋放使用中、停掉正在跑的流水線
+        stop.set()
+        close_all()
+        srv.shutdown()
+        return
     if not a.no_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
+    print("保持這個視窗開著；關掉視窗或按 Ctrl+C 就會同步並結束（正在跑的流水線也會停，之後可按「繼續跑」）。")
+    sigs = [signal.SIGINT, signal.SIGTERM] + [getattr(signal, n) for n in ("SIGHUP", "SIGBREAK") if hasattr(signal, n)]
+    done = threading.Event()
+
+    def on_signal(*_):
+        if done.is_set():  # 關閉中又收到訊號（例：uv 轉送一次）：不要打斷正在做的同步
+            return
+        done.set()
+        for sg in sigs:
+            signal.signal(sg, signal.SIG_IGN)
+        stop.set()
+        close_all()
+        sys.exit(0)
+    for sg in sigs:
+        signal.signal(sg, on_signal)
+    if os.name == "nt":  # 主控台版按 X 關視窗：用主控台事件接（約 5 秒內要做完）
+        import ctypes
+        HANDLER = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_uint)
+
+        def on_console(event):
+            if event in (2, 5, 6):
+                close_all()
+                return True
+            return False
+        main._console_handler = HANDLER(on_console)
+        ctypes.windll.kernel32.SetConsoleCtrlHandler(main._console_handler, True)
     try:
-        srv.serve_forever()
+        while True:
+            time.sleep(3600)
     finally:
         stop.set()
-        srv.server_close()
 
 
 if __name__ == "__main__":

@@ -6,5 +6,5 @@ if [ -z "$UV" ]; then
   echo "找不到 uv。請先在「終端機」執行：curl -LsSf https://astral.sh/uv/install.sh | sh ，裝好後再雙擊一次。"
   read -n1 -r -p "按任意鍵關閉"; exit 1
 fi
-"$UV" sync -q && exec "$UV" run python scripts/app.py "$@"
+"$UV" sync -q && exec "$UV" run python scripts/app.py --window "$@"
 read -n1 -r -p "啟動失敗，按任意鍵關閉"
