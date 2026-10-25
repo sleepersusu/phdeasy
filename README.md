@@ -30,18 +30,24 @@ uv sync
 uv run pytest
 ```
 
-## 看結果
+## 應用程式（看資料＋跑流水線）
 
-雙擊 repo 裡的 **`開啟教授檔案.command`**（Mac）或 **`開啟教授檔案.bat`**（Windows）：
+Windows：到 [Releases](https://github.com/sleepersusu/phdeasy/releases) 下載 `PhdeasyProfessorFiles-Setup.exe` 安裝。Mac：雙擊 repo 裡的 `開啟教授檔案.command`。
 
-1. 先從 Google 雲端硬碟拉下別台電腦的更新，重建首頁與教授頁。
-2. 自動用瀏覽器打開首頁：你的 CV 與研究計畫 → 教授比對 → 點進去是教授詳細資料。
-3. 開著的時候每 3 分鐘同步一次；另一台電腦正在用時，這台只看資料、不同步。
-4. 關掉那個黑色視窗（或按 Ctrl+C）會最後同步一次並釋放「使用中」。
+這台電腦要先有：
 
-**Windows 安裝版**：到 GitHub 的 [Releases](https://github.com/sleepersusu/phdeasy/releases) 下載 `PhdeasyProfessorFiles-Setup.exe` 安裝，不用裝 Python 或 uv。先裝 Google Drive 電腦版並登入；打開後會把 `我的雲端硬碟/phdeasy教授檔案` 同步到 `使用者\phdeasy\runs` 再顯示。安裝版只看資料、不重建網頁（網頁由跑流水線的那台建好後經雲端同步過來）。發新版：推一個 `v*` 版號，GitHub Actions 只打包 Windows。
+1. **Google Drive 電腦版**並登入：教授檔案放在 `我的雲端硬碟/phdeasy教授檔案`，每台打開都會同步；登入多個帳號時，第一次打開會問用哪一個。
+2. **Claude Code** 並登入：要在這台建新教授才需要；只看資料可以不用。
+3. **uv**：沒有的話，首頁「建新教授」那一區會問你要不要自動安裝（從 astral.sh 官方安裝，不用管理員權限）。
 
-建新教授、停 1／停 2 的確認仍在 Claude Code 裡做（「幫我建教授檔案：<姓名>，<學校>」）。
+打開後：
+
+- 首頁：你的 CV 與研究計畫 → 教授比對 → 點進去是教授詳細頁。網頁是做好的 HTML／JS（`web/`），資料從 `runs/` 的 JSON 讀，比對在瀏覽器裡算。
+- **建新教授**：填姓名、學校，按「開始建檔」。這台的 Claude Code 在背景跑到停 1；停 1／停 2 的報告和要你決定的事會出現在畫面上，你在框裡回覆就接著跑。各教授列表有「繼續跑」可以從中斷的地方接續。
+- 背景執行的權限只開流水線用到的工具（讀寫專案檔、`uv run`、派 subagent、查網頁），其他指令一律拒絕；卡住時畫面上會說卡在哪。
+- 開著每 3 分鐘同步一次；另一台電腦正在用時，這台只能看，不能跑流水線。關掉視窗會最後同步一次並釋放。
+
+安裝版第一次打開會把內建的流水線（scripts、skills、web、CLAUDE.md）放到 `使用者\phdeasy`，教授資料在 `使用者\phdeasy\runs`；更新版本時只換流水線，不動教授資料。發新版：推一個 `v*` 版號，GitHub Actions 只打包 Windows。
 
 你的資料放在 `runs/_me/me.json`（不進 git，經雲端硬碟同步）。
 

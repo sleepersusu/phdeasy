@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>__NAME__ 研究檔案</title>
+<title>教授研究檔案</title>
 <style>
 :root{
   --fg:#000;--bg:#fff;--muted:#3f3f3f;--line:#cfcfcf;--soft:#f4f4f4;
@@ -110,19 +110,21 @@ header.top .wrap{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-betw
 </head>
 <body>
 <a class="sr" href="#papers">跳到文章解析</a>
-<header class="top"><div class="wrap"><div><a class="btn btn-green" href="../../../index.html" style="margin-bottom:8px">← 回我的首頁</a><h1 id="title"></h1><div class="meta" id="meta"></div></div>
+<header class="top"><div class="wrap"><div><a class="btn btn-green" href="index.html" id="home-link" style="margin-bottom:8px">← 回我的首頁</a><h1 id="title"></h1><div class="meta" id="meta"></div></div>
   <div class="langs" role="group" aria-label="內容語言">
     <button class="btn btn-green" data-lang="zh" aria-pressed="false">中文</button>
     <button class="btn btn-green" data-lang="en" aria-pressed="false">English</button>
     <button class="btn btn-green" data-lang="both" aria-pressed="true">雙語</button>
   </div></div></header>
-<nav class="sections" aria-label="區段"><div class="wrap">__NAV__</div></nav>
-<main class="wrap">__SECTIONS__</main>
+<nav class="sections" aria-label="區段"><div class="wrap"><a href="#match">與我的研究比對</a><a href="#overview">總覽</a><a href="#profile">教授總覽</a><a href="#decisions">待你決定</a><a href="#coauthors">合作者</a><a href="#topics">研究領域</a><a href="#grants">研究計畫</a><a href="#papers">文章解析</a><a href="#exceptions">例外紀錄</a><a href="#files">檔案</a></div></nav>
+<main class="wrap"><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
 <footer class="wrap" id="foot"></footer>
-__FIELDS__
+<!-- 大意 --><!-- 研究設計 --><!-- 研究樣本 --><!-- 研究缺口 --><!-- 解決什麼 --><!-- 發現 --><!-- 研究限制 -->
+<script id="inline-data" type="application/json">__INLINE__</script>
+<script src="site_match.js"></script>
 <script>
-__MATCHJS__
-const D = __DATA__;
+/* 資料：應用程式從 runs/<slug>/out/site/data.json 讀；離線單檔版把資料內嵌在 #inline-data */
+let D = null;
 const LS = k => "phdeasy:" + (D.professor.author_id || "x") + ":" + k;
 const store = { get(k){ try { return JSON.parse(localStorage.getItem(LS(k))); } catch (e) { return null; } },
                 set(k, v){ try { localStorage.setItem(LS(k), JSON.stringify(v)); } catch (e) {} } };
@@ -474,11 +476,34 @@ document.addEventListener("click", ev => {
   ev.preventDefault(); openPaper(a.getAttribute("href").slice(7));
 });
 
-setLang(store.get("lang") || "both");
-document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
-header(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
-openFromHash();
-window.addEventListener("hashchange", openFromHash);
+function rebase(d, base){
+  /* data.json 裡的連結是相對於 runs/<slug>/out/site/ 的，轉成這一頁看得懂的網址 */
+  const fix = h => h && !/^(https?:|#|mailto:)/.test(h) ? new URL(h, base).href : h;
+  d.works.forEach(w => { w.pdf_href = fix(w.pdf_href); });
+  d.files.forEach(f => { f.href = fix(f.href); });
+  return d;
+}
+async function loadData(){
+  const inline = document.getElementById("inline-data").textContent.trim();
+  if (inline && inline !== "__INLINE__") return JSON.parse(inline);
+  const slug = new URLSearchParams(location.search).get("p");
+  if (!slug) throw new Error("網址少了 ?p=<教授資料夾>");
+  const base = new URL(`../runs/${encodeURIComponent(slug)}/out/site/`, location.href);
+  const r = await fetch(new URL("data.json", base), {cache: "no-store"});
+  if (!r.ok) throw new Error(`讀不到 ${slug} 的資料（${r.status}）`);
+  return rebase(await r.json(), base.href);
+}
+(async function init(){
+  try { D = await loadData(); }
+  catch (e) { document.querySelector("main").innerHTML = `<div class="empty" role="alert">${esc(e.message)}</div>`; return; }
+  if (document.getElementById("inline-data").textContent.trim() !== "__INLINE__") document.getElementById("home-link").href = "../../../index.html";
+  document.title = (D.professor.name || "") + " 研究檔案";
+  setLang(store.get("lang") || "both");
+  document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+  header(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
+  openFromHash();
+  window.addEventListener("hashchange", openFromHash);
+})();
 </script>
 </body>
 </html>

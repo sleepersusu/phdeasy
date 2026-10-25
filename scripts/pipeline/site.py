@@ -220,13 +220,15 @@ def build_site_data(run):
     }
 
 
+WEB = Path(__file__).resolve().parents[2] / "web"  # 前端（HTML／JS）正本，應用程式直接用它讀 data.json
+
+
+def _inline_json(data):
+    return json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
+
+
 def render_html(data):
-    payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    nav = "".join(f'<a href="#{sid}">{label}</a>' for sid, label in SECTIONS)
-    sections = "".join(f'<section id="{sid}" aria-labelledby="h-{sid}"><h2 id="h-{sid}">{label}</h2><div class="body"></div></section>' for sid, label in SECTIONS)
-    field_labels = "".join(f"<!-- {label} -->" for _, label in CARD_FIELDS)
-    match_js = Path(__file__).with_name("site_match.js").read_text()
-    return TEMPLATE.replace("__MATCHJS__", match_js).replace("__NAV__", nav).replace("__SECTIONS__", sections).replace("__FIELDS__", field_labels).replace("__DATA__", payload).replace("__NAME__", data["professor"]["name"] or "")
-
-
-TEMPLATE = (Path(__file__).with_name("site_template.html")).read_text() if Path(__file__).with_name("site_template.html").exists() else ""
+    """離線單檔版：把 data 與比對程式內嵌進 web/professor.html（應用程式不需要這個，直接讀 data.json）。"""
+    html = (WEB / "professor.html").read_text()
+    js = (WEB / "site_match.js").read_text()
+    return html.replace("__INLINE__", _inline_json(data), 1).replace('<script src="site_match.js"></script>', f"<script>\n{js}\n</script>", 1)

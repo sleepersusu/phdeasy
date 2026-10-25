@@ -21,7 +21,7 @@ FOLDER = "phdeasy教授檔案"
 STATE = ".drive_sync.json"
 LOCK = "_使用中.json"
 LOCK_FRESH = 10 * 60
-SKIP_DIRS = {"_同步衝突", "_同步刪除", "__pycache__"}
+SKIP_DIRS = {"_同步衝突", "_同步刪除", "__pycache__", "_app"}  # _app：這台的背景工作紀錄，只在這台
 SKIP_FILES = {STATE, LOCK, ".DS_Store", "drive.json"}  # drive.json：每台電腦自己的雲端設定，不同步
 DEVICE = (socket.gethostname() or "這台電腦").split(".")[0]
 

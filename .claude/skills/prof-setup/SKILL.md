@@ -83,7 +83,7 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
 
 - 加入外部候選：
   ```bash
-  cd scripts && uv run python add_works.py ../runs/<slug> --doi <doi1> --doi <doi2> && cd ..
+  uv run python scripts/add_works.py runs/<slug> --doi <doi1> --doi <doi2>
   uv run python scripts/fill_abstracts.py runs/<slug>
   uv run python scripts/setup_fulltext.py runs/<slug> --only <新 id，逗號分隔>
   ```

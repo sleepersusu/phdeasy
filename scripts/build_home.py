@@ -3,10 +3,11 @@
   uv run python scripts/build_home.py runs   # 結尾會同步到 Google 雲端硬碟（drive_sync.py）
 """
 import argparse
+import json
 from pathlib import Path
 
 from drive_sync import run as drive_sync
-from pipeline.home import build_home_data, render_home
+from pipeline.home import build_home_data, professors_index, render_home
 from pipeline.site import build_site_data, render_html
 
 
@@ -18,7 +19,10 @@ def main():
         if d.is_dir() and not d.name.startswith("_") and (d / "work" / "works.json").exists():
             out = d / "out" / "site" / "index.html"
             out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(render_html(build_site_data(d)))
+            data = build_site_data(d)
+            (out.parent / "data.json").write_text(json.dumps(data, ensure_ascii=False))
+            out.write_text(render_html(data))
+    (runs / "professors.json").write_text(json.dumps(professors_index(runs), ensure_ascii=False, indent=1))
     data = build_home_data(runs)
     (runs / "index.html").write_text(render_home(data))
     me = data["me"]["name"] if data["me"] else "（尚無本人資料）"

@@ -95,7 +95,7 @@ def test_html_has_all_sections_and_escapes_script(tmp_path):
     for _, label in CARD_FIELDS:
         assert label in html
     assert "Study </script> One" not in html  # 標題裡的 </script> 不能破壞頁面
-    assert html.count("<script>") == 1
+    assert html.count("<script>") == 2  # 比對程式＋主程式（資料在 <script id="inline-data" type="application/json">）
 
 
 def test_work_exception_states(tmp_path):
@@ -168,3 +168,14 @@ def test_html_has_match_section_and_language_switch(tmp_path):
     assert 'id="match"' in html
     assert "function rankDocs" in html  # 比對邏輯內嵌
     assert 'data-lang="zh"' in html and 'data-lang="en"' in html and 'data-lang="both"' in html
+
+
+def test_build_site_writes_data_json(tmp_path):
+    import json, sys
+    sys.path.insert(0, "scripts")
+    import build_site
+    run = make_run(tmp_path)
+    sys.argv = ["build_site.py", str(run)]
+    build_site.main()
+    d = json.loads((run / "out" / "site" / "data.json").read_text())
+    assert d["professor"] and d["works"]

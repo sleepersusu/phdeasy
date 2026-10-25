@@ -12,7 +12,6 @@ from pathlib import Path
 from .site import build_site_data
 
 MATCH_CLI = Path(__file__).with_name("match_cli.mjs")
-TEMPLATE = Path(__file__).with_name("home_template.html")
 
 
 def _j(p):
@@ -77,6 +76,18 @@ def professor_summary(run, me, use_node=True):
     }
 
 
+def professors_index(runs):
+    """應用程式首頁（web/index.html）讀的教授清單：比對在瀏覽器裡算，這裡只給位置。"""
+    runs = Path(runs)
+    out = []
+    for d in sorted(runs.iterdir()):
+        if d.is_dir() and not d.name.startswith("_") and (d / "state.json").exists() and (d / "work" / "works.json").exists():
+            st = _j(d / "state.json") or {}
+            out.append({"slug": d.name, "name": (st.get("professor") or {}).get("name"), "institution": (st.get("professor") or {}).get("institution"),
+                        "stage": st.get("stage"), "data": f"{d.name}/out/site/data.json", "built": (d / "out" / "site" / "data.json").exists()})
+    return out
+
+
 def build_home_data(runs, use_node=True):
     runs = Path(runs)
     me = _j(runs / "_me" / "me.json")
@@ -87,6 +98,12 @@ def build_home_data(runs, use_node=True):
     return {"me": me, "professors": profs}
 
 
+WEB = Path(__file__).resolve().parents[2] / "web"
+
+
 def render_home(data):
+    """離線單檔版首頁：資料與比對程式內嵌進 web/index.html（應用程式直接讀 runs/ 的 JSON，在瀏覽器裡比對）。"""
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
-    return TEMPLATE.read_text().replace("__DATA__", payload)
+    js = (WEB / "site_match.js").read_text()
+    html = (WEB / "index.html").read_text().replace("__INLINE__", payload, 1)
+    return html.replace('<script src="site_match.js"></script>', f"<script>\n{js}\n</script>", 1).replace('<script src="app.js"></script>\n', "", 1)

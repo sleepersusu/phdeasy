@@ -68,7 +68,7 @@ def test_render_home_sections_and_link(tmp_path):
     for sid in ("me", "proposal", "capabilities", "professors"):
         assert f'id="{sid}"' in html
     assert "demo/out/site/index.html" in html
-    assert html.count("<script>") == 1
+    assert html.count("<script>") == 2 and "app.js" not in html  # 比對程式＋主程式；離線版沒有流水線控制
 
 
 def test_home_without_me_shows_setup_hint(tmp_path):
@@ -84,3 +84,10 @@ def test_methods_not_mixed_into_topic_query_and_strong_count(tmp_path):
     p = build_home_data(runs)["professors"][0]
     assert "n_strong" in p and p["n_strong"] <= p["n_overlap_papers"]
     assert not any("rct" == t.lower() for t in p["shared_terms"])  # 研究設計另外算，不混進主題詞
+
+
+def test_professors_index_lists_runs(tmp_path):
+    from pipeline.home import professors_index
+    runs = runs_with_prof(tmp_path)
+    idx = professors_index(runs)
+    assert [p["slug"] for p in idx] == ["demo"] and idx[0]["data"] == "demo/out/site/data.json"

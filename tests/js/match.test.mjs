@@ -1,7 +1,7 @@
 // 首頁比對的邏輯測試（node 執行；由 tests/test_match_js.py 呼叫）
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-const src = readFileSync(new URL("../../scripts/pipeline/site_match.js", import.meta.url), "utf8");
+const src = readFileSync(new URL("../../web/site_match.js", import.meta.url), "utf8");
 const M = new Function(src + "; return { tokenize, expandQuery, buildIndex, rankDocs, displayTerms };")();
 
 // 斷詞：英文詞（去複數）＋中文雙字
