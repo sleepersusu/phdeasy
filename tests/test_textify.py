@@ -90,6 +90,12 @@ def test_normalize_for_match_unifies_ligatures_quotes_dashes():
     assert a == b
 
 
+def test_soft_hyphen_at_line_break_rejoins_word():
+    # 「can\u00ad\ncer」在 PDF 是斷行處的軟連字號，比對時要接回「cancer」，不能變成「can cer」
+    assert normalize_for_match("global can\u00ad\ncer morbidity") == "global cancer morbidity"
+    assert normalize_for_match("Aus\u00ad \n tralian adults") == "australian adults"
+
+
 def test_units_counts_markers():
     assert units("[p.1]\na\n[p.2]\nb") == 2
     assert units("[§1] a\n[§2] b\n[§3] c") == 3

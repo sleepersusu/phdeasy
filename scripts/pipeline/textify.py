@@ -103,7 +103,8 @@ def has_text(text, min_chars=MIN_CHARS):
 
 
 def normalize_for_match(text):
-    t = unicodedata.normalize("NFKC", text or "").replace("\u00ad", "")  # 看不見的軟連字號（BMJ 等 PDF 常見）
+    t = unicodedata.normalize("NFKC", text or "")  # 看不見的軟連字號（BMJ 等 PDF 常見）
+    t = re.sub(r"\u00ad\s*", "", t)  # 在斷行處時連同換行一起拿掉，字才接得回來
     t = re.sub(r"[‘’‚′`]", "'", t)
     t = re.sub(r"[“”„″]", '"', t)
     t = re.sub(r"[‐-―−]", "-", t)
