@@ -178,10 +178,10 @@ function setupHomeViews(){
     const fit = p => p.recommend ? `${p.recommend.targets.filter(t => t.fit === "strong").length} 個興趣強相關` : "還沒比對";
     hub.querySelector(".body").innerHTML = `
       <div class="grid">
-        <a class="card" href="me.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">我的資料</strong><div class="small muted">CV、研究興趣、我能做到的事</div></a>
-        <a class="card" href="professors.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">目標教授</strong><div class="small muted">${ps.length} 位：匹配程度、該先看哪幾篇與哪個計畫；在這裡新增教授</div></a>
-        <a class="card" href="pipeline.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">工作進度</strong><div class="small muted">Claude Code 在背景跑的工作、停點回覆</div></a>
-        <a class="card" href="settings.html" style="text-decoration:none;border:2px solid var(--fg)"><strong style="font-size:1.15rem">設定</strong><div class="small muted">雲端帳號、AI、金鑰、版本</div></a>
+        <a class="card" href="me.html" style="text-decoration:none"><strong style="font-size:1.15rem">我的資料</strong><div class="small muted">CV、研究興趣、我能做到的事</div></a>
+        <a class="card" href="professors.html" style="text-decoration:none"><strong style="font-size:1.15rem">目標教授</strong><div class="small muted">${ps.length} 位：匹配程度、該先看哪幾篇與哪個計畫；在這裡新增教授</div></a>
+        <a class="card" href="pipeline.html" style="text-decoration:none"><strong style="font-size:1.15rem">工作進度</strong><div class="small muted">Claude Code 在背景跑的工作、停點回覆</div></a>
+        <a class="card" href="settings.html" style="text-decoration:none"><strong style="font-size:1.15rem">設定</strong><div class="small muted">雲端帳號、AI、金鑰、版本</div></a>
       </div>`;
   } else {
     document.getElementById("hub")?.remove();

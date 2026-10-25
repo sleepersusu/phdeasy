@@ -41,7 +41,7 @@ details.src{margin-top:6px}
 details.src summary{cursor:pointer;font-size:.85rem;color:var(--muted);min-height:32px;display:flex;align-items:center}
 blockquote{margin:6px 0;padding:6px 10px;border-left:3px solid var(--line);background:var(--soft);font-size:.88rem}
 .loc{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
-.fig{border:2px solid var(--fg);border-radius:10px;padding:12px;margin:12px 0}
+.fig{border:1px solid var(--line);border-radius:10px;padding:12px;margin:12px 0}
 .fig img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;display:block;margin-top:8px;cursor:zoom-in}
 .fig img.big{cursor:zoom-out}
 .empty{padding:14px;border:1px dashed var(--fg);border-radius:8px}
@@ -51,6 +51,33 @@ blockquote{margin:6px 0;padding:6px 10px;border-left:3px solid var(--line);backg
 .tbl th{background:var(--soft)}
 .facts{font-size:.9rem;margin:4px 0}
 @media (max-width:760px){.bi,.bihead{grid-template-columns:1fr}.bi>.en{border-right:none;border-bottom:1px solid var(--line)}.bihead>div:last-child{display:none}}
+
+/* 簡單一致的樣式（本人 2026-10-26：按鈕和格子不要那麼醜）：淺灰細框、柔和的狀態標籤、主要動作綠色、次要按鈕白底 */
+:root{--line:#e3e5e8;--soft:#f6f7f8;--muted:#5b5f66}
+.btn{min-height:40px;padding:0 14px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:var(--fg);font-weight:600;font-size:.95rem;box-shadow:0 1px 1px rgba(0,0,0,.04);transition:background .15s,border-color .15s}
+.btn:hover{filter:none;background:var(--soft);border-color:#c3c7cc}
+.btn-green{background:var(--green);border-color:var(--green);color:#fff}.btn-green:hover{background:#116632;border-color:#116632}
+.btn-yellow{background:#fde68a;border-color:#f2c94c;color:#3b2f00}.btn-yellow:hover{background:#fcd34d;border-color:#e5b73b}
+.btn-red{background:#fff;border-color:#f1b5b5;color:#9f1d1d}.btn-red:hover{background:#fdf2f2}
+.btn[aria-pressed="false"]{background:#fff;color:var(--fg);border-color:#d5d8dc}
+.btn[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.pill{padding:1px 9px;border:none;border-radius:999px;background:#eef0f2;color:#2b2f33;font-weight:600;font-size:.8rem}
+.pill.g{background:#dcf3e3;color:#14532d}.pill.y{background:#fdf1c7;color:#6b4e00}.pill.r{background:#fde2e2;color:#8a1c1c}.pill.o{background:#fff;box-shadow:inset 0 0 0 1px #d5d8dc}
+.card,.item,.kpi,.prof,.fig{border:1px solid var(--line);border-radius:10px;background:#fff}
+.card,.item,.prof{padding:14px}
+.item.attn{border-left:4px solid #e9b949}.item.bad{border-left:4px solid #e57373}
+a.card{display:block;text-decoration:none;color:inherit;transition:border-color .15s,box-shadow .15s}
+a.card:hover{border-color:var(--green);box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.empty{border:1px dashed #cfd3d8;background:var(--soft);color:var(--muted);border-radius:10px}
+input[type=text],input[type=search],input[type=date],select,textarea{font:inherit;min-height:40px;padding:8px 10px;border:1px solid #d5d8dc;border-radius:8px;background:#fff;color:var(--fg)}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--green);outline-offset:1px;border-color:var(--green)}
+input[type=checkbox]{width:18px;height:18px;accent-color:var(--green)}
+details>summary{list-style:none}details>summary::-webkit-details-marker{display:none}
+details.item>summary::before{content:"›";display:inline-block;width:1em;color:var(--muted);transition:transform .15s}
+details.item[open]>summary::before{transform:rotate(90deg)}
+header.top{border-bottom:1px solid var(--line)}
 </style>
 </head>
 <body>

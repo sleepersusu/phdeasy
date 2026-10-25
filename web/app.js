@@ -16,7 +16,7 @@ function appBanner(st){
   if (!el){ el = document.createElement("div"); el.id = "app-banner"; el.className = "wrap"; document.querySelector("main").before(el); }
   if (wasSyncing && !st.syncing && !st.need_account){ wasSyncing = false; location.reload(); return; }  // 同步完：重新整理拿最新資料
   if (st.need_account){
-    el.innerHTML = `<div class="card" style="margin-top:12px;border:2px solid var(--fg)"><h3 style="margin-top:0">選擇放教授檔案的 Google 帳號</h3>
+    el.innerHTML = `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">選擇放教授檔案的 Google 帳號</h3>
       <p class="small">這台電腦登入了多個 Google 雲端硬碟帳號。選一次就好，之後會記住。</p>
       <div class="row">${st.drive_choices.map(a => `<button class="btn btn-green" data-acct="${esc(a)}">${esc(a)}</button>`).join("")}</div></div>`;
     el.querySelectorAll("[data-acct]").forEach(b => b.onclick = async () => { b.disabled = true; try { await API("account", {account: b.dataset.acct}); } catch (e) { alert(e.message); b.disabled = false; } });
