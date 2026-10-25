@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>設定｜我的博士申請</title>
+<link rel="stylesheet" href="home.css">
+</head>
+<body class="lang-both">
+<header class="top"><div class="wrap">
+  <div><h1 id="name"></h1><div class="meta" id="headline"></div><div class="meta small" id="contact"></div></div>
+  <div class="row" role="group" aria-label="內容語言">
+    <button class="btn btn-green" data-lang="zh">中文</button>
+    <button class="btn btn-green" data-lang="en">English</button>
+    <button class="btn btn-green" data-lang="both">雙語</button>
+  </div>
+</div></header>
+<nav class="sections" aria-label="區段"><div class="wrap">
+  <a href="#me">我是誰</a><a href="#proposal">我的研究計畫</a><a href="#capabilities">我能做到的事</a><a href="#professors">教授比對</a><a href="#pipeline" id="nav-pipeline" hidden>建新教授</a><a href="#settings" id="nav-settings" hidden>設定</a>
+</div></nav>
+<main class="wrap">
+  <section id="settings" aria-labelledby="h-set"><h2 id="h-set">設定</h2><div class="body"></div></section>
+</main>
+<footer class="wrap">這一頁只存在你的電腦（runs/ 不進版本控制）。內容摘自你的 CV 與研究計畫書，每段標了出處；比對只呈現主題重疊與證據，不是「適不適合」的判斷。</footer>
+<script id="inline-data" type="application/json">__INLINE__</script>
+<script src="site_match.js"></script>
+<script src="home.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -119,4 +119,6 @@ def render_home(data):
     payload = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     js = (WEB / "site_match.js").read_text()
     html = (WEB / "index.html").read_text().replace("__INLINE__", payload, 1)
+    html = html.replace('<link rel="stylesheet" href="home.css">', f"<style>\n{(WEB / 'home.css').read_text()}</style>", 1)
+    html = html.replace('<script src="home.js"></script>', f"<script>\n{(WEB / 'home.js').read_text()}\n</script>", 1)
     return html.replace('<script src="site_match.js"></script>', f"<script>\n{js}\n</script>", 1).replace('<script src="app.js"></script>\n', "", 1)

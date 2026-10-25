@@ -42,18 +42,14 @@ function appBanner(st){
 async function pipelinePanel(){
   let st;
   try { st = await API("status"); } catch (e) { return; }  // 不是在應用程式裡：不顯示
-  document.getElementById("pipeline").hidden = false;
-  document.getElementById("nav-pipeline").hidden = false;
-  document.getElementById("settings").hidden = false;
-  document.getElementById("nav-settings").hidden = false;
   window.APP_REMATCH = true;  // 教授卡片顯示「重新比對」按鈕
-  renderProfs(H.professors);
-  document.getElementById("professors").addEventListener("click", async ev => {
+  if (document.getElementById("professors") && !document.getElementById("professors").hidden) renderProfs(H.professors);
+  document.getElementById("professors")?.addEventListener("click", async ev => {
     const b = ev.target.closest("[data-rematch]");
     if (!b) return;
     if (!confirm("請 Claude Code 依你目前的研究興趣與研究計畫重新比對這位教授？約需 10–20 分鐘，進度在「建新教授」那一區。")) return;
     b.disabled = true;
-    try { await API("match", {slug: b.dataset.rematch}); document.getElementById("pipeline").scrollIntoView(); }
+    try { await API("match", {slug: b.dataset.rematch}); location.href = "pipeline.html"; }
     catch (e) { alert(e.message); b.disabled = false; }
   });
   appBanner(st);
@@ -67,7 +63,8 @@ function check(ok, good, bad){ return `<li>${ok ? `<span class="pill g">✓</spa
 
 let lastShape = "";
 function renderPipeline(st){
-  const el = document.querySelector("#pipeline .body");
+  const el = document.querySelector("#pipeline:not([hidden]) .body");
+  if (!el) return;  // 這一頁沒有「建新教授」區
   /* 每 3 秒更新：只有紀錄變多時只換紀錄那一塊，不打斷你正在打字的欄位 */
   const shape = JSON.stringify({...st, log: undefined});
   const logEl = el.querySelector(".log");
@@ -153,7 +150,8 @@ function renderPipeline(st){
 /* 設定：Google 雲端硬碟帳號（切換、立刻同步）、Claude Code（測試、登入）、金鑰檔、uv */
 let lastSettings = "";
 function renderSettings(st){
-  const el = document.querySelector("#settings .body");
+  const el = document.querySelector("#settings:not([hidden]) .body");
+  if (!el) return;
   const g = st.settings || {};
   const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, uv: st.uv, running: st.running, v: st.version, u: st.update && st.update.latest});
   if (shape === lastSettings) return;

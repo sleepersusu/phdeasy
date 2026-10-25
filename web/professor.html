@@ -173,6 +173,23 @@ function setLang(l){
 const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升中年女性的身體活動與心血管健康知識，特別是少數族群。",
                  tags: "chatbot、physical activity、women、cardiovascular、health disparities", methods: ["pilot-rct", "quasi-experimental"]};
 
+function recommendHTML(){
+  /* prof-match：Claude 依你的興趣與研究計畫挑出的推薦（核對過出處、推翻過） */
+  const r = D.recommend;
+  if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在首頁「教授比對」按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
+  const W = Object.fromEntries(D.works.map(w => [w.id, w])), G = Object.fromEntries(D.grants.map(g => [g.key, g]));
+  const FITL = {strong: ["g", "強相關"], partial: ["y", "部分相關"], none: ["", "沒有相關"]};
+  const paper = id => W[id] ? `<a href="#paper-${esc(id)}">${bi(W[id].title_zh, W[id].title)}</a> <span class="small muted">${W[id].year}</span>` : esc(id);
+  return `${r.stale ? `<div class="item attn">${pill("y", "比對過期")} 你的研究興趣或研究計畫改過了，這份推薦是用舊的內容比的。</div>` : ""}
+    <h3>建議先看這幾篇</h3><ol>${r.read_first.map(id => `<li>${paper(id)}</li>`).join("")}</ol>
+    <h3>依你的興趣與研究</h3>
+    ${r.targets.filter(t => t.fit !== "none").map(t => `<details class="item" ${t.fit === "strong" ? "open" : ""}><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(FITL[t.fit][0], FITL[t.fit][1])}<strong>${esc(t.label_zh)}</strong>${t.kind === "study" ? `<span class="small muted">（你的研究計畫）</span>` : ""}</summary>
+      <div class="small">${esc(t.why)}</div>
+      <ul>${t.papers.map(x => `<li>${paper(x.id)}<div class="small muted">${esc(x.why)}</div></li>`).join("")}
+      ${t.grants.map(x => `<li>${G[x.key] ? bi(G[x.key].title_zh || G[x.key].funder_zh, G[x.key].title || G[x.key].funder) : esc(x.key)}<div class="small muted">${esc(x.why)}</div></li>`).join("")}</ul></details>`).join("")}
+    ${r.targets.some(t => t.fit === "none") ? `<p class="small muted">沒有找到相關研究：${r.targets.filter(t => t.fit === "none").map(t => esc(t.label_zh)).join("、")}</p>` : ""}`;
+}
+
 function matchDocs(){ return buildIndex(D.match_docs); }
 let MIDX = null;
 
@@ -181,7 +198,7 @@ function match(){
   const saved = store.get("match") || D.me_query || {};
   const designs = [...new Set(D.works.map(w => (w.card.fields.find(x => x.key === "design") || {}).facts).filter(Boolean).map(f => f["設計類型"]).filter(Boolean))];
   if (!$("#mf")){
-    el.innerHTML = `
+    el.innerHTML = recommendHTML() + `<h3>${D.recommend ? "自己輸入想做的研究（用詞比對，參考用）" : ""}</h3>
       ${D.me_query && !store.get("match") ? `<div class="item" style="margin-bottom:12px">${pill("g", "已套用")} 已自動帶入你首頁的研究計畫與興趣，可以直接修改後重新比對。</div>` : ""}
       <p class="muted">輸入你想做的研究，頁面會在你的瀏覽器裡跟這位教授的文章、計畫、合作者與方法比對，列出重疊之處和證據。比對只看主題與用詞的重疊程度，<strong>不是</strong>「適不適合」的判斷；你輸入的內容只存在這台電腦的瀏覽器。</p>
       <form id="mf" class="match-form">
@@ -453,7 +470,7 @@ function exActions(e){
 async function startException(id, kind, action, note){
   if (APP.running) throw new Error("已經有一個工作在跑，等它跑完再按");
   await APIX("exception", {slug: SLUG, id, kind, action, note: note || ""});
-  alert("已請 Claude Code 在背景處理。進度在首頁的「建新教授」區；做完這一頁重新整理就會更新。");
+  alert("已請 Claude Code 在背景處理。進度在「建新教授」頁；做完這一頁重新整理就會更新。");
 }
 
 function exceptions(){
@@ -464,7 +481,7 @@ function exceptions(){
   const ops = APP && exFilter === "open";
   el.innerHTML = `<p class="muted">自動段無法完成而被隔離的項目。未解決的例外超過 30% 時流水線會停下來。${ops ? "每一筆可以請 AI 再處理一次，或上傳你自己下載的 PDF。" : (APP ? "" : "在應用程式裡打開這一頁，未解決的例外會有處理按鈕。")}</p>
     <div class="row" role="group" aria-label="例外篩選">${btn("open", "btn-red", "未解決")}${btn("info", "btn-yellow", "註記")}${btn("resolved", "btn-green", "已解決")}</div>
-    ${APP && APP.running ? `<div class="card" style="margin-top:8px" role="status">${pill("y", "執行中")} 已經有一個工作在跑：${esc((APP.job || {}).title || "")}。<a href="index.html#pipeline">看進度</a></div>` : ""}
+    ${APP && APP.running ? `<div class="card" style="margin-top:8px" role="status">${pill("y", "執行中")} 已經有一個工作在跑：${esc((APP.job || {}).title || "")}。<a href="pipeline.html">看進度</a></div>` : ""}
     <div class="tablebox" style="margin-top:12px"><table><thead><tr><th>狀態</th><th>項目</th><th>階段</th><th>類型</th><th>說明${ops ? "與處理" : ""}</th></tr></thead><tbody>
     ${list.map(e => `<tr><td>${exPill(e)}</td><td>${/^W\d+$/.test(e.id) ? `<a href="#paper-${e.id}">${e.id}</a>` : esc(e.id)}</td><td>${esc(e.stage)}</td><td>${esc(e.kind)}</td><td class="small">${esc(e.detail)}${e.resolved ? `<div class="muted">解決：${esc(e.resolved)}</div>` : ""}${ops ? `<div style="margin-top:8px">${exActions(e)}</div>` : ""}</td></tr>`).join("") || `<tr><td colspan="5">這一類沒有紀錄。</td></tr>`}
     </tbody></table></div>`;
@@ -492,6 +509,45 @@ function files(){
     <div class="row">${D.files.map(f => `<a class="btn btn-green" href="${esc(f.href)}" target="_blank" rel="noopener">${esc(f.label)}</a>`).join("")}</div>`;
 }
 
+let OFFLINE = false;
+const VIEW = () => new URLSearchParams(location.search).get("v") || (location.hash.startsWith("#paper-") ? "papers" : "");
+const viewHref = v => `professor.html?p=${encodeURIComponent(new URLSearchParams(location.search).get("p") || "")}${v ? "&v=" + v : ""}`;
+const VIEWS = [
+  ["match", "與我的研究比對", "依你的興趣推薦先看哪幾篇、哪個計畫", d => d.recommend ? `${d.recommend.read_first.length} 篇先看` : "還沒比對"],
+  ["profile", "教授總覽", "研究主線、演變、合作、可以問的問題", d => `${(d.profile || []).length} 章`],
+  ["papers", "文章解析", "每篇的大意、設計、樣本、缺口、發現、限制", d => `${d.counts.works} 篇`],
+  ["grants", "研究計畫", "她主持的、合作者主持的、論文致謝提到的", d => `本人主持 ${d.counts.grants_pi}／共 ${d.counts.grants_total}`],
+  ["coauthors", "合作者", "跟誰合作最多", d => `${d.counts.coauthors} 位`],
+  ["topics", "研究領域", "領域、子領域、主題分佈", d => ""],
+  ["overview", "數字總覽", "文章數、作者序、全文、流水線進度", d => ""],
+  ["decisions", "待你決定", "需要你確認的事", d => `${d.decisions.length} 件`],
+  ["exceptions", "例外紀錄", "找不到全文等，可以按按鈕請 AI 再處理", d => `未解決 ${d.counts.exceptions_open}`],
+  ["files", "檔案", "報告、CSV、Zotero 匯入檔", d => ""],
+];
+function setupViews(){
+  const v = VIEW(), main = document.querySelector("main");
+  const nav = document.querySelector("nav.sections .wrap");
+  nav.innerHTML = `<a href="${viewHref("")}" ${!v ? 'aria-current="true"' : ""}>教授首頁</a>` +
+    VIEWS.map(([id, label]) => `<a href="${viewHref(id)}" ${v === id ? 'aria-current="true"' : ""}>${label}</a>`).join("");
+  document.querySelectorAll("main > section").forEach(sec => { sec.hidden = !!v ? sec.id !== v : true; });
+  document.getElementById("hub")?.remove();
+  if (!v){
+    const hub = document.createElement("section");
+    hub.id = "hub";
+    hub.innerHTML = `<p class="muted">選一個想看的部分，按進去就只顯示那一塊；上方的列可以隨時切換。</p>
+      <div class="mgrid">${VIEWS.map(([id, label, hint, n]) => `<a class="card" href="${viewHref(id)}" style="text-decoration:none;display:block;border:2px solid var(--fg);border-radius:10px;padding:16px">
+        <div class="row" style="justify-content:space-between"><strong style="font-size:1.1rem">${label}</strong><span class="pill">${esc(n(D) || "看")}</span></div>
+        <div class="small muted" style="margin-top:6px">${hint}</div></a>`).join("")}</div>`;
+    main.prepend(hub);
+  } else {
+    const back = document.createElement("div");
+    back.id = "hub";
+    back.innerHTML = `<a class="btn btn-green" href="${viewHref("")}" style="margin-top:12px">← ${esc(D.professor.name || "")} 教授首頁</a>`;
+    main.prepend(back);
+  }
+  window.scrollTo(0, 0);
+}
+
 function openFromHash(){
   const id = decodeURIComponent(location.hash.slice(1));
   if (id.startsWith("paper-")) openPaper(id.slice(6));
@@ -512,7 +568,9 @@ function openPaper(id){
 document.addEventListener("click", ev => {
   const a = ev.target.closest('a[href^="#paper-"]');
   if (!a || a.dataset.copy) return;
-  ev.preventDefault(); openPaper(a.getAttribute("href").slice(7));
+  ev.preventDefault();
+  if (!OFFLINE && VIEW() !== "papers"){ location.href = viewHref("papers") + a.getAttribute("href"); return; }  // 別的區塊裡點文章：進「文章解析」打開那篇
+  openPaper(a.getAttribute("href").slice(7));
 });
 
 function rebase(d, base){
@@ -535,11 +593,14 @@ async function loadData(){
 (async function init(){
   try { D = await loadData(); }
   catch (e) { document.querySelector("main").innerHTML = `<div class="empty" role="alert">${esc(e.message)}</div>`; return; }
-  if (document.getElementById("inline-data").textContent.trim() !== "__INLINE__") document.getElementById("home-link").href = "../../../index.html";
+  OFFLINE = document.getElementById("inline-data").textContent.trim() !== "__INLINE__";
+  if (OFFLINE) document.getElementById("home-link").href = "../../../index.html";
   document.title = (D.professor.name || "") + " 研究檔案";
   setLang(store.get("lang") || "both");
   document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
-  header(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files(); navHighlight();
+  header(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files();
+  if (OFFLINE){ navHighlight(); }   // 離線單檔版：全部放在一頁
+  else { setupViews(); }            // 應用程式：教授首頁是按鈕，一個按鈕進一個區塊
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
   try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); } } catch (e) {}  // 離線單檔版沒有 /api
