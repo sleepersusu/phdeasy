@@ -102,7 +102,12 @@ def r_ncbi_efetch(w):
 def r_s2(w):
     if not w.get("doi"):
         return []
-    d = get_json(f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(w['doi'])}?fields=openAccessPdf,externalIds", min_interval=1.1, retry_429=(5, 15, 30, 60), headers=s2_headers())
+    try:
+        d = get_json(f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(w['doi'])}?fields=openAccessPdf,externalIds", min_interval=1.1, retry_429=(5, 15, 30, 60), headers=s2_headers())
+    except RuntimeError as e:
+        if str(e).startswith("http_404"):  # Semantic Scholar 沒收錄這篇：明確的「沒有」，不是錯誤
+            return []
+        raise
     urls = []
     if (d.get("openAccessPdf") or {}).get("url"):
         urls.append(d["openAccessPdf"]["url"])

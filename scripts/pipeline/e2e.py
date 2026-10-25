@@ -122,6 +122,8 @@ def check_index(run, works):
         with open(p, newline="") as f:
             rows = {r["id"]: r for r in csv.DictReader(f)}
     missing = [w["id"] for w in works if w["id"] not in rows]
+    ids = {w["id"] for w in works}
+    rows = {k: v for k, v in rows.items() if k in ids}  # 本人移除或合併的文章不算
     lazy = []
     for r in rows.values():
         if r["status"] == "no_free_fulltext":

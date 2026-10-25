@@ -145,7 +145,9 @@ def test_is_preprint_url():
 
 
 def test_s2_headers_use_env_key(monkeypatch):
+    from pipeline import http
     from pipeline.http import s2_headers
+    monkeypatch.setattr(http, "SECRETS", http.Path("/nonexistent/secrets.env"))  # 不要讀到本人真的金鑰檔
     monkeypatch.delenv("S2_API_KEY", raising=False)
     assert s2_headers() == {}
     monkeypatch.setenv("S2_API_KEY", "k123")
@@ -161,3 +163,11 @@ def test_s2_key_from_synced_secrets_file(monkeypatch, tmp_path):
     assert http.s2_headers() == {"x-api-key": "abc"}
     monkeypatch.setenv("S2_API_KEY", "env-wins")
     assert http.s2_headers() == {"x-api-key": "env-wins"}
+
+
+def test_s2_not_found_is_conclusive(monkeypatch):
+    import setup_fulltext as sf
+    def boom(*a, **k):
+        raise RuntimeError("http_404 https://api.semanticscholar.org/x")
+    monkeypatch.setattr(sf, "get_json", boom)
+    assert sf.r_s2({"doi": "10.1/x"}) == []

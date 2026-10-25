@@ -145,3 +145,11 @@ def test_wrong_number_in_translation_caught(tmp_path):
     t["en"]["findings"] = ["from 2.4 to 3.9"]
     p.write_text(json.dumps(t))
     assert not results(run)["i18n"]["pass"]
+
+
+def test_dropped_works_do_not_count_for_fulltext_checks(tmp_path):
+    run = make(tmp_path)
+    chain = "zotero:none; openalex:none; landing:none; unpaywall:skipped(x); europepmc:none; pmc_oa:none; ncbi_efetch:none; semantic_scholar:error; preprints:none; core:skipped(x); inbox:none"
+    with open(run / "pdfs" / "index.csv", "a") as f:
+        f.write(f'W999,2024,full,no_free_fulltext,,,,,,"{chain}",Removed by owner\n')
+    assert results(run)["fulltext_conclusive"]["pass"]
