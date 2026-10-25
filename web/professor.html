@@ -117,7 +117,7 @@ header.top .wrap{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-betw
     <button class="btn btn-green" data-lang="both" aria-pressed="true">雙語</button>
   </div></div></header>
 <nav class="sections" aria-label="區段"><div class="wrap"><a href="#match">與我的研究比對</a><a href="#overview">總覽</a><a href="#profile">教授總覽</a><a href="#decisions">待你決定</a><a href="#coauthors">合作者</a><a href="#topics">研究領域</a><a href="#grants">研究計畫</a><a href="#papers">文章解析</a><a href="#exceptions">例外紀錄</a><a href="#files">檔案</a></div></nav>
-<main class="wrap"><section id="progress" aria-labelledby="h-progress"><h2 id="h-progress">我們的進展</h2><div class="body"></div></section><section id="draft" aria-labelledby="h-draft"><h2 id="h-draft">研究構想草稿</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
+<main class="wrap"><section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">研究計畫書</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
 <footer class="wrap" id="foot"></footer>
 <!-- 大意 --><!-- 研究設計 --><!-- 研究樣本 --><!-- 研究缺口 --><!-- 解決什麼 --><!-- 發現 --><!-- 研究限制 -->
 <script id="inline-data" type="application/json">__INLINE__</script>
@@ -519,8 +519,8 @@ let OFFLINE = false;
 const VIEW = () => new URLSearchParams(location.search).get("v") || (location.hash.startsWith("#paper-") ? "papers" : "");
 const viewHref = v => `professor.html?p=${encodeURIComponent(new URLSearchParams(location.search).get("p") || "")}${v ? "&v=" + v : ""}`;
 const VIEWS = [
-  ["progress", "我們的進展", "你跟這位教授一起討論出來的研究計畫", d => d.joint_proposal ? "有" : ""],
-  ["draft", "研究構想草稿", "依你的 CV 與她目前的經費，AI 擬的小型研究構想（給你改寫）", d => d.proposal_draft ? (d.proposal_draft.stale ? "過期" : "有") : "還沒產生"],
+  ["proposal", "研究計畫書", "跟她討論過的計畫書；或依她的方向與經費、你做得到的事擬的幾個版本（附信心程度）",
+   d => [d.joint_proposal ? "討論過的版本" : "", draftVersions(d).length ? `草稿 ${draftVersions(d).length} 版${d.proposal_draft.stale ? "（過期）" : ""}` : ""].filter(Boolean).join("＋") || "還沒有"],
   ["match", "與我的研究比對", "依你的興趣推薦先看哪幾篇、哪個計畫", d => d.recommend ? `${d.recommend.read_first.length} 篇先看` : "還沒比對"],
   ["profile", "教授總覽", "研究主線、演變、合作、可以問的問題", d => `${(d.profile || []).length} 章`],
   ["papers", "文章解析", "每篇的大意、設計、樣本、缺口、發現、限制", d => `${d.counts.works} 篇`],
@@ -533,7 +533,6 @@ const VIEWS = [
   ["files", "檔案", "報告、CSV、Zotero 匯入檔", d => ""],
 ];
 function setupViews(){
-  if (!D.joint_proposal){ const i = VIEWS.findIndex(x => x[0] === "progress"); if (i >= 0) VIEWS.splice(i, 1); }
   const v = VIEW(), main = document.querySelector("main");
   const nav = document.querySelector("nav.sections .wrap");
   nav.innerHTML = `<a href="${viewHref("")}" ${!v ? 'aria-current="true"' : ""}>教授首頁</a>` +
@@ -557,41 +556,87 @@ function setupViews(){
   window.scrollTo(0, 0);
 }
 
-function progressView(){
-  const el = body("progress"), p = D.joint_proposal;
-  if (!p){ el.innerHTML = `<div class="empty">你跟這位教授還沒有一起討論的研究計畫。</div>`; return; }
-  el.innerHTML = `<p class="muted">這份研究計畫是你跟 ${esc(D.professor.name)} 一起討論出來的（出處：${esc(p.src || "研究計畫書")}）。</p>
-    <div class="item"><h3 style="margin-top:0">${bi(p.title_zh, p.title, "div")}</h3><div class="small muted">${esc(p.subtitle || "")}</div><div class="small">${esc(p.supervisor || "")}</div>
-    <div style="margin-top:8px">${bi(p.synopsis_zh, p.synopsis, "div")}</div></div>
-    <h3>研究缺口</h3><ol>${(p.gaps || []).map(g => `<li>${bi(g.zh, g.en, "div")}</li>`).join("")}</ol>
-    <h3>三個研究</h3>${(p.studies || []).map(st => `<div class="item"><strong>${bi(st.name_zh, st.name, "div")}</strong><div class="small" style="margin-top:4px">${bi(st.detail_zh, st.detail, "div")}</div></div>`).join("")}`;
-}
+const draftVersions = d => ((d && d.proposal_draft && d.proposal_draft.versions) || []);
+const CONF = {high: ["g", "信心 高"], medium: ["y", "信心 中"], low: ["r", "信心 低"]};
+const refLinks = refs => (refs || []).length ? `<div class="small muted">依據：${refs.map(r => /^W\d+$/.test(r) ? `<a href="${OFFLINE ? "#paper-" + esc(r) : paperPage(r)}">${esc(r)}</a>` : esc(r)).join("、")}</div>` : "";
+const para = x => x ? `${bi(x.zh, x.en, "div")}${refLinks(x.refs)}` : "";
 
-function proposeButton(d){
-  /* 應用程式裡才有：請 Claude Code 依你的 CV 與她目前的經費擬（或重擬）草稿 */
+function proposeButton(has){
+  /* 應用程式裡才有：請 Claude Code 依她的方向與經費、你的興趣與做得到的事擬（或重擬）幾個版本 */
   if (!APP) return "";
-  const label = d ? "重新產生研究構想草稿" : "產生研究構想草稿";
-  return `<div class="row" style="margin-top:10px"><button class="btn ${d && !d.stale ? "btn-yellow" : "btn-green"}" data-propose>${label}</button>
-    <span class="small muted">約 10–20 分鐘，進度在「工作進度」頁${d ? "；舊的草稿會保留在備份資料夾" : ""}</span></div>`;
+  return `<div class="row" style="margin-top:10px"><button class="btn ${has ? "btn-yellow" : "btn-green"}" data-propose>${has ? "重新產生計畫書草稿" : "產生計畫書草稿"}</button>
+    <span class="small muted">約 15–30 分鐘，進度在「工作進度」頁${has ? "；舊的草稿會保留在備份資料夾" : ""}</span></div>`;
 }
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-propose]");
   if (!b) return;
   if (APP.running){ alert("已經有一個工作在跑，等它跑完再按"); return; }
-  if (!confirm(`請 Claude Code 依你的 CV（會的、做過的）與 ${D.professor.name} 目前期間內的經費，擬一份研究構想草稿？`)) return;
+  if (!confirm(`請 Claude Code 依 ${D.professor.name} 的研究方向與目前期間內的經費、你的興趣與做得到的事，擬 2–3 個方向的計畫書草稿？`)) return;
   b.disabled = true;
   try { await APIX("propose", {slug: SLUG}); location.href = "pipeline.html"; }
   catch (e) { alert(e.message); b.disabled = false; }
 });
+document.addEventListener("click", ev => {
+  const b = ev.target.closest("[data-ver]");
+  if (!b) return;
+  PROP_VER = b.dataset.ver; proposalView();
+});
+let PROP_VER = null;
 
-function draftView(){
-  const el = body("draft"), d = D.proposal_draft;
-  if (!d){ el.innerHTML = `<div class="empty">還沒產生研究構想草稿。${APP ? "" : `在應用程式裡打開可以按按鈕產生；或跟 Claude 說「幫我擬 ${esc(D.professor.name)} 的研究構想」。`}${proposeButton(d)}</div>`; return; }
-  const sec = (t, x) => x ? `<h3>${t}</h3>${bi(x.zh, x.en, "div")}${(x.refs || []).length ? `<div class="small muted">依據：${x.refs.map(r => /^W\d+$/.test(r) ? `<a href="#paper-${esc(r)}">${esc(r)}</a>` : esc(r)).join("、")}</div>` : ""}` : "";
-  el.innerHTML = `<div class="item attn">${pill("y", "草稿")} 這是 AI 依你的 CV、你做過與會的事、以及她目前的經費擬的構想，<strong>只是素材</strong>，要寄給教授前請自己改寫。${d.stale ? " 你的 CV 或她的資料改過，這份可能過期。" : ""}</div>
-    <h3 style="margin-top:12px">${bi(d.title && d.title.zh, d.title && d.title.en, "div")}</h3>
-    ${sec("對應的經費", d.funding)}${sec("背景與缺口", d.background)}${sec("研究目的", d.aims)}${sec("研究設計與方法", d.methods)}
-    ${sec("樣本與變項", d.sample)}${sec("預期貢獻", d.contribution)}${sec("我能做的部分（依你的 CV）", d.my_role)}${sec("時程", d.timeline)}${sec("風險與限制", d.risks)}${proposeButton(d)}`;
+function jointHTML(p){
+  /* 跟教授討論過的計畫書：照原本的分段放上去 */
+  const doc = p.document || [];
+  const secs = doc.length ? doc.map((s, i) => `<details class="item" ${i < 2 ? "open" : ""}><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>${esc(s.heading_zh)}｜${esc(s.heading_en)}</strong></summary>
+      <div style="margin-top:8px;white-space:pre-line">${bi(s.zh || "", s.en, "div")}</div></details>`).join("")
+    : `<h3>研究缺口</h3><ol>${(p.gaps || []).map(g => `<li>${bi(g.zh, g.en, "div")}</li>`).join("")}</ol>
+       ${(p.studies || []).map(st => `<div class="item"><strong>${bi(st.name_zh, st.name, "div")}</strong><div class="small" style="margin-top:4px">${bi(st.detail_zh, st.detail, "div")}</div></div>`).join("")}`;
+  return `<div class="card"><div class="row">${pill("g", "跟她討論過")}<span class="small muted">出處：${esc(p.document_src || p.src || "研究計畫書")}</span></div>
+    <h3 style="margin-top:10px">${bi(p.title_zh, p.title, "div")}</h3><div class="small muted">${esc(p.subtitle || "")}</div><div class="small">${esc(p.supervisor || "")}</div>
+    ${doc.length ? "" : `<div style="margin-top:8px">${bi(p.synopsis_zh, p.synopsis, "div")}</div>`}</div>${secs}`;
+}
+
+function versionHTML(v){
+  const c = CONF[(v.confidence || {}).level] || ["", "信心 ?"];
+  const sec = (h, x) => x ? `<h3>${h}</h3>${para(x)}` : "";
+  return `<div class="card"><div class="row">${pill(c[0], c[1])}<strong>${bi((v.direction || {}).zh, (v.direction || {}).en)}</strong></div>
+      <div class="small" style="margin-top:6px">${para(v.confidence)}</div></div>
+    <h3 style="margin-top:14px">${bi((v.title || {}).zh, (v.title || {}).en, "div")}</h3><div class="small muted">${bi((v.subtitle || {}).zh, (v.subtitle || {}).en)}</div>
+    ${sec("摘要｜Synopsis", v.synopsis)}
+    ${sec("1. 研究背景與缺口｜Rationale and Research Gap", v.rationale)}
+    ${(v.gaps || []).length ? `<ol>${v.gaps.map(g => `<li>${para(g)}</li>`).join("")}</ol>` : ""}
+    ${sec("2. 整體目的與目標｜Overall Aim and Objectives", v.aim)}
+    ${(v.objectives || []).length ? `<ol>${v.objectives.map(o => `<li>${para(o)}</li>`).join("")}</ol>` : ""}
+    <h3>3. 研究規劃與方法｜Research Programme and Methodology</h3>
+    ${(v.studies || []).map((st, i) => `<div class="item"><strong>3.${i + 1} ${bi((st.name || {}).zh, (st.name || {}).en)}</strong>
+       <div class="small" style="margin-top:6px"><strong>目的</strong>${para(st.aim)}<strong>設計與方法</strong>${para(st.methods)}<strong>分析</strong>${para(st.analysis)}</div></div>`).join("")}
+    ${sec("4. 預期貢獻｜Expected Contribution", v.contribution)}
+    ${sec("5. 時程｜Timeline", v.timeline)}
+    ${sec("6. 資源與經費｜Resources and Funding", v.resources)}
+    <h3>我做得到的／可能做得到的</h3>
+    <div class="mgrid"><div class="item"><div class="row">${pill("g", "已經會、做過")}</div><ul>${((v.fit || {}).can_do || []).map(x => `<li>${para(x)}</li>`).join("")}</ul></div>
+      <div class="item"><div class="row">${pill("y", "要再學、可能做得到")}</div><ul>${((v.fit || {}).could_do || []).map(x => `<li>${para(x)}</li>`).join("")}</ul></div></div>
+    ${sec("風險與限制｜Risks", v.risks)}`;
+}
+
+function proposalView(){
+  const el = body("proposal"), p = D.joint_proposal, d = D.proposal_draft, vs = draftVersions(D);
+  if (!p && !vs.length){
+    el.innerHTML = `<div class="empty">還沒有研究計畫書。${d && !vs.length ? "（之前的草稿是舊格式，請重新產生。）" : ""}${APP ? "" : `在應用程式裡打開可以按按鈕產生；或跟 Claude 說「幫我擬 ${esc(D.professor.name)} 的研究計畫書」。`}${proposeButton(!!d)}</div>`;
+    return;
+  }
+  let html = p ? jointHTML(p) : "";
+  if (vs.length){
+    const cur = vs.find(v => v.id === PROP_VER) || vs[0];
+    html += `<h3 style="margin-top:${p ? "28px" : "0"}">${p ? "AI 草稿：延伸方向" : "AI 草稿"}</h3>
+      <div class="item attn">${pill("y", "草稿")} 依 ${esc(D.professor.name)} 的研究方向與目前期間內的經費、你的興趣與做得到的事擬的 ${vs.length} 個方向，<strong>只是素材</strong>，寄給教授前請自己改寫。信心程度看經費是不是她主持、你要補多少能力。${d.stale ? " 你的 CV 或她的資料改過，這份可能過期。" : ""}</div>
+      <div class="row" role="tablist" style="margin-top:10px;flex-wrap:wrap">${vs.map(v => { const c = CONF[(v.confidence || {}).level] || ["", "?"];
+        return `<button class="btn ${v.id === cur.id ? "btn-green" : ""}" role="tab" aria-selected="${v.id === cur.id}" data-ver="${esc(v.id)}">${esc(v.id)}｜${esc((v.direction || {}).zh || "")} ${pill(c[0], c[1])}</button>`; }).join("")}</div>
+      <div style="margin-top:12px">${versionHTML(cur)}</div>`;
+  } else if (p) {
+    html += `<h3 style="margin-top:28px">AI 草稿：延伸方向</h3><div class="empty">還沒有依這份計畫延伸的草稿。${proposeButton(!!d)}</div>`;
+  }
+  if (vs.length) html += proposeButton(true);
+  el.innerHTML = html;
 }
 
 function openFromHash(){
@@ -645,12 +690,12 @@ async function loadData(){
   document.title = (D.professor.name || "") + " 研究檔案";
   setLang(store.get("lang") || "both");
   document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
-  header(); progressView(); draftView(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files();
+  header(); proposalView(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files();
   if (OFFLINE){ navHighlight(); }   // 離線單檔版：全部放在一頁
   else { setupViews(); }            // 應用程式：教授首頁是按鈕，一個按鈕進一個區塊
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
-  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); draftView(); } } catch (e) {}  // 離線單檔版沒有 /api
+  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); proposalView(); } } catch (e) {}  // 離線單檔版沒有 /api
 })();
 </script>
 </body>

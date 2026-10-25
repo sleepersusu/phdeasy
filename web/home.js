@@ -34,9 +34,9 @@ function renderProposal(p){
   if (H.me && H.me.proposal_with){  // 跟教授一起討論出來的計畫：放在那位教授的頁面（我們的進展），不算本人獨立的計畫
     const prof = (H.professors || []).find(x => x.slug === H.me.proposal_with);
     const name = prof ? prof.name : H.me.proposal_with;
-    body("proposal").innerHTML = `<div class="card">「${bi(p.title_zh, p.title)}」是你跟 <strong>${esc(name)}</strong> 一起討論出來的，放在她的教授頁「我們的進展」。
-      <div class="row" style="margin-top:8px"><a class="btn btn-green" href="professor.html?p=${encodeURIComponent(H.me.proposal_with)}&v=progress">看我們的進展 →</a></div>
-      <p class="small muted" style="margin-top:8px">每位目標教授另外有一份依你的 CV 與她目前的經費做的「研究構想草稿」，在各教授頁裡。</p></div>`;
+    body("proposal").innerHTML = `<div class="card">「${bi(p.title_zh, p.title)}」是你跟 <strong>${esc(name)}</strong> 一起討論出來的，放在她的教授頁「研究計畫書」。
+      <div class="row" style="margin-top:8px"><a class="btn btn-green" href="professor.html?p=${encodeURIComponent(H.me.proposal_with)}&v=proposal">看研究計畫書 →</a></div>
+      <p class="small muted" style="margin-top:8px">每位目標教授的頁面也有「研究計畫書」：依她的方向與經費、你做得到的事擬的幾個版本，附信心程度。</p></div>`;
     return;
   }
   body("proposal").innerHTML = `
