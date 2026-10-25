@@ -59,3 +59,9 @@ def test_render_paper_md_states_basis_incl_preprint_and_title_only():
     w = {"id": "W1", "title": "T", "year": 2026, "authors": []}
     assert "預印本" in render_paper_md(w, {"basis": "fulltext", "preprint_text": True, "fields": {}})
     assert "只有標題" in render_paper_md(w, {"basis": "title_only", "fields": {}})
+
+
+def test_paper_dir_groups_each_paper():
+    from pipeline.export import paper_dir_name
+    w = {"id": "W1", "year": 2024, "title": "Study A", "authors": [{"name": "Ann Lee"}]}
+    assert paper_dir_name(w) == "2024_Lee_Study-A_W1"

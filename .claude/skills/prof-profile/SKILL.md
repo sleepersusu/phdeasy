@@ -34,7 +34,7 @@ uv run python scripts/state_cli.py show runs/<slug>
    ```
    會寫三樣東西：
    - `work/profile/facts.json`
-   - `out/papers/*.md`：每篇一份解析 Markdown
+   - `out/papers/<年_作者_標題_id>/解析.md`：每篇一個資料夾，放解析、圖表頁（figures/）與 AI 重點（重點.json）
    - `out/zotero/<slug>.ris`：Zotero 匯入檔，每篇附解析卡大意當筆記
 2. **撰寫**：派總覽撰寫者（`model: opus`）：
    > 讀 `.claude/skills/prof-profile/writer.md` 照做。slug=<slug>

@@ -6,7 +6,7 @@
 
 1. `runs/<slug>/protocol.md` 第 5 節「驗收判準」（只看這一節與第 1 節的目標作者資訊）。
 2. 最終產出：
-   - `runs/<slug>/out/profile.md`、`runs/<slug>/out/papers/*.md`、`runs/<slug>/out/data/*.csv`、`runs/<slug>/out/zotero/*.ris`
+   - `runs/<slug>/out/profile.md`、`runs/<slug>/out/papers/<每篇資料夾>/解析.md`、`runs/<slug>/out/data/*.csv`、`runs/<slug>/out/zotero/*.ris`
    - `runs/<slug>/work/cards/<id>/card.json`、`runs/<slug>/work/text/<id>.txt`（抽查引句用）
    - `runs/<slug>/pdfs/index.csv`、`runs/<slug>/work/works.json`、`runs/<slug>/work/grants/grants_final.json`、`runs/<slug>/work/hashes.json`
    - `runs/<slug>/verify/e2e.json`（腳本總檢查結果；你要自己抽查，不能只引用它）

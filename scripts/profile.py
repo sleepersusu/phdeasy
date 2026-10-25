@@ -13,7 +13,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from pipeline.export import basis_label, paper_md_name, render_paper_md, to_ris
+from pipeline.export import basis_label, paper_dir_name, paper_md_name, render_paper_md, to_ris
 from pipeline.profile import build_facts, check_draft, render_profile_md
 from pipeline.state import load_state
 
@@ -44,7 +44,12 @@ def facts(run):
     papers.mkdir(parents=True, exist_ok=True)
     for w in works:
         if w["id"] in cards:
-            (papers / paper_md_name(w)).write_text(render_paper_md(w, cards[w["id"]]))
+            d = papers / paper_dir_name(w)
+            d.mkdir(parents=True, exist_ok=True)
+            (d / "解析.md").write_text(render_paper_md(w, cards[w["id"]]))
+            old = papers / paper_md_name(w)  # 舊版是一篇一個 .md 平放：搬進資料夾後拿掉
+            if old.exists():
+                old.unlink()
     with open(run / "pdfs" / "index.csv", newline="") as fh:
         index = {r["id"]: r for r in csv.DictReader(fh)}
     notes = {wid: "phdeasy 解析｜依據：" + basis_label(c) + "｜大意：" + (((c.get("fields") or {}).get("summary") or {}).get("text") or "來源未提及") for wid, c in cards.items()}

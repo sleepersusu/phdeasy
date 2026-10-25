@@ -392,7 +392,13 @@ function cardHtml(w){
   return `${c.pending_note ? `<p class="small">${pill("y", "注意")} ${esc(c.pending_note)}</p>` : ""}
     <dl class="card">${c.fields.map(f => `<dt>${esc(f.label)}</dt><dd>${val(f)}</dd>`).join("")}</dl>`;
 }
+const paperPage = id => `paper.html?p=${encodeURIComponent(new URLSearchParams(location.search).get("p") || "")}&id=${encodeURIComponent(id)}`;
 function paperHtml(w){
+  if (!OFFLINE){  // 應用程式：列表只放標題，點進去是那一篇自己的頁面（左英右中、AI 重點、圖表）
+    return `<a class="paper item" id="paper-${w.id}" href="${paperPage(w.id)}" style="display:block;text-decoration:none;margin:8px 0">
+      <span class="t" style="font-weight:600">${bi(w.title_zh, w.title)}</span>
+      <span class="row small" style="margin-top:4px">${w.year}｜${esc(TYPE[w.type] || w.type)}｜${esc(w.venue || "期刊來源未提及")}｜${esc(role(w.target_position, w.target_corresponding))} ${fulltextPill(w)} ${w.digest ? pill("g", "有 AI 重點") : ""} ${(w.figures || []).length ? pill("", `圖表 ${w.figures.length}`) : ""} ${w.exceptions.some(e => e.state === "open") ? pill("r", "有例外") : ""}</span></a>`;
+  }
   const authors = w.authors.map(a => a.position && a.name && w.target_position === a.position && a.id === D.professor.author_id ? `<strong>${esc(a.name)}</strong>` : esc(a.name)).join("、");
   return `<details class="paper" id="paper-${w.id}">
     <summary>
@@ -550,6 +556,7 @@ function setupViews(){
 
 function openFromHash(){
   const id = decodeURIComponent(location.hash.slice(1));
+  if (!OFFLINE && id.startsWith("paper-")){ location.replace(paperPage(id.slice(6))); return; }
   if (id.startsWith("paper-")) openPaper(id.slice(6));
 }
 function navHighlight(){
@@ -569,7 +576,7 @@ document.addEventListener("click", ev => {
   const a = ev.target.closest('a[href^="#paper-"]');
   if (!a || a.dataset.copy) return;
   ev.preventDefault();
-  if (!OFFLINE && VIEW() !== "papers"){ location.href = viewHref("papers") + a.getAttribute("href"); return; }  // 別的區塊裡點文章：進「文章解析」打開那篇
+  if (!OFFLINE){ location.href = paperPage(a.getAttribute("href").slice(7)); return; }  // 應用程式：直接開那一篇自己的頁面
   openPaper(a.getAttribute("href").slice(7));
 });
 

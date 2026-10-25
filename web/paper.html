@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>文章</title>
+<style>
+:root{
+  --fg:#000;--bg:#fff;--muted:#3f3f3f;--line:#cfcfcf;--soft:#f4f4f4;
+  --green:#15803d;--on-green:#fff;--yellow:#facc15;--on-yellow:#000;--red:#b91c1c;--on-red:#fff;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif;
+  --mono:ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.6}
+a{color:var(--fg);text-underline-offset:3px}
+:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+.wrap{max-width:1200px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-left,0px))}
+header{border-bottom:2px solid var(--fg);padding:16px 0}
+h1{font-size:1.35rem;line-height:1.35;margin:0}
+h2{font-size:1.2rem;margin:28px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
+h3{font-size:1rem;margin:16px 0 6px}
+.muted{color:var(--muted)}.small{font-size:.9rem}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 14px;border-radius:8px;border:2px solid transparent;font:inherit;font-weight:600;cursor:pointer;text-decoration:none}
+.btn-green{background:var(--green);color:var(--on-green)}.btn-yellow{background:var(--yellow);color:var(--on-yellow)}.btn-red{background:var(--red);color:var(--on-red)}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.82rem;font-weight:600;border:1px solid var(--fg)}
+.pill.g{background:var(--green);color:#fff;border-color:var(--green)}.pill.y{background:var(--yellow);border-color:#a16207}
+/* 左英右中 */
+.bi{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.bi>div{padding:12px 14px;min-width:0;overflow-wrap:anywhere}
+.bi>.en{border-right:1px solid var(--line)}
+.bi .lab{font-size:.8rem;font-weight:700;color:var(--muted);margin-bottom:4px;letter-spacing:.03em}
+.bihead{display:grid;grid-template-columns:1fr 1fr;font-weight:700;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+.bihead>div{padding:0 14px}
+.field{margin-bottom:12px}
+.field>.name{font-weight:700;margin:14px 0 6px}
+ul,ol{margin:.2em 0;padding-left:1.25em}
+li{margin:.25em 0}
+details.src{margin-top:6px}
+details.src summary{cursor:pointer;font-size:.85rem;color:var(--muted);min-height:32px;display:flex;align-items:center}
+blockquote{margin:6px 0;padding:6px 10px;border-left:3px solid var(--line);background:var(--soft);font-size:.88rem}
+.loc{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.fig{border:2px solid var(--fg);border-radius:10px;padding:12px;margin:12px 0}
+.fig img{max-width:100%;height:auto;border:1px solid var(--line);border-radius:6px;display:block;margin-top:8px;cursor:zoom-in}
+.fig img.big{cursor:zoom-out}
+.empty{padding:14px;border:1px dashed var(--fg);border-radius:8px}
+.facts{font-size:.9rem;margin:4px 0}
+@media (max-width:760px){.bi,.bihead{grid-template-columns:1fr}.bi>.en{border-right:none;border-bottom:1px solid var(--line)}.bihead>div:last-child{display:none}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <div class="row" style="justify-content:space-between"><a class="btn btn-green" id="back" href="#">← 回文章列表</a><span class="small muted" id="prof"></span></div>
+  <div class="bi" style="margin-top:12px;border:none"><div class="en"><h1 id="t-en" lang="en"></h1></div><div><h1 id="t-zh"></h1></div></div>
+  <div class="small muted" id="meta" style="margin-top:6px"></div>
+  <div class="row" id="links" style="margin-top:8px"></div>
+</div></header>
+<main class="wrap" id="main"><div class="empty" style="margin-top:16px">載入中…</div></main>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const Q = new URLSearchParams(location.search), SLUG = Q.get("p"), ID = Q.get("id");
+const ROLE = {first: "第一作者", middle: "中間作者", last: "最後作者"};
+const none = `<span class="muted">來源未提及</span>`;
+const noneEn = `<span class="muted" lang="en">Not reported in the source</span>`;
+
+const cites = cs => (cs && cs.length) ? `<details class="src"><summary>原文出處（${cs.length}）</summary>${cs.map(c => `<blockquote lang="en">"${esc(c.quote)}" <span class="loc">[${esc(c.loc)}]</span></blockquote>`).join("")}</details>` : "";
+const pair = (en, zh, labEn, labZh, extra = "") => `<div class="bi"><div class="en" lang="en">${labEn ? `<div class="lab">${labEn}</div>` : ""}${en ? esc(en) : noneEn}</div><div>${labZh ? `<div class="lab">${labZh}</div>` : ""}${zh ? esc(zh) : none}${extra}</div></div>`;
+const pairList = (items, ordered) => {
+  if (!items || !items.length) return pair(null, null);
+  const tag = ordered ? "ol" : "ul";
+  return `<div class="bi"><div class="en" lang="en"><${tag}>${items.map(x => `<li>${x.en ? esc(x.en) : noneEn}${cites(x.citations)}</li>`).join("")}</${tag}></div><div><${tag}>${items.map(x => `<li>${x.zh ? esc(x.zh) : none}</li>`).join("")}</${tag}></div></div>`;
+};
+
+function render(d, w){
+  document.title = w.title;
+  $("#back").href = `professor.html?p=${encodeURIComponent(SLUG)}&v=papers`;
+  $("#prof").textContent = d.professor.name + " 的文章";
+  $("#t-en").textContent = w.title; $("#t-zh").textContent = w.title_zh || "（還沒有中文標題）";
+  $("#meta").innerHTML = [w.year, esc(w.venue || "期刊來源未提及"), (ROLE[w.target_position] || "作者序不明") + (w.target_corresponding ? "＋通訊作者" : ""),
+    w.card && w.card.exists ? (w.text_source === "abstract" ? "依摘要解析" : w.text_source === "none" ? "只有標題" : "依全文解析") : "還沒解析",
+    w.exceptions.some(e => e.kind === "preprint_text") ? "全文是預印本版本" : ""].filter(Boolean).join("｜");
+  $("#links").innerHTML = (w.pdf_href ? `<a class="btn btn-green" href="${esc(w.pdf_href)}" target="_blank" rel="noopener">開啟全文 PDF</a>` : `<span class="btn btn-red" aria-disabled="true">沒有全文檔</span>`) +
+    (w.doi ? `<a class="btn btn-green" href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">期刊頁（DOI）</a>` : "");
+
+  const F = Object.fromEntries((w.card.fields || []).map(f => [f.key, f]));
+  const g = w.digest;
+  let h = "";
+  // 1. AI 重點（中英）
+  h += `<h2>AI 重點整理</h2>`;
+  if (g && g.key_points && g.key_points.length){
+    h += `<div class="bihead"><div>English</div><div>中文</div></div>` + pairList(g.key_points, true);
+  } else {
+    h += `<div class="empty">這篇還沒有 AI 重點整理${w.text_source === "none" ? "（沒有全文也沒有摘要，只有標題）" : "（由「單篇重點」階段產生）"}。下面是解析卡的大意。</div>`;
+    if (F.summary) h += `<div style="margin-top:8px">${pair(F.summary.text_en, F.summary.text)}</div>`;
+  }
+  // 2. 研究設計
+  h += `<h2>研究設計</h2>`;
+  const facts = F.design && F.design.facts ? Object.entries(F.design.facts).map(([k, v]) => `${esc(k)}：${esc(v)}`).join("｜") : "";
+  const sfacts = F.sample && F.sample.facts ? Object.entries(F.sample.facts).map(([k, v]) => `${esc(k)}：${esc(v)}`).join("｜") : "";
+  if (g && g.design) h += pair(g.design.en, g.design.zh, "", "", "") + cites(g.design.citations);
+  if (facts || sfacts) h += `<div class="facts">${facts}${facts && sfacts ? "<br>" : ""}${sfacts}</div>`;
+  if (F.design && (F.design.text || F.design.text_en)) h += `<div class="field"><div class="name">設計（解析卡）</div>${pair(F.design.text_en, F.design.text)}${cites(F.design.citations)}</div>`;
+  if (F.sample && (F.sample.text || F.sample.text_en)) h += `<div class="field"><div class="name">樣本</div>${pair(F.sample.text_en, F.sample.text)}${cites(F.sample.citations)}</div>`;
+  // 3. 圖與表（一張都不漏）
+  const figs = w.figures || [];
+  h += `<h2>圖與表（${figs.length}）</h2>`;
+  if (!figs.length) h += `<div class="empty">${w.text_source === "pdf" || w.text_source === "xml" ? "全文裡沒有找到圖或表的標題。" : "沒有全文，看不到圖表；有 PDF 的話可以在教授頁的例外紀錄上傳。"}</div>`;
+  figs.forEach(f => {
+    h += `<div class="fig"><div class="row" style="justify-content:space-between"><strong>${esc(f.label)}</strong><span class="loc">${esc(f.loc || "")}</span></div>
+      <div class="small" lang="en" style="margin-top:4px">${esc(f.caption || "")}</div>
+      ${f.en || f.zh ? `<div style="margin-top:8px">${pair(f.en, f.zh, "What it shows", "這張在講什麼")}</div>${cites(f.citations)}` : `<div class="small muted" style="margin-top:6px">（還沒有 AI 說明）</div>`}
+      ${f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)} 所在頁面（${esc(f.loc || "")}）">` : `<div class="small muted" style="margin-top:6px">沒有頁面截圖（XML 全文）：請開全文看這張圖。</div>`}</div>`;
+  });
+  // 4. 解析卡其他欄位（左英右中）
+  h += `<h2>完整解析</h2>`;
+  const claimField = (key, ordered) => {
+    const f = F[key]; if (!f) return "";
+    const items = (f.claims || []).map(c => ({en: c.text_en, zh: c.text, citations: c.citations}));
+    return `<div class="field"><div class="name">${esc(f.label)}</div>${f.state === "not_applicable" ? `<div class="small muted">短卡不寫這一欄</div>` : pairList(items, ordered)}</div>`;
+  };
+  if (F.summary && g) h += `<div class="field"><div class="name">大意</div>${pair(F.summary.text_en, F.summary.text)}${cites(F.summary.citations)}</div>`;
+  h += claimField("gap") + claimField("solves") + claimField("findings", true);
+  if (F.limitations){
+    const L = F.limitations;
+    const a = (L.author_stated || []).map(c => ({en: c.text_en, zh: c.text, citations: c.citations}));
+    const i = (L.inferred || []).map(c => ({en: c.text_en, zh: c.text, citations: c.citations}));
+    h += `<div class="field"><div class="name">研究限制</div>${L.state === "not_applicable" ? `<div class="small muted">短卡不寫這一欄</div>` :
+      `<div class="small"><strong>作者自己寫的</strong></div>${pairList(a)}<div class="small" style="margin-top:8px"><strong>解析者推論（標明非作者原話）</strong></div>${pairList(i)}`}</div>`;
+  }
+  if ((w.keywords_en || []).length) h += `<h2>關鍵詞</h2>${pair((w.keywords_en || []).join(", "), (w.keywords_zh || []).join("、"))}`;
+  if (w.abstract) h += `<h2>摘要原文</h2><div lang="en" class="small">${esc(w.abstract)}</div>`;
+  $("#main").innerHTML = h;
+  document.querySelectorAll(".fig img").forEach(img => img.onclick = () => img.classList.toggle("big"));
+}
+
+(async function init(){
+  try {
+    if (!SLUG || !ID) throw new Error("網址少了 ?p=<教授>&id=<文章>");
+    const base = new URL(`../runs/${encodeURIComponent(SLUG)}/out/site/`, location.href);
+    const r = await fetch(new URL("data.json", base), {cache: "no-store"});
+    if (!r.ok) throw new Error(`讀不到資料（${r.status}）`);
+    const d = await r.json();
+    const w = d.works.find(x => x.id === ID);
+    if (!w) throw new Error(`這位教授沒有 ${ID} 這篇`);
+    const fix = h => h && !/^(https?:|#|mailto:)/.test(h) ? new URL(h, base).href : h;
+    w.pdf_href = fix(w.pdf_href);
+    (w.figures || []).forEach(f => { f.image = fix(f.image); });
+    render(d, w);
+  } catch (e) { $("#main").innerHTML = `<div class="empty" role="alert" style="margin-top:16px">${esc(e.message)}</div>`; }
+})();
+</script>
+</body>
+</html>

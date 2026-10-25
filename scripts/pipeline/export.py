@@ -56,6 +56,11 @@ STATE_TEXT = {"not_in_source": "來源未提及", "not_applicable": "短卡不�
 ROLE = {"first": "第一作者", "middle": "中間作者", "last": "最後作者"}
 
 
+def paper_dir_name(w):
+    """每篇一個資料夾：out/papers/<年>_<第一作者>_<短標題>_<id>/（解析.md、figures/、重點.json 都放這裡，經雲端同步）。"""
+    return paper_md_name(w)[:-3]
+
+
 def paper_md_name(w):
     from .fetch import pdf_relpath
 

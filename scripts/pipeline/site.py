@@ -120,6 +120,17 @@ def _ex_state(e):
     return "resolved" if e.get("resolved") else ("info" if e["kind"] in INFO_KINDS else "open")
 
 
+def _paper_extras(run, w):
+    """單篇頁要的：AI 重點（out/papers/<資料夾>/重點.json）與全部圖表（work/figures/<id>.json）。"""
+    from .export import paper_dir_name
+    folder = paper_dir_name(w)
+    dg = _j(run / "out" / "papers" / folder / "重點.json")
+    figs = (_j(run / "work" / "figures" / f"{w['id']}.json") or {}).get("items") or []
+    if dg:
+        figs = dg.get("figures") or figs  # 有重點的用重點裡的（含 AI 說明），沒有就只列標題與截圖
+    return {"folder": folder, "digest": {k: dg.get(k) for k in ("key_points", "design")} if dg else None, "figures": figs}
+
+
 def _recommend(run, owner):
     """prof-match 的推薦（out/match.json）；本人的興趣或研究計畫改過就標 stale，提醒重新比對。"""
     from .match import me_fingerprint
@@ -174,6 +185,7 @@ def build_site_data(run):
             "exceptions": [{"kind": e["kind"], "detail": e["detail"], "resolved": e.get("resolved"), "state": _ex_state(e)} for e in by_work_exc.get(w["id"], [])],
             "added_by_owner": bool(w.get("added_by_owner")),
             "card": card,
+            **_paper_extras(run, w),
         })
 
     ex_list = [{**e, "state": _ex_state(e)} for e in exc]
