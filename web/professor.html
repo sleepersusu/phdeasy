@@ -174,7 +174,7 @@ const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升�
                  tags: "chatbot、physical activity、women、cardiovascular、health disparities", methods: ["pilot-rct", "quasi-experimental"]};
 
 function recommendHTML(){
-  /* prof-match：Claude 依你的興趣與研究計畫挑出的推薦（核對過出處、推翻過） */
+  /* prof-match：Claude 依你的興趣與 CV 項目計畫挑出的推薦（核對過出處、推翻過） */
   const r = D.recommend;
   if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在「目標教授」頁按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
   const W = Object.fromEntries(D.works.map(w => [w.id, w])), G = Object.fromEntries(D.grants.map(g => [g.key, g]));
@@ -182,7 +182,7 @@ function recommendHTML(){
   const paper = id => W[id] ? `<a href="#paper-${esc(id)}">${bi(W[id].title_zh, W[id].title)}</a> <span class="small muted">${W[id].year}</span>` : esc(id);
   return `${r.stale ? `<div class="item attn">${pill("y", "比對過期")} 你的研究興趣或研究計畫改過了，這份推薦是用舊的內容比的。</div>` : ""}
     <h3>建議先看這幾篇</h3><ol>${r.read_first.map(id => `<li>${paper(id)}</li>`).join("")}</ol>
-    <h3>依你的興趣與研究</h3>
+    <h3>依你的興趣與 CV 項目</h3>
     ${r.targets.filter(t => t.fit !== "none").map(t => `<details class="item" ${t.fit === "strong" ? "open" : ""}><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(FITL[t.fit][0], FITL[t.fit][1])}<strong>${esc(t.label_zh)}</strong>${t.kind === "cv" ? `<span class="small muted">（你的 CV：會的／做過的）</span>` : ""}</summary>
       <div class="small">${esc(t.why)}</div>
       <ul>${t.papers.map(x => `<li>${paper(x.id)}<div class="small muted">${esc(x.why)}</div></li>`).join("")}

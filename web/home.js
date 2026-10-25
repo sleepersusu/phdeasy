@@ -69,10 +69,10 @@ function recommendBlock(p){
   const r = p.recommend, ts = r.targets, hit = ts.filter(t => t.fit !== "none"), miss = ts.filter(t => t.fit === "none");
   const link = w => `<a href="${esc(paperLink(p, w.id))}">${bi(w.title_zh, w.title)}</a>`;
   const n = k => ts.filter(t => t.fit === k).length;
-  return kpis(p, `<div class="kpi"><div class="n">${n("strong")}／${n("partial")}</div><div class="l">你的 ${ts.length} 個興趣與研究：強相關／部分相關</div></div>`) +
+  return kpis(p, `<div class="kpi"><div class="n">${n("strong")}／${n("partial")}</div><div class="l">你的 ${ts.length} 個興趣與 CV 項目：強相關／部分相關</div></div>`) +
     (r.stale ? `<div class="card" role="status"><span class="pill y">比對過期</span> 你的研究興趣或研究計畫改過了，這份推薦是用舊的內容比的。${window.APP_REMATCH ? `<button class="btn btn-yellow" data-rematch="${esc(p.slug)}">重新比對</button>` : "請跟 Claude 說「重新比對 " + esc(p.name) + "」。"}</div>` : "") +
     (r.read_first.length ? `<div><strong>建議先看這幾篇</strong><ol>${r.read_first.map(w => `<li>${w.year ?? ""}｜${link(w)}</li>`).join("")}</ol></div>` : "") +
-    `<div><strong>依你的興趣與研究</strong>${hit.map(t => `<details class="card" style="margin-top:8px" ${t.fit === "strong" ? "open" : ""}>
+    `<div><strong>依你的興趣與 CV 項目</strong>${hit.map(t => `<details class="card" style="margin-top:8px" ${t.fit === "strong" ? "open" : ""}>
         <summary style="cursor:pointer;min-height:44px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="pill ${FIT[t.fit][0]}">${FIT[t.fit][1]}</span><strong>${esc(t.label_zh)}</strong>${t.kind === "cv" ? `<span class="small muted">（你的 CV：會的／做過的）</span>` : ""}</summary>
         <div class="small">${esc(t.why)}</div>
         ${t.papers.length ? `<ul>${t.papers.map(w => `<li>${link(w)}<div class="small muted">${esc(w.why)}</div></li>`).join("")}</ul>` : ""}
@@ -87,7 +87,7 @@ function keywordBlock(p){
     (p.top_papers.length ? `<div><strong>用詞最重疊的文章</strong><ol>${p.top_papers.map(w => `<li><span class="bar" aria-hidden="true"><span style="width:${w.pct}%"></span></span> ${w.year}｜<a href="${esc(paperLink(p, w.id))}">${bi(w.title_zh, w.title)}</a><div class="small muted">命中：${w.terms.map(esc).join("、")}</div></li>`).join("")}</ol></div>` : "");
 }
 function matchStars(r){
-  /* 匹配程度 1–5 顆星：你的興趣與研究裡，強相關算 1、部分相關算 0.5，佔全部的比例換成星數 */
+  /* 匹配程度 1–5 顆星：你的興趣與 CV 項目裡，強相關算 1、部分相關算 0.5，佔全部的比例換成星數 */
   if (!r || !r.targets.length) return null;
   const score = r.targets.reduce((a, t) => a + (t.fit === "strong" ? 1 : t.fit === "partial" ? 0.5 : 0), 0) / r.targets.length;
   return {n: Math.max(1, Math.min(5, Math.round(score * 5))), score};
@@ -96,7 +96,7 @@ function starsHTML(r){
   const s = matchStars(r);
   if (!s) return `<span class="pill y" title="還沒依你的興趣比對">還沒比對</span>`;
   const n = r.targets.length, st = r.targets.filter(t => t.fit === "strong").length, pa = r.targets.filter(t => t.fit === "partial").length;
-  return `<span class="stars" role="img" aria-label="匹配程度 ${s.n} 顆星（共 5 顆）" title="你的 ${n} 個興趣與研究：強相關 ${st}、部分相關 ${pa}">${"★".repeat(s.n)}<span class="off">${"★".repeat(5 - s.n)}</span></span>`;
+  return `<span class="stars" role="img" aria-label="匹配程度 ${s.n} 顆星（共 5 顆）" title="你的 ${n} 個興趣與 CV 項目：強相關 ${st}、部分相關 ${pa}">${"★".repeat(s.n)}<span class="off">${"★".repeat(5 - s.n)}</span></span>`;
 }
 function renderProfs(ps){
   const el = body("professors");
@@ -106,7 +106,7 @@ function renderProfs(ps){
     head.insertAdjacentHTML("beforeend", window.APP_REMATCH ? `<a class="btn btn-green" id="add-prof" href="pipeline.html#new">＋ 新增教授</a>` : "");
   }
   if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按右上角「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
-  el.innerHTML = `<p class="muted">星星是匹配程度：依你的每個研究興趣與研究計畫，看她有多少強相關、部分相關的研究。點文章標題會跳到那篇的完整解析。</p>` +
+  el.innerHTML = `<p class="muted">星星是匹配程度：依你的每個研究興趣與 CV 項目計畫，看她有多少強相關、部分相關的研究。點文章標題會跳到那篇的完整解析。</p>` +
     ps.map(p => {
       const c = p.counts || {};
       return `<article class="prof">

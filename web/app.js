@@ -47,7 +47,7 @@ async function pipelinePanel(){
   document.getElementById("professors")?.addEventListener("click", async ev => {
     const b = ev.target.closest("[data-rematch]");
     if (!b) return;
-    if (!confirm("請 Claude Code 依你目前的研究興趣與研究計畫重新比對這位教授？約需 10–20 分鐘，進度在「建新教授」那一區。")) return;
+    if (!confirm("請 Claude Code 依你目前的研究興趣與 CV 項目計畫重新比對這位教授？約需 10–20 分鐘，進度在「建新教授」那一區。")) return;
     b.disabled = true;
     try { await API("match", {slug: b.dataset.rematch}); location.href = "pipeline.html"; }
     catch (e) { alert(e.message); b.disabled = false; }
