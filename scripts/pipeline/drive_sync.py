@@ -6,7 +6,7 @@
 - 一邊刪掉、另一邊沒改 → 另一邊也刪（刪的檔先收到 `_同步刪除/`，不直接消失）
 - 第一次同步、或換了雲端資料夾（base 不是這個雲端）→ 只合併、不刪
 - 雲端的 JSON 突然變得小很多（例：被空檔蓋掉）→ 不拿它蓋這台，雲端那份收到 `_同步衝突/`
-- 使用中記號（雲端 `_使用中.json`）：別台電腦 10 分鐘內同步過＝還在用，這台先不同步（先到先用），除非 force
+- 使用中記號（雲端 `_使用中.json`）：別台電腦 5 分鐘內同步過＝還在用，這台先不同步（先到先用），除非 force
 """
 import json
 import os
@@ -20,7 +20,7 @@ DRIVE_NAMES = ("我的雲端硬碟", "My Drive", "我的云端硬盘")
 FOLDER = "phdeasy教授檔案"
 STATE = ".drive_sync.json"
 LOCK = "_使用中.json"
-LOCK_FRESH = 10 * 60
+LOCK_FRESH = 5 * 60  # 開著的程式每 3 分鐘同步一次；超過 5 分鐘沒動靜就當作已關掉
 SKIP_DIRS = {"_同步衝突", "_同步刪除", "__pycache__", "_app"}  # _app：這台的背景工作紀錄，只在這台
 SKIP_FILES = {STATE, LOCK, ".DS_Store", "drive.json"}  # drive.json：每台電腦自己的雲端設定，不同步
 DEVICE = (socket.gethostname() or "這台電腦").split(".")[0]
@@ -147,7 +147,7 @@ def read_lock(remote_root):
 
 
 def busy_elsewhere(remote_root, my_id, now=None):
-    """別台電腦 10 分鐘內同步過、還沒釋放 → 回傳那台的記號；否則 None。"""
+    """別台電腦 5 分鐘內同步過、還沒釋放 → 回傳那台的記號；否則 None。"""
     lk = read_lock(remote_root)
     now = now or time.time()
     if lk.get("id") and lk["id"] != my_id and now - (lk.get("t") or 0) < LOCK_FRESH:

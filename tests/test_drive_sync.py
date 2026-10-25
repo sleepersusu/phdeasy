@@ -104,3 +104,18 @@ def test_cli_sync_releases_unless_holding(tmp_path, monkeypatch):
     assert not read_lock(drive).get("id")  # 一次性的同步（重建首頁、每段收尾）做完就放開
     cli.run(tmp_path / "runs", hold=True)
     assert read_lock(drive).get("id")  # 應用程式開著時才佔用
+
+
+def test_cli_waits_for_release_before_giving_up(tmp_path, monkeypatch):
+    import drive_sync as cli
+    from pipeline.drive_sync import release
+    drive = tmp_path / "drive"
+    (tmp_path / "runs").mkdir()
+    sync(tmp_path / "other", drive, my_id="pcB", device="Win")  # 別台佔著
+    monkeypatch.setattr(cli, "target", lambda runs, *a, **k: drive)
+    calls = []
+    def fake_sleep(s):
+        calls.append(s)
+        release(drive, my_id="pcB")  # 等的時候那台的「已釋放」同步過來了
+    monkeypatch.setattr(cli.time, "sleep", fake_sleep)
+    assert cli.run(tmp_path / "runs", wait=60) == 0 and calls

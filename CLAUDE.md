@@ -15,7 +15,7 @@
 | 比對推薦 | （`verify` 之前） | `prof-match` | 自動；本人改興趣後可單獨重跑 |
 | 驗收 | `verify` → `stop2` | `prof-verify` | ⏸ 本人 |
 
-每位教授一個批次資料夾 `runs/<slug>/`。開工先跑 `uv run python scripts/drive_sync.py runs`，把別台電腦在 Google 雲端硬碟上的更新拉下來（回 `BLOCKED` 表示另一台電腦還在用：停下告訴本人，不要自己加 `--force`；回 `SKIP` 表示這台沒裝或沒登入 Google Drive：告訴本人先裝好登入，再跑 `--setup` 選帳號），再讀該批次的 `state.json`，從 `stage` 接續；自動段的 skill 結尾直接執行下一個 skill，直到 `stop2` 或熔斷。
+每位教授一個批次資料夾 `runs/<slug>/`。開工先跑 `uv run python scripts/drive_sync.py runs`，把別台電腦在 Google 雲端硬碟上的更新拉下來（回 `BLOCKED` 表示另一台電腦還在用：先加 `--wait 180` 再試一次（剛關掉的那台，「已釋放」要等雲端硬碟同步過來），仍然 BLOCKED 就停下告訴本人，本人確認那台已關掉才加 `--force`；回 `SKIP` 表示這台沒裝或沒登入 Google Drive：告訴本人先裝好登入，再跑 `--setup` 選帳號），再讀該批次的 `state.json`，從 `stage` 接續；自動段的 skill 結尾直接執行下一個 skill，直到 `stop2` 或熔斷。
 
 ## 開工檢查
 

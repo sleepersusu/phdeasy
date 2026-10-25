@@ -12,6 +12,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 from pipeline.drive_sync import FOLDER, find_drive, find_drives, release, sync
@@ -37,7 +38,7 @@ def target(runs, account=None, given=None):
     return d / FOLDER if d else None
 
 
-def run(runs, account=None, given=None, force=False, do_release=False, hold=False):
+def run(runs, account=None, given=None, force=False, do_release=False, hold=False, wait=0):
     """hold=False（預設）：同步完就放開「使用中」，別台可以接著用；只有應用程式開著時用 hold=True 佔住。"""
     hold = hold or os.environ.get("PHDEASY_HOLD") == "1"  # 應用程式開著時，它叫的重建／流水線也算在佔用中
     dst = target(runs, account, given)
@@ -45,9 +46,14 @@ def run(runs, account=None, given=None, force=False, do_release=False, hold=Fals
         print("SKIP 找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入，再跑 --setup")
         return 1
     n = sync(runs, dst, force=force)
+    waited = 0
+    while "blocked" in n and waited < wait:  # 別台剛關掉時，「已釋放」要等雲端硬碟同步過來（常延遲 1–2 分鐘）
+        time.sleep(15)
+        waited += 15
+        n = sync(runs, dst, force=force)
     if "blocked" in n:
         p = sync(runs, dst, pull_only=True)
-        print(f"BLOCKED 另一台電腦（{n['blocked']}）10 分鐘內還在用：先只把雲端的資料拉下來看（拉下 {p.get('pull', 0)} 個檔），不推上去。"
+        print(f"BLOCKED 另一台電腦（{n["blocked"]}）5 分鐘內還在用：先只把雲端的資料拉下來看（拉下 {p.get('pull', 0)} 個檔），不推上去。"
               "那台關掉後再同步；確定那台已關掉就加 --force")
         return 2
     msg = "、".join(f"{k} {v}" for k, v in sorted(n.items())) or "沒有變動"
@@ -66,6 +72,7 @@ def main():
     ap.add_argument("--dir", default=None)
     ap.add_argument("--force", action="store_true")
     ap.add_argument("--release", action="store_true")
+    ap.add_argument("--wait", type=int, default=0, help="別台顯示使用中時，最多等幾秒讓它的「已釋放」同步過來")
     a = ap.parse_args()
     runs = Path(a.runs)
     if a.setup:
@@ -79,7 +86,7 @@ def main():
             print(f"- {label}：{p}{mark}")
         print("選一個帳號：uv run python scripts/drive_sync.py runs --account <上面的帳號>")
         return 0
-    return run(runs, a.account, a.dir, a.force, a.release)
+    return run(runs, a.account, a.dir, a.force, a.release, wait=a.wait)
 
 
 if __name__ == "__main__":
