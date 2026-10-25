@@ -102,7 +102,7 @@ def r_ncbi_efetch(w):
 def r_s2(w):
     if not w.get("doi"):
         return []
-    d = get_json(f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(w['doi'])}?fields=openAccessPdf,externalIds", min_interval=1.1, retry_429=(5, 15, 30))
+    d = get_json(f"https://api.semanticscholar.org/graph/v1/paper/DOI:{quote(w['doi'])}?fields=openAccessPdf,externalIds", min_interval=1.1, retry_429=(5, 15, 30, 60))
     urls = []
     if (d.get("openAccessPdf") or {}).get("url"):
         urls.append(d["openAccessPdf"]["url"])

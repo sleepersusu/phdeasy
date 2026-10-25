@@ -14,8 +14,10 @@ BLOCK_TAGS = {"p", "title", "caption", "award-group", "funding-statement"}
 
 
 def clean_pdf_text(s):
-    """部分 PDF 字型把負號編成控制字元 \x02（例：W4392799619），還原成負號。"""
-    return re.sub(r"\x02(?=[\d.])", "−", s)
+    """部分 PDF 字型把負號編成控制字元 \x02（例：W4392799619），還原成負號；
+    把小數中點（94·7%）編成 $ 的（例：W4399408713），還原成小數點。"""
+    s = re.sub(r"\x02(?=[\d.])", "−", s)
+    return re.sub(r"(?<=\d)\$(?=\d)", ".", s)
 
 
 def pdf_to_marked(path):

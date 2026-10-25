@@ -107,3 +107,8 @@ def test_pdf_control_char_minus_restored():
     from pipeline.textify import clean_pdf_text
     assert clean_pdf_text("β = \x020.02 (95% CI \x020.04 to \x020.01)") == "β = −0.02 (95% CI −0.04 to −0.01)"
     assert clean_pdf_text("plain text") == "plain text"
+
+
+def test_clean_pdf_text_restores_mid_dot_decimal_encoded_as_dollar():
+    from pipeline.textify import clean_pdf_text
+    assert clean_pdf_text("GPs surveyed (94$7%) were; cost US$5 and $20") == "GPs surveyed (94.7%) were; cost US$5 and $20"
