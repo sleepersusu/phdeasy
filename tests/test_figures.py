@@ -51,3 +51,15 @@ def test_soft_hyphen_ignored_when_matching_quotes():
     text = "[p.1]\nWe used a meta­analysis of eleven trials in adults.\n"
     assert check_quote(text, "We used a meta-analysis of eleven trials", "p.1")[0] or check_quote(text, "We used a metaanalysis of eleven trials", "p.1")[0]
     assert check_quote(text, "We used a meta­analysis of eleven trials", "p.1")[0]
+
+
+def test_xml_list_is_authoritative_and_pdf_adds_images():
+    import sys
+    sys.path.insert(0, "scripts")
+    from figures import merge_xml_pdf
+    jats = [{"label": "Figure 1", "caption": "Figure 1 Flow", "page": None, "loc": None, "image": None},
+            {"label": "Table 1", "caption": "Table 1 Baseline", "page": None, "loc": None, "image": None}]
+    pdf = [{"label": "Figure 1", "caption": "x", "page": 3, "loc": "p.3", "image": "p3.png"}]
+    out = merge_xml_pdf(jats, pdf)
+    assert [o["label"] for o in out] == ["Figure 1", "Table 1"] and out[0]["image"] == "p3.png" and out[1]["image"] is None
+    assert merge_xml_pdf([], pdf) == pdf

@@ -11,6 +11,18 @@ from pipeline.figures import from_jats, from_pdf
 from pipeline.state import append_progress
 
 
+def merge_xml_pdf(jats, pdf_items):
+    """XML 標好的圖表清單為準（不會漏）；PDF 抓到同一個圖號的，補上頁碼與頁面截圖。XML 沒標任何圖表才用 PDF 的。"""
+    if not jats:
+        return pdf_items
+    by = {it["label"].lower(): it for it in pdf_items}
+    out = []
+    for it in jats:
+        p = by.get(it["label"].lower())
+        out.append({**it, **({"page": p["page"], "loc": p["loc"], "image": p["image"]} if p else {})})
+    return out
+
+
 def figure_pdf(run, w):
     """XML 全文的文章：試 OpenAlex 與期刊落地頁的免費 PDF，存在 work/figures/_pdf/（只用來截圖表）。"""
     from pipeline.fetch import is_pdf
@@ -49,7 +61,7 @@ def extract(run):
         try:
             if e["source_type"] == "xml":
                 pdf = figure_pdf(run, wmap[wid])  # XML 沒有圖片：另外抓出版社的 PDF 只拿來截圖表頁（不放進 pdfs/，不改原檔）
-                items = from_pdf(pdf, figdir) if pdf else from_jats(src.read_bytes())
+                items = merge_xml_pdf(from_jats(src.read_bytes()), from_pdf(pdf, figdir) if pdf else [])
             else:
                 items = from_pdf(src, figdir)
         except Exception as ex:
