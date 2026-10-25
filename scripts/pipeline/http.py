@@ -72,9 +72,28 @@ def get_json(url, retry_429=(), **kw):
     return json.loads(data)
 
 
+from pathlib import Path
+
+# 本人的金鑰檔：放在 runs/_me/（不進 git，經 Google 雲端硬碟同步到每台電腦）；環境變數優先
+SECRETS = Path(__file__).resolve().parents[2] / "runs" / "_me" / "secrets.env"
+
+
+def secret(name):
+    if os.environ.get(name):
+        return os.environ[name]
+    try:
+        for line in SECRETS.read_text(encoding="utf-8").splitlines():
+            k, sep, v = line.partition("=")
+            if sep and k.strip() == name and not line.lstrip().startswith("#"):
+                return v.strip().strip('"').strip("'") or None
+    except OSError:
+        pass
+    return None
+
+
 def s2_headers():
-    """Semantic Scholar API 金鑰（本人申請，存在環境變數 S2_API_KEY，不進 git）。"""
-    key = os.environ.get("S2_API_KEY")
+    """Semantic Scholar API 金鑰（本人申請）：環境變數 S2_API_KEY，或 runs/_me/secrets.env。"""
+    key = secret("S2_API_KEY")
     return {"x-api-key": key} if key else {}
 
 

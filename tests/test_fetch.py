@@ -150,3 +150,14 @@ def test_s2_headers_use_env_key(monkeypatch):
     assert s2_headers() == {}
     monkeypatch.setenv("S2_API_KEY", "k123")
     assert s2_headers() == {"x-api-key": "k123"}
+
+
+def test_s2_key_from_synced_secrets_file(monkeypatch, tmp_path):
+    from pipeline import http
+    monkeypatch.delenv("S2_API_KEY", raising=False)
+    (tmp_path / "_me").mkdir()
+    (tmp_path / "_me" / "secrets.env").write_text("# 註解\nS2_API_KEY = \"abc\"\n")
+    monkeypatch.setattr(http, "SECRETS", tmp_path / "_me" / "secrets.env")
+    assert http.s2_headers() == {"x-api-key": "abc"}
+    monkeypatch.setenv("S2_API_KEY", "env-wins")
+    assert http.s2_headers() == {"x-api-key": "env-wins"}
