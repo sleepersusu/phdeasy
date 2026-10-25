@@ -235,3 +235,19 @@ def test_title_only_card_is_valid_short_card():
     assert validate_card(c, kind="short") == []
     assert c["fields"]["summary"]["status"] == "not_in_source" and c["basis"] == "title_only"
     assert check_card(c, "") == []
+
+
+def test_check_refute_honours_ids(tmp_path, capsys):
+    import json, sys, pytest
+    sys.path.insert(0, "scripts")
+    import cards as cli
+    run = tmp_path / "r"
+    (run / "work" / "cards" / "W1").mkdir(parents=True)
+    (run / "work" / "cards" / "W2").mkdir(parents=True)
+    (run / "work" / "works.json").write_text(json.dumps([{"id": "W1", "kind": "full"}, {"id": "W2", "kind": "full"}]))
+    a = {"id": "W1", "fields": {}}
+    for w in ("W1", "W2"):
+        (run / "work" / "cards" / w / "a.json").write_text(json.dumps(a))
+    (run / "work" / "cards" / "W1" / "refute.json").write_text(json.dumps({"verdicts": []}))
+    cli.check_refute(run, {"W1"})
+    assert "W2" not in capsys.readouterr().out

@@ -107,9 +107,11 @@ def diff(run):
     print(f"DONE 需要裁決 {len(need)} 篇：{','.join(need)}")
 
 
-def check_refute(run):
+def check_refute(run, ids=None):
     miss_all = {}
     for w in _works(run):
+        if ids and w["id"] not in ids:
+            continue
         d = run / "work" / "cards" / w["id"]
         a, r = _j(d / "a.json"), _j(d / "refute.json")
         if w["kind"] != "full" or a is None:
@@ -196,7 +198,7 @@ def main():
     elif a.cmd == "diff":
         diff(run)
     elif a.cmd == "check-refute":
-        check_refute(run)
+        check_refute(run, set(a.ids.split(",")) if a.ids else None)
     else:
         assemble_all(run)
 

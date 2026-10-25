@@ -2,6 +2,8 @@
 import json
 import os
 import socket
+import ssl
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -39,11 +41,32 @@ def get(url, accept="*/*", headers=None, timeout=30, min_interval=0.3):
     except (socket.timeout, TimeoutError):
         return None, "timeout"
     except (urllib.error.URLError, ConnectionError, OSError) as e:
+        if isinstance(getattr(e, "reason", e), ssl.SSLCertVerificationError):
+            return _curl(url, accept, headers, timeout)  # 伺服器沒送完整憑證鏈：改用系統 curl（macOS 鑰匙圈）
         return None, f"conn_error({getattr(e, 'reason', e)})"
 
 
-def get_json(url, **kw):
+def _curl(url, accept, headers, timeout):
+    cmd = ["curl", "-sL", "-m", str(timeout), "-A", user_agent(url), "-H", f"Accept: {accept}", "-w", "\n%{http_code}"]
+    for k, v in (headers or {}).items():
+        cmd += ["-H", f"{k}: {v}"]
+    try:
+        r = subprocess.run(cmd + [url], capture_output=True, timeout=timeout + 5)
+    except (subprocess.TimeoutExpired, OSError):
+        return None, "timeout"
+    body, _, code = r.stdout.rpartition(b"\n")
+    if r.returncode != 0 or not code.isdigit():
+        return None, f"conn_error(curl exit {r.returncode})"
+    return (body, "ok") if code.startswith(b"2") else (None, f"http_{code.decode()}")
+
+
+def get_json(url, retry_429=(), **kw):
     data, status = get(url, accept="application/json", **kw)
+    for pause in retry_429:  # 限流（例：Semantic Scholar 共用額度）就等一下再試
+        if status != "http_429":
+            break
+        time.sleep(pause)
+        data, status = get(url, accept="application/json", **kw)
     if data is None:
         raise RuntimeError(f"{status} {url}")
     return json.loads(data)

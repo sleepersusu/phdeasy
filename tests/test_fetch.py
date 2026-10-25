@@ -113,3 +113,24 @@ def test_osf_guid_and_pdf_pick():
     tricky = [("Engagement trajectories", "Analysis plan (protocol v2).pdf", "https://osf.io/download/e/"),
               ("Protocol", "2026 Effect of a mobile health intervention.pdf", "https://osf.io/download/p/")]
     assert osf_pdfs(tricky)[0] == "https://osf.io/download/p/"  # 名為 Protocol 的資料夾勝過檔名含 protocol
+
+
+def test_get_json_retries_on_429(monkeypatch):
+    from pipeline import http
+    seq = [(None, "http_429"), (None, "http_429"), (b'{"ok": 1}', "ok")]
+    monkeypatch.setattr(http, "get", lambda url, **kw: seq.pop(0))
+    monkeypatch.setattr(http.time, "sleep", lambda s: None)
+    assert http.get_json(url="https://api.semanticscholar.org/x", retry_429=(1, 1, 1)) == {"ok": 1}
+
+
+def test_get_falls_back_to_system_curl_on_cert_error(monkeypatch):
+    import ssl, subprocess, urllib.error
+    from pipeline import http
+
+    def boom(req, timeout=0):
+        raise urllib.error.URLError(ssl.SSLCertVerificationError(1, "CERTIFICATE_VERIFY_FAILED"))
+
+    monkeypatch.setattr(http.urllib.request, "urlopen", boom)
+    monkeypatch.setattr(http.subprocess, "run", lambda *a, **k: subprocess.CompletedProcess(a, 0, stdout=b"%PDF-1.7 x\n200", stderr=b""))
+    data, status = http.get("https://linkinghub.example/x", min_interval=0)
+    assert status == "ok" and data == b"%PDF-1.7 x"
