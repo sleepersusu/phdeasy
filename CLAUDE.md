@@ -14,7 +14,7 @@
 | 總覽 | `profile` | `prof-profile` | 自動 |
 | 驗收 | `verify` → `stop2` | `prof-verify` | ⏸ 本人 |
 
-每位教授一個批次資料夾 `runs/<slug>/`。開工先讀該批次的 `state.json`，從 `stage` 接續；自動段的 skill 結尾直接執行下一個 skill，直到 `stop2` 或熔斷。
+每位教授一個批次資料夾 `runs/<slug>/`。開工先跑 `uv run python scripts/drive_sync.py runs`，把別台電腦在 Google 雲端硬碟上的更新拉下來，再讀該批次的 `state.json`，從 `stage` 接續；自動段的 skill 結尾直接執行下一個 skill，直到 `stop2` 或熔斷。
 
 ## 開工檢查
 
@@ -56,7 +56,8 @@
 | cards | `cards.py todo／check／diff／check-refute／assemble` |
 | profile | `profile.py facts／check／assemble` |
 | verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
-| 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁；本人資料在 `runs/_me/me.json`（只存本機） |
+| 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |
+| 雲端 | `drive_sync.py runs`：`runs/` 與 `<我的雲端硬碟>/phdeasy教授檔案/` 雙向同步（帳號設定在 `runs/_me/drive.json`）；每段收尾、停點前都跑一次 |
 
 ## 腳本與測試
 

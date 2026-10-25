@@ -53,7 +53,7 @@ runs/<slug>/
   verify/           驗收報告
 ```
 
-`runs/` 含有論文全文，不進版本控制。
+`runs/` 含有論文全文，不進版本控制；改由 Google 雲端硬碟同步（`<我的雲端硬碟>/phdeasy教授檔案/`），每位教授一個資料夾。另一台電腦裝好 Google Drive 電腦版、clone 這個 repo 後跑 `uv run python scripts/drive_sync.py runs` 就會拉下全部教授檔案；兩台都改過的檔案用較新的，舊的收在 `_同步衝突/`。
 
 ## 怎麼確保沒出錯
 

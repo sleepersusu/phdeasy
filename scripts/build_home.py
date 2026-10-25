@@ -1,10 +1,11 @@
 """產生個人首頁 runs/index.html，並重建每位教授的詳細頁（讓它們帶入本人的比對內容）。
 
-  uv run python scripts/build_home.py runs
+  uv run python scripts/build_home.py runs   # 結尾會同步到 Google 雲端硬碟（drive_sync.py）
 """
 import argparse
 from pathlib import Path
 
+from drive_sync import run as drive_sync
 from pipeline.home import build_home_data, render_home
 from pipeline.site import build_site_data, render_html
 
@@ -23,6 +24,7 @@ def main():
     me = data["me"]["name"] if data["me"] else "（尚無本人資料）"
     print(f"DONE {runs / 'index.html'}：{me}；教授 {len(data['professors'])} 位：" +
           "、".join(f"{p['name']}（重疊 {p['n_overlap_papers']} 篇）" for p in data["professors"]))
+    drive_sync(runs)  # 每次重建首頁就同步到雲端硬碟
 
 
 if __name__ == "__main__":
