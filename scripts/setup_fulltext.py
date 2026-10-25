@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import quote
 
-from pipeline.fetch import citation_pdf_urls, match_inbox, needs_fulltext, missing_report, pdf_relpath, sha256_file, zotero_pdf_paths
+from pipeline.fetch import citation_pdf_urls, match_inbox, needs_fulltext, osf_guid, osf_pdfs, missing_report, pdf_relpath, sha256_file, zotero_pdf_paths
 from pipeline.fulltext import SkipSource, run_chain
 from pipeline.index import find_existing, load_index, save_index
 from pipeline.http import get, get_json
@@ -123,6 +123,25 @@ def r_preprints(w):
             for c in coll[-1:]:
                 server = c.get("server", "medrxiv").lower()
                 urls.append(f"https://www.{server}.org/content/{doi}v{c['version']}.full.pdf")
+    guid = osf_guid(w.get("landing_pages"))
+    if guid:  # OSF 頁面由 JavaScript 產生，要走 API；可能是 preprint 或 project（node）
+        try:
+            pre = get_json(f"https://api.osf.io/v2/preprints/{guid}/?embed=primary_file")
+            dl = (((pre["data"].get("embeds") or {}).get("primary_file") or {}).get("data") or {}).get("links", {}).get("download")
+            if dl:
+                urls.append(dl)
+        except Exception:
+            listing = []
+            root = get_json(f"https://api.osf.io/v2/nodes/{guid}/files/osfstorage/")
+            for f in root.get("data", []):
+                a = f["attributes"]
+                if a["kind"] == "file":
+                    listing.append(("", a["name"], f["links"].get("download")))
+                else:
+                    for g in get_json(f["relationships"]["files"]["links"]["related"]["href"]).get("data", []):
+                        if g["attributes"]["kind"] == "file":
+                            listing.append((a["name"], g["attributes"]["name"], g["links"].get("download")))
+            urls += osf_pdfs(listing)
     data, status = get(f'https://export.arxiv.org/api/query?search_query=ti:%22{quote(w["title"] or "")}%22&max_results=3', min_interval=3)
     if data:
         ns = {"a": "http://www.w3.org/2005/Atom"}

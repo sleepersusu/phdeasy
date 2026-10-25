@@ -108,3 +108,17 @@ def is_supplementary_url(url):
 
 def needs_fulltext(w):
     return w["kind"] == "full" or w.get("short_reason") == "not_led"
+
+
+def osf_guid(urls):
+    for u in urls or []:
+        m = re.search(r"osf\.io/(?:preprints/[^/]+/)?([a-z0-9]{5})(?:/|$)", u or "")
+        if m:
+            return m.group(1)
+    return None
+
+
+def osf_pdfs(listing):
+    """listing: [(資料夾名, 檔名, 下載網址)]。只留 PDF，Protocol 資料夾或檔名含 protocol 的排前面。"""
+    pdfs = [(f, n, u) for f, n, u in listing if n.lower().endswith(".pdf") and u]
+    return [u for f, n, u in sorted(pdfs, key=lambda x: (0 if "protocol" in (x[0] + x[1]).lower() else 1, x[0], x[1]))]

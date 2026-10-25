@@ -100,3 +100,13 @@ def test_needs_fulltext_includes_not_led_short_cards():
     assert needs_fulltext({"kind": "full"})
     assert needs_fulltext({"kind": "short", "short_reason": "not_led"})  # 致謝段找計畫要用
     assert not needs_fulltext({"kind": "short"})
+
+
+def test_osf_guid_and_pdf_pick():
+    from pipeline.fetch import osf_guid, osf_pdfs
+    assert osf_guid(["https://doi.org/x", "https://osf.io/7mux6"]) == "7mux6"
+    assert osf_guid(["https://osf.io/preprints/psyarxiv/abc12"]) == "abc12"
+    assert osf_guid(["https://example.org"]) is None
+    listing = [("SAP", "plan.pdf", "https://osf.io/download/2/"), ("Protocol", "trial protocol.pdf", "https://osf.io/download/1/"),
+               ("Protocol", "notes.docx", "https://osf.io/download/3/")]
+    assert osf_pdfs(listing) == ["https://osf.io/download/1/", "https://osf.io/download/2/"]  # 只要 PDF，Protocol 資料夾優先
