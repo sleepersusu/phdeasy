@@ -205,3 +205,24 @@ def competition_ranks(ns):
     for i, n in enumerate(ns):
         out.append(out[-1] if i and n == ns[i - 1] else i + 1)
     return out
+
+
+def check_consistency(net, works):
+    """network.json 自我核對（取代獨立計數 agent）：總篇數、每位合作者的篇數＝文章清單、文章都存在、年度加總、依篇數排序。"""
+    ids = {w["id"] for w in works}
+    fails = []
+    if net.get("works_total") != len(works) or (net.get("roles") or {}).get("total", len(works)) != len(works):
+        fails.append({"key": "-", "why": "works_total_mismatch"})
+    prev = None
+    for c in net.get("coauthors") or []:
+        ws = c.get("works") or []
+        if c.get("n") != len(set(ws)):
+            fails.append({"key": c["key"], "why": "n_not_equal_works"})
+        if set(ws) - ids:
+            fails.append({"key": c["key"], "why": "unknown_work"})
+        if sum((c.get("years") or {}).values()) != len(set(ws)):
+            fails.append({"key": c["key"], "why": "years_sum_mismatch"})
+        if prev is not None and c.get("n", 0) > prev:
+            fails.append({"key": c["key"], "why": "not_sorted"})
+        prev = c.get("n", 0)
+    return fails

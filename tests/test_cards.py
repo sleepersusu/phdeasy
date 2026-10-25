@@ -5,7 +5,6 @@ from pipeline.cards import (
     validate_card,
     check_card,
     numbers_in,
-    diff_fixed,
     apply_judge,
     apply_refute,
     assemble,
@@ -122,20 +121,6 @@ def test_numbers_in_handles_ranges_decimals_and_chinese():
     assert numbers_in("美國 92 位 26–70 歲女性，P<.001，2.4 升到 3.1") == ["92", "26", "70", ".001", "2.4", "3.1"]
 
 
-def test_diff_fixed_equal():
-    a = good_card()
-    b = {"id": "W1", "design": {"type": "quasi-experimental"}, "sample": {"n_enrolled": 92, "n_analyzed": 85, "country": "united states"}}
-    assert diff_fixed(a, b) == []
-
-
-def test_diff_fixed_detects_differences():
-    a = good_card()
-    b = {"id": "W1", "design": {"type": "rct"}, "sample": {"n_enrolled": 92, "n_analyzed": 92, "country": "USA"}}
-    d = {x["field"]: x for x in diff_fixed(a, b)}
-    assert set(d) == {"design.type", "sample.n_analyzed"}  # USA 與 United States 視為相同
-    assert d["sample.n_analyzed"]["a"] == 85 and d["sample.n_analyzed"]["b"] == 92
-
-
 def test_apply_judge_sets_value_or_unresolved():
     c = good_card()
     out, unresolved = apply_judge(c, [{"field": "sample.n_analyzed", "verdict": "b", "value": 92, "reason": "x"},
@@ -194,15 +179,17 @@ def test_assemble_sample_with_wrong_count_clears_count_and_reports():
 def test_missing_refute_paths():
     from pipeline.cards import missing_refute_paths
     c = good_card()
-    verdicts = [{"path": "gap[0]", "verdict": "keep"}, {"path": "findings[0]", "verdict": "maybe"}]
-    assert missing_refute_paths(c, verdicts) == ["solves[0]", "findings[0]", "limitations.author_stated[0]", "limitations.inferred[0]"]
+    # 本人 2026-10-26：推翻者只判推論類（研究缺口、推論的限制）；其他欄位的引句與數字由腳本逐字核對
+    verdicts = [{"path": "findings[0]", "verdict": "keep"}]
+    assert missing_refute_paths(c, verdicts) == ["gap[0]", "limitations.inferred[0]"]
+    verdicts = [{"path": "gap[0]", "verdict": "keep"}, {"path": "limitations.inferred[0]", "verdict": "maybe"}]
+    assert missing_refute_paths(c, verdicts) == ["limitations.inferred[0]"]
 
 
-def test_country_list_equals_multiple():
-    a = good_card()
-    a["fields"]["sample"]["country"] = "Canada, Brazil, Italy, United States"
-    b = {"design": {"type": "quasi-experimental"}, "sample": {"n_enrolled": 92, "n_analyzed": 85, "country": "multiple"}}
-    assert diff_fixed(a, b) == []
+def test_refute_only_needed_for_fulltext_cards():
+    from pipeline.cards import needs_refute
+    assert needs_refute({"kind": "full"}, "pdf") and needs_refute({"kind": "full"}, "xml")
+    assert not needs_refute({"kind": "full"}, "abstract") and not needs_refute({"kind": "short"}, "pdf")
 
 
 def test_apply_judge_adds_evidence_citation():

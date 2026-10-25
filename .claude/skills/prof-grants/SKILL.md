@@ -64,8 +64,10 @@ uv run python scripts/state_cli.py show runs/<slug>
    ```bash
    uv run python scripts/grants.py merge runs/<slug>
    ```
-5. **推翻**：派推翻者，`model: opus`：
+5. **推翻**：派推翻者，`model: opus`，只判她主持（`confirmed`）與待確認（`pending`）的計畫：
    > 讀 `.claude/skills/prof-grants/refuter.md` 照做。slug=<slug>
+
+   （本人 2026-10-26 縮小範圍：致謝提及、合作者主持的不會當成她的經費，引句已由腳本逐字核對；套用時照留，標 `not_in_scope`。）
 6. **套用**
    ```bash
    uv run python scripts/grants.py apply-refute runs/<slug>

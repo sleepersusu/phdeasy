@@ -192,3 +192,22 @@ def test_possible_splits_requires_compatible_first_and_middle():
              s("A9", "R. John Simes"), s("A10", "Robert John Simes"), s("A11", "Peter Lee"), s("A12", "Peter Lee")]
     keys = sorted(sorted(g["keys"]) for g in possible_splits(stats))
     assert keys == [["A10", "A9"], ["A11", "A12"], ["A7", "A8"]]
+
+
+def test_consistency_check_catches_planted_errors():
+    # 拿掉獨立計數者後（本人 2026-10-26），改由腳本自我核對 network.json 與 works.json 對得上
+    from pipeline.network import check_consistency
+    works = [{"id": "W1"}, {"id": "W2"}, {"id": "W3"}]
+    good = {"works_total": 3, "roles": {"first": 1, "middle": 1, "last": 1, "unknown": 0, "corresponding": 1, "total": 3},
+            "coauthors": [{"key": "A1", "n": 2, "works": ["W1", "W2"], "years": {"2023": 1, "2024": 1}, "as_first": 1, "as_last": 0, "as_corresponding": 0},
+                          {"key": "A2", "n": 1, "works": ["W3"], "years": {"2024": 1}, "as_first": 0, "as_last": 1, "as_corresponding": 1}]}
+    assert check_consistency(good, works) == []
+    import copy
+    bad = copy.deepcopy(good)
+    bad["works_total"] = 4
+    bad["coauthors"][0]["n"] = 3                     # 篇數跟文章清單對不上
+    bad["coauthors"][1]["works"] = ["W9"]            # 不存在的文章
+    bad["coauthors"][1]["years"] = {"2024": 2}       # 年度加總不等於篇數
+    bad["coauthors"].reverse()                       # 沒有照篇數排序
+    whys = {f["why"] for f in check_consistency(bad, works)}
+    assert {"works_total_mismatch", "n_not_equal_works", "unknown_work", "years_sum_mismatch", "not_sorted"} <= whys

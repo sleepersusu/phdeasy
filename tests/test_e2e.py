@@ -35,8 +35,8 @@ def make(tmp_path):
     (run / "pdfs" / "index.csv").write_text("id,year,kind,status,source,ext,path,sha256,url,tried,title\nW1,2024,full,ok,openalex,pdf,pdfs/2024/W1_Lee_Study.pdf,h,u,,Study\n")
     (wd / "cards" / "W1").mkdir(parents=True)
     (wd / "cards" / "W1" / "card.json").write_text(json.dumps(card()))
-    (wd / "network.json").write_text(json.dumps({"coauthors": [{"key": "A1", "n": 1}]}))
-    (wd / "count-diff.json").write_text("[]")
+    (wd / "network.json").write_text(json.dumps({"works_total": 1, "roles": {"total": 1},
+                                                 "coauthors": [{"key": "A1", "n": 1, "works": ["W1"], "years": {"2024": 1}}]}))
     (wd / "grants").mkdir()
     (wd / "grants" / "grants_final.json").write_text(json.dumps([{"key": "NIH:X", "status": "confirmed", "works": ["W1"], "evidence": [{"type": "nih_pi"}]}]))
     (wd / "profile").mkdir()
@@ -63,6 +63,15 @@ def test_clean_run_passes_everything(tmp_path):
     r = results(make(tmp_path))
     bad = {k: v["detail"] for k, v in r.items() if not v["pass"]}
     assert bad == {}
+
+
+def test_coauthor_count_not_matching_paper_list_caught(tmp_path):
+    run = make(tmp_path)
+    p = run / "work" / "network.json"
+    net = json.loads(p.read_text())
+    net["coauthors"][0]["n"] = 2
+    p.write_text(json.dumps(net))
+    assert not results(run)["network_counts"]["pass"]
 
 
 def test_tampered_original_caught(tmp_path):

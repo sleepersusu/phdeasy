@@ -45,11 +45,11 @@ uv run python scripts/e2e.py runs/<slug>
 2. **驗收判準逐條結果**：照 `verify/acceptance.md`，與 `verify/e2e.json` 對照；兩者不一致的地方明寫。
 3. **各段驗證數字**：取自 `progress.md`，例如：
    - 全文 x/y
-   - 合作者計數比對
+   - 合作者計數自我核對
    - 計畫引句 a/a
    - 解析卡引句 b/b
-   - 雙軌不一致 c 筆與裁決結果
-   - 推翻 reject d 筆
+   - 重點與研究方法核對 c/c
+   - 推翻 reject d 筆（解析卡推論類、她主持與待確認的計畫、總覽、比對推薦）
 4. **花費**：各段 subagent 數與 token。
 5. **產出位置**：
    - `out/site/index.html`（前端）

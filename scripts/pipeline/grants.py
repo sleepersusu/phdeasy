@@ -248,14 +248,23 @@ def check_mention(text, m):
 VERDICTS = {"keep", "reject", "unresolved"}
 
 
+def in_refute_scope(g):
+    """推翻者要判的：她主持（confirmed）與待確認（pending）。本人 2026-10-26 縮小範圍：
+    致謝提及與合作者主持的不會當成她的經費，引句已由腳本逐字核對。"""
+    return g.get("status") in ("confirmed", "pending")
+
+
 def apply_verdicts(grants, verdicts):
-    """回傳 (保留, 推翻, 待確認, 漏判 keys)。沒有 API 證據的不能被改成 pi／co_pi，改判待確認。"""
+    """回傳 (保留, 推翻, 待確認, 漏判 keys)。沒有 API 證據的不能被改成 pi／co_pi，改判待確認。
+    推翻範圍外、沒有判決的照留，標 not_in_scope。"""
     ref = {v["key"]: v for v in verdicts if v.get("verdict") in VERDICTS}
-    missing = [g["key"] for g in grants if g["key"] not in ref]
+    missing = [g["key"] for g in grants if in_refute_scope(g) and g["key"] not in ref]
     final, rejected, unresolved = [], [], []
     for g in grants:
         v = ref.get(g["key"])
         if v is None:
+            if not in_refute_scope(g):
+                final.append({**g, "refute": {"verdict": "not_in_scope", "reason": None, "evidence": None}})
             continue
         g = {**g, "refute": {"verdict": v["verdict"], "reason": v.get("reason"), "evidence": v.get("evidence")}}
         if v["verdict"] == "reject":

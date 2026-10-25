@@ -1,9 +1,10 @@
 """network：合作者、作者序角色、領域分佈、年度分佈。
 
   uv run python scripts/network.py build runs/<slug>
-      → work/network.json、work/author_lists.md（給計數 agent）、out/data/{works,coauthors,topics}.csv
+      → work/network.json、work/author_lists.md、out/data/{works,coauthors,topics}.csv
   uv run python scripts/network.py check runs/<slug>
-      → 比對 work/count-check.json（計數 agent 產出），寫 work/count-diff.json；不一致時 exit 1
+      → network.json 自我核對（篇數、文章清單、年度加總、排序），寫 work/network-check.json；不過時 exit 1
+        （本人 2026-10-26 拿掉獨立計數 agent：合作者由作者 id 機械計算，重數同一份資料抓不到新錯）
 """
 import argparse
 import csv
@@ -88,18 +89,16 @@ def build(run):
 
 
 def check(run):
+    from pipeline.network import check_consistency
     net = json.loads((run / "work" / "network.json").read_text())
-    cc = json.loads((run / "work" / "count-check.json").read_text())
-    if cc.get("sections_read") != net["works_total"]:
-        print(f"FAIL 覆蓋不足：計數者讀 {cc.get('sections_read')} 節，文章 {net['works_total']} 篇")
+    works = json.loads((run / "work" / "works.json").read_text())
+    fails = check_consistency(net, works)
+    (run / "work" / "network-check.json").write_text(json.dumps(fails, ensure_ascii=False, indent=2))
+    for f in fails:
+        print(f"FAIL {f['key']} {f['why']}")
+    if fails:
         sys.exit(1)
-    agent = cc["counts"]
-    diffs = compare_counts(net["coauthors"], agent, top=TOP, min_n=MIN_N)
-    (run / "work" / "count-diff.json").write_text(json.dumps(diffs, ensure_ascii=False, indent=2))
-    if diffs:
-        print(f"FAIL 不一致 {len(diffs)} 人：" + "; ".join(f"{d['key']} 腳本 {d['script']} / agent {d['agent']}" for d in diffs))
-        sys.exit(1)
-    print(f"PASS 計數一致（比對 {len(agent)} 人，門檻 ≥{MIN_N} 篇）")
+    print(f"PASS network.json 自我核對：{len(net['coauthors'])} 位合作者的篇數、文章清單、年度加總都對得上")
 
 
 def main():

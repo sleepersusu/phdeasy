@@ -2,10 +2,12 @@
 
   uv run python scripts/cards.py todo runs/<slug>              # 每篇還缺哪一步（可接續）
   uv run python scripts/cards.py check runs/<slug> [--ids W1,W2]  # 甲的 a.json：格式＋引句＋數字核對 → check.json；有錯 exit 1
-  uv run python scripts/cards.py diff runs/<slug>              # 甲 vs 乙的固定事實 → diff.json，列出要裁決的
-  uv run python scripts/cards.py assemble runs/<slug>          # a＋judge＋refute → card.json；被移除的寫 out/rejected.md
+  uv run python scripts/cards.py check-refute runs/<slug>      # 推翻者有沒有把推論類（研究缺口、推論的限制）逐條判完
+  uv run python scripts/cards.py assemble runs/<slug>          # a＋refute（舊批次有 judge 也套用）→ card.json；被移除的寫 out/rejected.md
 
-工作檔：work/cards/<id>/{a.json, b.json, check.json, diff.json, judge.json, refute.json, card.json}
+工作檔：work/cards/<id>/{a.json, check.json, refute.json, card.json}
+本人 2026-10-26 精簡：拿掉乙（雙軌固定事實）與裁決者——設計與樣本數改由研究方法十部分逐字引句、腳本核對；
+推翻只做全文完整卡的推論類欄位。
 """
 import argparse
 import json
@@ -13,7 +15,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from pipeline.cards import apply_judge, apply_refute, assemble, check_card, diff_fixed, missing_refute_paths, title_only_card, validate_card
+from pipeline.cards import apply_judge, apply_refute, assemble, check_card, missing_refute_paths, needs_refute, refute_paths, title_only_card, validate_card
 from pipeline.exceptions import add_exception, check_circuit
 from pipeline.state import append_progress
 
@@ -53,22 +55,18 @@ def write_title_only(run):
 
 def todo(run):
     write_title_only(run)
+    src = {k: v.get("source_type") for k, v in (_j(run / "work" / "ingest.json") or {}).items()}
     rows = []
     for w in _works(run):
         d = run / "work" / "cards" / w["id"]
-        has = {n: (d / f"{n}.json").exists() for n in ("a", "b", "check", "diff", "judge", "refute", "card")}
+        has = {n: (d / f"{n}.json").exists() for n in ("a", "check", "refute", "card")}
         chk = _j(d / "check.json") if has["check"] else None
-        dif = _j(d / "diff.json") if has["diff"] else None
         need = []
         if not has["a"]:
             need.append("甲")
-        if w["kind"] == "full" and not has["b"]:
-            need.append("乙")
         if has["a"] and (not chk or chk.get("fails")):
             need.append("check")
-        if dif and dif.get("diffs") and not has["judge"]:
-            need.append("裁決")
-        if w["kind"] == "full" and has["a"] and not has["refute"]:
+        if has["a"] and not has["refute"] and needs_refute(w, src.get(w["id"])) and refute_paths(_j(d / "a.json")):
             need.append("推翻")
         if not has["card"]:
             need.append("組裝")
@@ -104,32 +102,15 @@ def check(run, ids=None):
     print(f"PASS {n} 篇全數通過（格式、引句、數字）")
 
 
-def diff(run):
-    need = []
-    for w in _works(run):
-        if w["kind"] != "full":
-            continue
-        d = run / "work" / "cards" / w["id"]
-        a, b = _j(d / "a.json"), _j(d / "b.json")
-        if a is None or b is None:
-            continue
-        ds = diff_fixed(a, b)
-        (d / "diff.json").write_text(json.dumps({"diffs": ds}, ensure_ascii=False, indent=2))
-        if ds:
-            need.append(w["id"])
-            for x in ds:
-                print(f"DIFF {w['id']} {x['field']}：甲 {x['a']} ／ 乙 {x['b']}")
-    print(f"DONE 需要裁決 {len(need)} 篇：{','.join(need)}")
-
-
 def check_refute(run, ids=None):
     miss_all = {}
+    src = {k: v.get("source_type") for k, v in (_j(run / "work" / "ingest.json") or {}).items()}
     for w in _works(run):
         if ids and w["id"] not in ids:
             continue
         d = run / "work" / "cards" / w["id"]
         a, r = _j(d / "a.json"), _j(d / "refute.json")
-        if w["kind"] != "full" or a is None:
+        if a is None or not needs_refute(w, src.get(w["id"])) or not refute_paths(a):
             continue
         miss = missing_refute_paths(a, (r or {}).get("verdicts", [])) if r else ["(沒有 refute.json)"]
         if miss:
@@ -137,7 +118,7 @@ def check_refute(run, ids=None):
             print(f"FAIL {w['id']} 漏判：{', '.join(miss)}")
     if miss_all:
         sys.exit(1)
-    print("PASS 每條都有推翻判決")
+    print("PASS 推論類（研究缺口、推論的限制）每條都有推翻判決")
 
 
 def _rejected(run, title, reason, evidence):
@@ -203,7 +184,7 @@ def assemble_all(run, limit=0.3):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["todo", "check", "diff", "check-refute", "assemble"])
+    ap.add_argument("cmd", choices=["todo", "check", "check-refute", "assemble"])
     ap.add_argument("run")
     ap.add_argument("--ids", default=None)
     a = ap.parse_args()
@@ -212,8 +193,6 @@ def main():
         todo(run)
     elif a.cmd == "check":
         check(run, set(a.ids.split(",")) if a.ids else None)
-    elif a.cmd == "diff":
-        diff(run)
     elif a.cmd == "check-refute":
         check_refute(run, set(a.ids.split(",")) if a.ids else None)
     else:

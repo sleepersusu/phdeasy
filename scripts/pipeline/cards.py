@@ -21,8 +21,6 @@ DESIGN_TYPES = {
     "mixed-methods", "systematic-review", "scoping-review", "meta-analysis", "secondary-analysis", "protocol",
     "modeling", "machine-learning", "text-mining", "other",
 }
-COUNTRY_ALIASES = {"usa": "united states", "us": "united states", "u.s.": "united states", "u.s.a.": "united states",
-                   "united states of america": "united states", "美國": "united states", "uk": "united kingdom", "台灣": "taiwan"}
 NUM = re.compile(r"\d*\.\d+|\d+")
 
 
@@ -131,26 +129,6 @@ def check_card(c, text):
             if float(n) not in have:
                 fails.append({"path": path, "field": field, "sub": sub, "idx": idx, "cite": None, "why": f"number_not_in_quotes:{n}"})
     return fails
-
-
-# ---------- 雙軌 ----------
-
-def _country(x):
-    x = (x or "").strip().lower()
-    if "," in x or " and " in x or "、" in x:
-        return "multiple"
-    return COUNTRY_ALIASES.get(x, x) or None
-
-
-def diff_fixed(a, b):
-    af = a.get("fields") or {}
-    pairs = [
-        ("design.type", (af.get("design") or {}).get("type"), (b.get("design") or {}).get("type")),
-        ("sample.n_enrolled", (af.get("sample") or {}).get("n_enrolled"), (b.get("sample") or {}).get("n_enrolled")),
-        ("sample.n_analyzed", (af.get("sample") or {}).get("n_analyzed"), (b.get("sample") or {}).get("n_analyzed")),
-        ("sample.country", _country((af.get("sample") or {}).get("country")), _country((b.get("sample") or {}).get("country"))),
-    ]
-    return [{"field": f, "a": x, "b": y} for f, x, y in pairs if x != y]
 
 
 def apply_judge(c, judgments):
@@ -276,11 +254,21 @@ def assemble(c, text):
     return out, rejected
 
 
+def refute_paths(c):
+    """推翻者要判的：推論類（研究缺口、推論的限制）。本人 2026-10-26 縮小範圍：其他欄位的引句與數字由腳本逐字核對，
+    之前逐條推翻 333 條只推翻 5 條。"""
+    return [p for p, field, sub, idx, _ in _items(c) if field == "gap" or (field == "limitations" and sub == "inferred")]
+
+
+def needs_refute(w, text_source):
+    """只有全文的完整卡要推翻；只有摘要或短卡的推論少，靠腳本核對。"""
+    return w.get("kind") == "full" and text_source in ("pdf", "xml")
+
+
 def missing_refute_paths(c, verdicts):
     """推翻者該判卻沒判（或 verdict 不合法）的 claim 路徑。"""
     ok = {v["path"] for v in verdicts if v.get("verdict") in ("keep", "reject", "partial")}
-    paths = [p for p, field, sub, idx, _ in _items(c) if field in CLAIM_FIELDS or field == "limitations"]
-    return [p for p in paths if p not in ok]
+    return [p for p in refute_paths(c) if p not in ok]
 
 
 def title_only_card(work_id):

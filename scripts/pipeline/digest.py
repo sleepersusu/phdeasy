@@ -75,6 +75,8 @@ def check_digest(d, text, figure_labels):
         fails.append({"path": "figures", "why": "figure_duplicate"})
     if "method" in d:
         fails += check_method(d["method"], text)
+    else:  # 重點與研究方法由同一個 agent 一次寫完（本人 2026-10-26），不能缺
+        fails.append({"path": "method", "why": "missing_method"})
     for path, it in _items(d):
         en, zh = (it.get("en") or "").strip(), (it.get("zh") or "").strip()
         if not en or not zh:
@@ -95,7 +97,7 @@ def check_digest(d, text, figure_labels):
 def assemble_digest(d, text, figure_labels, figures):
     """拿掉核對不過的條目（記下來給 rejected），圖表說明併入圖片位置與標題，給前端直接用。"""
     bad = {f["path"].split(".citations")[0] for f in check_digest(d, text, figure_labels)
-           if f["why"] not in ("need_3_to_6", "figure_missing", "figure_not_in_paper", "figure_duplicate")}
+           if f["why"] not in ("need_3_to_6", "figure_missing", "figure_not_in_paper", "figure_duplicate", "missing_method")}
     rejected = []
     out = {"id": d.get("id"), "key_points": [], "design": None, "figures": [], "method": None}
     if d.get("method"):

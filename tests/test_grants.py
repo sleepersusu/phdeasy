@@ -196,9 +196,20 @@ def test_apply_verdicts():
     assert missing == []
 
 
+def test_refute_only_required_for_her_own_and_pending_grants():
+    # 本人 2026-10-26：推翻只看她主持與待確認的；致謝提及、合作者主持的靠腳本逐字核對引句
+    from pipeline.grants import apply_verdicts, in_refute_scope
+    grants = [{"key": "A", "status": "confirmed", "target_role": "pi"}, {"key": "B", "status": "acknowledged", "target_role": "acknowledged"},
+              {"key": "C", "status": "other", "target_role": "other_pi"}, {"key": "D", "status": "pending", "target_role": "pi"}]
+    assert [g["key"] for g in grants if in_refute_scope(g)] == ["A", "D"]
+    final, rejected, unresolved, missing = apply_verdicts(grants, [{"key": "A", "verdict": "keep"}])
+    assert missing == ["D"]
+    assert {g["key"]: g["refute"]["verdict"] for g in final} == {"A": "keep", "B": "not_in_scope", "C": "not_in_scope"}
+
+
 def test_apply_verdicts_reports_missing_and_bad_verdict():
     from pipeline.grants import apply_verdicts
-    grants = [{"key": "A", "status": "confirmed", "target_role": "pi"}, {"key": "B", "status": "other", "target_role": "other_pi"}]
+    grants = [{"key": "A", "status": "confirmed", "target_role": "pi"}, {"key": "B", "status": "pending", "target_role": "pi"}]
     _, _, _, missing = apply_verdicts(grants, [{"key": "A", "verdict": "maybe"}])
     assert missing == ["A", "B"]  # 不合法的 verdict 視同漏判
 

@@ -72,10 +72,11 @@ def _cite_holders(c):
 
 
 def check_network(run):
-    diff = _j(run / "work" / "count-diff.json")
+    from .network import check_consistency
     net = _j(run / "work" / "network.json", {})
-    ok = diff == [] and bool(net.get("coauthors"))
-    return _r("network_counts", ok, "腳本與獨立計數一致" if ok else f"count-diff={diff}")
+    fails = check_consistency(net, _j(run / "work" / "works.json", [])) if net.get("coauthors") else [{"key": "-", "why": "no_network"}]
+    return _r("network_counts", not fails, f"{len(net.get('coauthors') or [])} 位合作者篇數自我核對通過" if not fails else
+              "; ".join(f"{f['key']} {f['why']}" for f in fails[:6]))
 
 
 def check_grants(run):

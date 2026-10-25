@@ -16,13 +16,9 @@ uv run python scripts/library.py process runs/<slug>
 
 `process` 會跑找全文（含本機 Zotero 唯讀、inbox 裡本人上傳的檔）→ 轉文字 → 抓圖表 → 列出還沒寫重點的文獻。
 
-每 4–5 篇派一個整理者（`model: opus`），同時最多 5 個：
+每 4–5 篇派一個整理者（`model: opus`），同時最多 5 個；重點、圖表、研究方法十部分一次寫完：
 
 > 讀 `.claude/skills/prof-digest/digester.md` 照做。slug=<slug>/library，id=<id 清單>。這些是討論文獻，沒有解析卡（card.json 不存在就略過那一步）。
-
-再派研究方法拆解（`model: opus`）：
-
-> 讀 `.claude/skills/prof-digest/detailer.md` 照做。slug=<slug>/library，id=<id 清單>。沒有解析卡就略過那一步。
 
 ```bash
 uv run python scripts/digest.py check <lib>
