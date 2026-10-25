@@ -155,20 +155,22 @@ def busy_elsewhere(remote_root, my_id, now=None):
     return None
 
 
-def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_only=False):
+def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_only=False, progress=None):
     """回傳 {動作: 數量}；別台正在用且沒有 force → 回傳 {"blocked": 那台電腦名}。
-    pull_only：別台正在用時，只把雲端較新的檔拉下來看（不推、不刪、不搶使用中、不更新 base）。"""
+    pull_only：別台正在用時，只把雲端較新的檔拉下來看（不推、不刪、不搶使用中、不更新 base）。
+    progress(第幾個, 共幾個, 檔名, {動作: 數量})：給開機畫面顯示進度。"""
     local_root, remote_root = Path(local_root), Path(remote_root)
     remote_root.mkdir(parents=True, exist_ok=True)
     my_id = my_id or device_id()
     if pull_only:
         n = {}
         loc, rem = scan(local_root), scan(remote_root)
-        for rel, r in rem.items():
-            l = loc.get(rel)
-            if not l or _sig(r)[1] > _sig(l)[1] + 2:
-                _copy(remote_root / rel, local_root / rel)
-                n["pull"] = n.get("pull", 0) + 1
+        todo = [rel for rel, r in rem.items() if not loc.get(rel) or _sig(r)[1] > _sig(loc[rel])[1] + 2]
+        for i, rel in enumerate(todo, 1):
+            _copy(remote_root / rel, local_root / rel)
+            n["pull"] = n.get("pull", 0) + 1
+            if progress:
+                progress(i, len(todo), rel, n)
         return n
     other = busy_elsewhere(remote_root, my_id)
     if other and not force:
@@ -178,7 +180,10 @@ def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_o
     base = saved.get("files", {}) if saved.get("remote") == str(remote_root) else {}  # 換了雲端資料夾：當第一次，只合併不刪
     who_r = (read_lock(remote_root).get("device") or read_lock(remote_root).get("closed") or "另一台")
     n = {}
-    for act, rel in plan(scan(local_root), scan(remote_root), base):
+    acts = [a for a in plan(scan(local_root), scan(remote_root), base)]
+    if progress:
+        progress(0, len(acts), "", n)
+    for i, (act, rel) in enumerate(acts, 1):
         lp, rp = local_root / rel, remote_root / rel
         if act in ("push", "conflict_push", "shrunk"):
             if act != "push":
@@ -195,6 +200,8 @@ def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_o
             _keep(remote_root, "_同步刪除", rel, rp, who_r)
             rp.unlink(missing_ok=True)
         n[act] = n.get(act, 0) + 1
+        if progress:
+            progress(i, len(acts), rel, n)
     l2, r2 = scan(local_root), scan(remote_root)
     files = {rel: {"l": _sig(l2.get(rel)), "r": _sig(r2.get(rel))} for rel in set(l2) & set(r2)}
     sp.write_text(json.dumps({"remote": str(remote_root), "files": files}, ensure_ascii=False))

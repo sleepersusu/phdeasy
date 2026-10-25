@@ -16,11 +16,12 @@ def test_newer_compares_numbers_not_text():
 
 
 def test_check_reports_available_and_handles_network_errors():
-    assert check("v0.6.0", fetch=lambda u: rel("v0.7.0"))["available"] is True
-    assert check("v0.7.0", fetch=lambda u: rel("v0.7.0"))["available"] is False
+    nored = lambda: None  # 模擬網頁轉址查不到，改走 API
+    assert check("v0.6.0", fetch=lambda u: rel("v0.7.0"), redirect=nored)["available"] is True
+    assert check("v0.7.0", fetch=lambda u: rel("v0.7.0"), redirect=nored)["available"] is False
     def boom(u):
         raise OSError("offline")
-    assert check("v0.6.0", fetch=boom)["available"] is False
+    assert check("v0.6.0", fetch=boom, redirect=nored)["available"] is False
 
 
 class Resp(io.BytesIO):
@@ -39,3 +40,19 @@ def test_download_checks_size_header_and_origin(tmp_path):
         download(good, tmp_path, opener=lambda req, timeout: Resp(b"<htm"))  # 不是執行檔
     with pytest.raises(ValueError):
         download({**good, "url": "https://evil.example/x.exe"}, tmp_path, opener=lambda req, timeout: Resp(b"MZab"))
+
+
+def test_latest_by_redirect_needs_no_api():
+    from pipeline.updater import latest_release
+    def no_api(u):
+        raise AssertionError("不應該用 API")
+    r = latest_release(fetch=no_api, redirect=lambda: "v1.2.3")
+    assert r["tag"] == "v1.2.3" and r["url"].endswith("/releases/download/v1.2.3/" + ASSET)
+    assert check("v1.2.0", fetch=no_api, redirect=lambda: "v1.2.3")["available"]
+
+
+def test_redirect_failure_falls_back_to_api():
+    from pipeline.updater import latest_release
+    def boom():
+        raise OSError("offline")
+    assert latest_release(fetch=lambda u: rel("v0.9.0"), redirect=boom)["tag"] == "v0.9.0"

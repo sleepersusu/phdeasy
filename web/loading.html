@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>教授研究檔案</title>
+<style>
+:root{--fg:#000;--bg:#fff;--muted:#3f3f3f;--line:#cfcfcf;--green:#15803d;--yellow:#facc15;--red:#b91c1c;
+  --font:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--fg);font-family:var(--font)}
+.box{width:min(520px,90vw);text-align:center}
+h1{font-size:28px;margin:0;color:var(--muted)}
+.track{position:relative;height:126px;margin:14px 34px 0}
+.pos{position:absolute;bottom:-4px;left:0;transform:translateX(-50%);transition:left .3s linear}
+.bar{height:18px;border:2.5px solid var(--fg);border-radius:999px;padding:3px}
+.bar i{display:block;height:100%;width:0;border-radius:999px;background:var(--fg);transition:width .3s linear}
+#txt{margin:12px 0 2px;font-weight:600}
+#sub{margin:0;min-height:1.4em;color:var(--muted);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+ul{list-style:none;padding:0;margin:16px 0 0;text-align:left;font-size:14px}
+li{display:flex;gap:8px;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--line)}
+li .s{width:22px;flex:none;text-align:center;font-weight:700}
+li .n{color:var(--muted);font-size:13px}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 16px;border-radius:8px;border:2px solid transparent;font:inherit;font-weight:600;cursor:pointer;margin:4px}
+.btn-green{background:var(--green);color:#fff}.btn-yellow{background:var(--yellow);color:#000}
+#ask{margin-top:12px}
+.gira{display:block;overflow:visible}
+.gira .gbody{animation:gbob 1.6s ease-in-out infinite}
+@keyframes gbob{0%,50%,100%{transform:translateY(0)}25%,75%{transform:translateY(-1.5px)}}
+.gira .lg{transform-box:fill-box;transform-origin:50% 0}
+.gira .a1,.gira .a2{animation:gleg 1.6s ease-in-out infinite}
+.gira .b1,.gira .b2{animation:gleg 1.6s ease-in-out infinite;animation-delay:-.8s}
+@keyframes gleg{0%,100%{transform:rotate(12deg)}50%{transform:rotate(-12deg)}}
+.gira .gneck{transform-box:view-box;transform-origin:68px 72px;animation:gsway 3.2s ease-in-out infinite}
+@keyframes gsway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+.gira .ghead{transform-box:view-box;transform-origin:84px 22px;animation:gnod 4.8s ease-in-out infinite}
+@keyframes gnod{0%,70%,100%{transform:rotate(0)}78%{transform:rotate(8deg)}86%{transform:rotate(-2deg)}}
+.gira .gtail{transform-box:view-box;transform-origin:18px 70px;animation:gtail 2.4s ease-in-out infinite}
+@keyframes gtail{0%,100%{transform:rotate(-10deg)}50%{transform:rotate(12deg)}}
+@media (prefers-reduced-motion:reduce){.gira *{animation:none!important}.pos,.bar i{transition:none}}
+</style>
+</head>
+<body>
+<div class="box" role="status" aria-live="polite">
+  <h1>教授研究檔案</h1>
+  <!-- 黃色長頸鹿（同雅思練習室）：跟著進度條往前走 -->
+  <div class="track"><div class="pos" id="dog"><svg class="gira" viewBox="0 0 110 140" width="96" height="122" aria-hidden="true">
+    <ellipse cx="50" cy="136" rx="30" ry="3.5" fill="rgba(0,0,0,.12)"/>
+    <g class="gbody">
+      <g class="lg b1"><rect x="25" y="86" width="7" height="44" rx="3.5" fill="#e9b437"/><rect x="25" y="125" width="7" height="6" rx="2" fill="#7a5a2e"/></g>
+      <g class="lg a2"><rect x="62" y="86" width="7" height="44" rx="3.5" fill="#e9b437"/><rect x="62" y="125" width="7" height="6" rx="2" fill="#7a5a2e"/></g>
+      <path class="gtail" d="M18 70 Q10 80 12 94" stroke="#e9b437" stroke-width="3" fill="none" stroke-linecap="round"/>
+      <ellipse class="gtail" cx="12" cy="96" rx="3" ry="4.5" fill="#7a5a2e"/>
+      <rect x="16" y="62" width="62" height="30" rx="15" fill="#f9cf4a"/>
+      <g fill="#d9952f"><circle cx="30" cy="72" r="5"/><circle cx="45" cy="80" r="4.5"/><circle cx="58" cy="70" r="4"/><circle cx="70" cy="81" r="3.5"/><circle cx="35" cy="85" r="3"/></g>
+      <g class="lg a1"><rect x="31" y="86" width="7" height="44" rx="3.5" fill="#f9cf4a"/><rect x="31" y="125" width="7" height="6" rx="2" fill="#8a6634"/></g>
+      <g class="lg b2"><rect x="68" y="86" width="7" height="44" rx="3.5" fill="#f9cf4a"/><rect x="68" y="125" width="7" height="6" rx="2" fill="#8a6634"/></g>
+      <g class="gneck">
+        <path d="M62 70 L80 20 L92 24 L78 74 Z" fill="#f9cf4a"/>
+        <path d="M80 20 L76 31 L72 44 L69 55 L66 66" stroke="#c98a2b" stroke-width="2.4" fill="none" stroke-linecap="round" stroke-dasharray="4 3"/>
+        <g fill="#d9952f"><circle cx="80" cy="40" r="3"/><circle cx="75" cy="56" r="3.4"/><circle cx="85" cy="30" r="2.4"/></g>
+        <g class="ghead">
+          <line x1="86" y1="12" x2="84" y2="3" stroke="#c98a2b" stroke-width="2.4" stroke-linecap="round"/><circle cx="84" cy="3" r="2.4" fill="#7a5a2e"/>
+          <line x1="91" y1="12" x2="91" y2="3" stroke="#c98a2b" stroke-width="2.4" stroke-linecap="round"/><circle cx="91" cy="3" r="2.4" fill="#7a5a2e"/>
+          <ellipse cx="79" cy="15" rx="6" ry="3" fill="#e9b437" transform="rotate(-25 79 15)"/>
+          <ellipse cx="92" cy="18" rx="11" ry="8" fill="#f9cf4a"/>
+          <ellipse cx="101" cy="21" rx="6" ry="5" fill="#fbe39a"/>
+          <circle cx="103" cy="20" r="1" fill="#7a5a2e"/>
+          <circle cx="91" cy="15" r="2.2" fill="#3a2a18"/><circle cx="91.7" cy="14.3" r=".7" fill="#fff"/>
+          <ellipse cx="94" cy="21" rx="2.2" ry="1.3" fill="#f3a3a0" opacity=".7"/>
+        </g>
+      </g>
+    </g></svg></div></div>
+  <div class="bar"><i id="bar"></i></div>
+  <p id="txt">啟動中…</p>
+  <p id="sub"></p>
+  <div id="ask" hidden></div>
+  <ul id="steps"></ul>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const W = {drive: 5, sync: 60, rebuild: 20, tools: 5, update: 10};  // 每一步佔進度條的比例
+const MARK = {todo: ["·", "var(--muted)"], doing: ["…", "var(--fg)"], ok: ["✓", "var(--green)"], skip: ["–", "var(--muted)"], warn: ["!", "#a16207"], new: ["★", "var(--green)"]};
+const post = (p, b) => fetch("/api/" + p, {method: "POST", headers: {"Content-Type": "application/json", "X-Phdeasy-App": "1"}, body: JSON.stringify(b || {})}).then(r => r.json());
+let shown = 0, asked = false, leaving = false, t0 = Date.now();
+
+function pct(b){
+  let p = 0;
+  for (const k of b.order){
+    const s = b.steps[k].state;
+    if (s === "todo") break;
+    if (s === "doing"){
+      if (k === "sync" && b.sync && b.sync.total) p += W[k] * b.sync.done / b.sync.total;
+      else p += W[k] * 0.3;
+      break;
+    }
+    p += W[k];
+  }
+  return Math.min(100, p);
+}
+
+function render(st){
+  const b = st.boot, u = st.update_state || {};
+  $("#steps").innerHTML = b.order.map(k => { const s = b.steps[k]; const [m, c] = MARK[s.state] || MARK.todo;
+    return `<li><span class="s" style="color:${c}">${m}</span><div><div>${esc(b.labels[k])}</div>${s.note ? `<div class="n">${esc(s.note)}</div>` : ""}</div></li>`; }).join("");
+  let target = pct(b), txt = b.labels[b.step] + "…", sub = "";
+  if (b.step === "drive" && st.need_account){ txt = "選擇放教授檔案的 Google 帳號"; askAccount(st); }
+  if (b.step === "sync" && !b.done){
+    const s = b.sync || {}, sec = Math.round((Date.now() - t0) / 1000);
+    txt = s.total ? `正在從雲端同步教授檔案　${s.done}/${s.total}（${Math.round(s.done / s.total * 100)}%）` : (st.blocked ? "另一台電腦正在用，等它關掉…" : "正在比對雲端與這台的檔案…");
+    sub = [s.pulled ? `拉下 ${s.pulled}` : "", s.pushed ? `推上 ${s.pushed}` : "", sec >= 3 ? `已 ${sec} 秒` : "", s.cur || ""].filter(Boolean).join("・");
+  }
+  if (u.stage === "download"){ target = 100 * (u.total ? u.got / u.total : 0); txt = `正在下載新版 ${esc((st.update || {}).latest || "")}　${u.total ? Math.round(u.got / u.total * 100) : 0}%`; sub = "更新好會自動重新打開，教授資料不會動"; }
+  if (u.stage === "install"){ target = 100; txt = "新版下載好了，正在安裝，馬上自動重新打開…"; sub = ""; }
+  if (u.error){ sub = "這次沒更新成功：" + u.error; }
+  if (b.done && !u.stage){
+    if (st.update && st.update.available && !asked){ txt = `有新版本 ${st.update.latest}（目前 ${st.update.current}）`; sub = "要現在更新嗎？更新好會自動重新打開"; askUpdate(); target = Math.min(target, 95); }
+    else if (asked !== "pending"){ txt = b.error ? "準備好了（有一步沒成功，見下方）" : "準備好了"; target = 100; }
+  }
+  $("#txt").textContent = txt; $("#sub").textContent = sub;
+  if (!u.stage) target = Math.min(target, (Date.now() - t0) / 3500 * 100);  // 至少走 3.5 秒，每一步都看得到（同雅思練習室）
+  shown += (target - shown) * 0.35;
+  if (target >= 100 && shown > 99) shown = 100;
+  $("#bar").style.width = shown + "%"; $("#dog").style.left = shown + "%";
+  if (shown >= 100 && b.done && !u.stage && asked !== "pending" && !leaving){ leaving = true; setTimeout(() => location.replace("index.html"), 900); }
+}
+
+function askAccount(st){
+  const a = $("#ask"); if (!a.hidden) return;
+  a.hidden = false;
+  a.innerHTML = `<div style="font-size:14px;margin-bottom:6px">這台電腦登入了多個 Google 帳號，選一次就會記住：</div>` +
+    st.drive_choices.map(x => `<button class="btn btn-green" data-a="${esc(x)}">${esc(x)}</button>`).join("");
+  a.querySelectorAll("[data-a]").forEach(btn => btn.onclick = async () => { await post("account", {account: btn.dataset.a}); a.hidden = true; a.innerHTML = ""; });
+}
+function askUpdate(){
+  asked = "pending";
+  const a = $("#ask"); a.hidden = false;
+  a.innerHTML = `<button class="btn btn-green" id="go">現在更新</button><button class="btn btn-yellow" id="skip">先不要，用目前版本</button>`;
+  $("#go").onclick = async () => { a.hidden = true; asked = true; const r = await post("update"); if (r.error) $("#sub").textContent = r.error; };
+  $("#skip").onclick = () => { a.hidden = true; asked = true; };
+}
+
+async function loop(){
+  try { const st = await (await fetch("/api/status", {cache: "no-store"})).json(); render(st); }
+  catch (e) { if ((await (async () => { try { return (await fetch("/api/status")).ok; } catch (x) { return false; } })()) === false) $("#txt").textContent = "正在重新打開…"; }
+  if (!leaving) setTimeout(loop, 400);
+}
+loop();
+</script>
+</body>
+</html>

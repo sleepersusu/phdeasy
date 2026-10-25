@@ -120,3 +120,12 @@ def test_cli_waits_for_release_before_giving_up(tmp_path, monkeypatch):
         release(drive, my_id="pcB")  # 等的時候那台的「已釋放」同步過來了
     monkeypatch.setattr(cli.time, "sleep", fake_sleep)
     assert cli.run(tmp_path / "runs", wait=60) == 0 and calls
+
+
+def test_sync_reports_progress(tmp_path):
+    a, drive = tmp_path / "A", tmp_path / "drive"
+    for i in range(3):
+        _w(a / f"f{i}.txt", str(i))
+    seen = []
+    sync(a, drive, my_id="pcA", progress=lambda i, total, rel, n: seen.append((i, total)))
+    assert seen[0] == (0, 3) and seen[-1] == (3, 3)

@@ -30,7 +30,7 @@ function appBanner(st){
       <span class="small muted">${st.running ? "有工作在跑，跑完再更新" : "會先同步雲端，再自動安裝並重新打開；教授資料不會動。"}</span></div></div>`;
     el.querySelector("#do-update")?.addEventListener("click", async ev => {
       ev.currentTarget.disabled = true;
-      try { await API("update", {}); el.innerHTML = `<div class="card" style="margin-top:12px" role="status"><span class="pill y">更新中</span> 正在下載並安裝新版，視窗會自己關掉再打開，大約一分鐘。</div>`; }
+      try { await API("update", {}); location.href = "loading.html"; }  // 開機畫面會顯示下載百分比，裝好自動重開
       catch (e) { alert(e.message); ev.currentTarget.disabled = false; }
     });
   } else {
@@ -186,7 +186,7 @@ function renderSettings(st){
       </div>
       <div class="card"><h3 style="margin-top:0">版本</h3>
         <p class="small">目前版本：<strong>${esc(st.version || "dev")}</strong>${st.update && st.update.latest ? `｜最新：${esc(st.update.latest)}` : ""}</p>
-        ${st.version && st.version !== "dev" ? `<button class="btn btn-green" id="check-update">檢查更新</button><p class="small muted">打開程式時與每 6 小時會自動檢查；有新版會出現在最上方。</p>`
+        ${st.version && st.version !== "dev" ? `<button class="btn btn-green" id="check-update">檢查更新</button><div class="small" id="update-result" style="margin-top:8px" aria-live="polite">${window.UPDATE_MSG || ""}</div><p class="small muted">打開程式時與每 6 小時會自動檢查；有新版會出現在最上方。</p>`
           : `<p class="small muted">開發版（從 repo 直接跑）：用 git pull 更新。</p>`}
       </div>
       <div class="card"><h3 style="margin-top:0">流水線工具（uv）</h3>
@@ -201,7 +201,20 @@ function renderSettings(st){
     await API("account", {account: b.dataset.switch});
   }));
   el.querySelector("#sync-now")?.addEventListener("click", act(() => API("sync", {})));
-  el.querySelector("#check-update")?.addEventListener("click", act(async () => { const r = await API("check-update", {}); if (!r.available) alert("已經是最新版（" + (r.current || "") + "）"); }));
+  el.querySelector("#update-now")?.addEventListener("click", async () => {
+    try { await API("update", {}); location.href = "loading.html"; } catch (e) { el.querySelector("#update-result").textContent = "更新失敗：" + e.message; } });
+  el.querySelector("#check-update")?.addEventListener("click", async ev => {
+    const b = ev.currentTarget, out = el.querySelector("#update-result");
+    b.disabled = true; b.textContent = "檢查中…"; out.textContent = "";
+    try {
+      const r = await API("check-update", {});
+      window.UPDATE_MSG = r.available ? `<span class="pill g">有新版本</span> ${esc(r.latest)}（目前 ${esc(r.current)}） <button class="btn btn-green" id="update-now">更新並重開</button>`
+        : !r.latest ? `<span class="pill r">沒辦法檢查</span> 連不到 GitHub，網路好了再試` : `<span class="pill g">✓</span> 已經是最新版本 ${esc(r.current)}`;
+      out.innerHTML = window.UPDATE_MSG;
+    } catch (e) { out.textContent = "檢查失敗：" + e.message; }
+    b.disabled = false; b.textContent = "檢查更新";
+    lastSettings = ""; renderSettings(await API("status"));  // 重畫一次，讓「更新並重開」按鈕綁上
+  });
   el.querySelector("#claude-test")?.addEventListener("click", act(async () => { el.querySelector("#claude-test").textContent = "測試中（最多 3 分鐘）…"; await API("test-claude", {}); }));
   el.querySelector("#claude-login")?.addEventListener("click", act(() => API("login-claude", {})));
   el.querySelector("#open-secrets")?.addEventListener("click", act(() => API("open-secrets", {})));

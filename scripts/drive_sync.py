@@ -38,21 +38,21 @@ def target(runs, account=None, given=None):
     return d / FOLDER if d else None
 
 
-def run(runs, account=None, given=None, force=False, do_release=False, hold=False, wait=0):
+def run(runs, account=None, given=None, force=False, do_release=False, hold=False, wait=0, progress=None):
     """hold=False（預設）：同步完就放開「使用中」，別台可以接著用；只有應用程式開著時用 hold=True 佔住。"""
     hold = hold or os.environ.get("PHDEASY_HOLD") == "1"  # 應用程式開著時，它叫的重建／流水線也算在佔用中
     dst = target(runs, account, given)
     if not dst or not dst.parent.exists():
         print("SKIP 找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入，再跑 --setup")
         return 1
-    n = sync(runs, dst, force=force)
+    n = sync(runs, dst, force=force, progress=progress)
     waited = 0
     while "blocked" in n and waited < wait:  # 別台剛關掉時，「已釋放」要等雲端硬碟同步過來（常延遲 1–2 分鐘）
         time.sleep(15)
         waited += 15
         n = sync(runs, dst, force=force)
     if "blocked" in n:
-        p = sync(runs, dst, pull_only=True)
+        p = sync(runs, dst, pull_only=True, progress=progress)
         print(f"BLOCKED 另一台電腦（{n["blocked"]}）5 分鐘內還在用：先只把雲端的資料拉下來看（拉下 {p.get('pull', 0)} 個檔），不推上去。"
               "那台關掉後再同步；確定那台已關掉就加 --force")
         return 2

@@ -188,6 +188,9 @@ class App:
         self.version = "dev"
         self.update_info = None
         self.quitting = threading.Event()  # 自動更新時設起來：關掉視窗、結束程式，讓安裝程式接手
+        self.boot = {"steps": {k: {"state": "todo", "note": ""} for k, _ in BOOT_STEPS}, "labels": dict(BOOT_STEPS),
+                     "order": [k for k, _ in BOOT_STEPS], "step": "drive", "sync": {}, "done": False}
+        self.update_state = {"stage": "", "got": 0, "total": 0, "error": ""}
 
     def after_job(self, job):
         try:
@@ -205,7 +208,8 @@ class App:
                 "blocked": self.blocked or (other or {}).get("device"), "running": self.jobs.running(), "job": job,
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
                 "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})},
-                "settings": self.settings(), "update": self.update_info, "version": self.version}
+                "settings": self.settings(), "update": self.update_info, "version": self.version,
+                "boot": self.boot, "update_state": self.update_state}
 
     def settings(self):
         """設定頁要顯示的：雲端帳號（這台偵測到的全部）、Claude Code 測試結果、金鑰有沒有設（不顯示內容）。"""
@@ -233,8 +237,7 @@ class App:
         return self.update_info
 
     def do_update(self):
-        """下載新版安裝檔、安靜安裝；安裝程式等這個程式結束後才開始裝，裝完自動重開。"""
-        from pipeline.updater import download
+        """下載新版安裝檔（畫面顯示百分比）、安靜安裝；安裝程式等這個程式結束後才開始裝，裝完自動重開。"""
         info = self.update_info or self.check_update()
         if not info or not info.get("available"):
             raise ValueError("目前已經是最新版")
@@ -242,11 +245,24 @@ class App:
             raise ValueError("自動更新只支援 Windows 安裝版；Mac 請用 git pull 更新")
         if self.jobs.running():
             raise ValueError("有工作在跑，等它跑完再更新")
-        exe = download(info["release"], self.workspace / "update")
-        subprocess.Popen([str(exe), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", f"/WAITPID={os.getpid()}", "/AUTOUPDATE=1"],
-                         creationflags=getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0), close_fds=True)
-        threading.Timer(1.0, self.quitting.set).start()  # 先讓畫面收到回應，再結束程式
+        if self.update_state["stage"] in ("download", "install"):
+            return {"ok": True, "already": True}
+        self.update_state.update(stage="download", got=0, total=0, error="")
+        threading.Thread(target=self._update_worker, args=(info,), daemon=True).start()
         return {"ok": True, "installing": info["latest"]}
+
+    def _update_worker(self, info):
+        from pipeline.updater import download
+        st = self.update_state
+        try:
+            exe = download(info["release"], self.workspace / "update", progress=lambda g, t: st.update(got=g, total=t or 0))
+            st["stage"] = "install"
+            subprocess.Popen([str(exe), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", f"/WAITPID={os.getpid()}", "/AUTOUPDATE=1"],
+                             creationflags=getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0), close_fds=True)
+            threading.Timer(1.5, self.quitting.set).start()  # 先讓畫面顯示「安裝中」，再結束程式
+        except Exception as e:
+            st.update(stage="", error=str(e)[:300])
+            print(f"更新失敗：{e}")
 
     def switch_account(self, acct):
         """換雲端帳號：先放開舊雲端的使用中，記下新帳號，在背景重新同步（新雲端當第一次同步：只合併不刪）。"""
@@ -457,24 +473,64 @@ def make_handler(app):
     return Handler
 
 
+BOOT_STEPS = [("drive", "找 Google 雲端硬碟"), ("sync", "同步教授檔案"), ("rebuild", "更新教授資料"),
+              ("tools", "檢查 AI（Claude Code）與流水線工具"), ("update", "檢查新版本")]
+
+
 def startup(app, choose=True):
-    """背景做：選帳號（必要時等畫面上選）→ 同步雲端 → 重建資料。視窗先開，畫面顯示進度。"""
+    """背景做（視窗先開，開機畫面顯示每一步與進度）：找雲端硬碟 → 選帳號 → 同步 → 重建資料 → 檢查工具 → 檢查新版本。"""
+    b = app.boot
+    def step(key, state, note=""):
+        b["steps"][key] = {"state": state, "note": note}
+        if state == "doing":
+            b["step"] = key
     try:
+        step("drive", "doing")
         if choose and app.need_account.is_set():
+            step("drive", "doing", "這台登入了多個 Google 帳號：請選一個")
             app.account_chosen.wait()
-        print("從 Google 雲端硬碟同步…")
-        if drive_sync(app.runs, hold=True) == 2:
+        dst = target(app.runs)
+        step("drive", "ok" if dst and dst.parent.exists() else "warn",
+             str(dst) if dst and dst.parent.exists() else "找不到 Google 雲端硬碟：只用這台的資料（到設定看怎麼裝）")
+        step("sync", "doing")
+
+        def prog(i, total, rel, n):
+            b["sync"] = {"done": i, "total": total, "cur": rel, "pulled": n.get("pull", 0) + n.get("conflict_pull", 0),
+                         "pushed": n.get("push", 0) + n.get("conflict_push", 0) + n.get("shrunk", 0)}
+        r = drive_sync(app.runs, hold=True, wait=60, progress=prog) if dst and dst.parent.exists() else 1
+        if r == 2:
             app.blocked = (busy_elsewhere(target(app.runs), device_id()) or {}).get("device") or "另一台電腦"
-            print("另一台電腦還在用：這台先只看資料（已拉下雲端的檔），不推上去，也先不要建新教授。")
+            step("sync", "warn", f"另一台電腦（{app.blocked}）正在用：已拉下雲端的資料給你看，這台先不推上去")
         else:
             app.closer = Closer(app.runs)
-        print("更新教授資料…")
-        if not rebuild(app.workspace):
-            print("（沒有 uv：先用雲端同步下來的資料；要在這台建新教授，首頁會引導你安裝）")
+            sy = b.get("sync") or {}
+            step("sync", "ok" if r == 0 else "warn",
+                 (f"拉下 {sy.get('pulled', 0)}、推上 {sy.get('pushed', 0)} 個檔案" if (sy.get("pulled") or sy.get("pushed")) else "已經是最新的") if r == 0 else "沒有同步（只用這台的資料）")
+        step("rebuild", "doing")
+        step("rebuild", "ok" if rebuild(app.workspace) else "skip", "" if find_uv() else "沒有 uv：用雲端同步下來的資料")
+        step("tools", "doing")
+        c, u = find_claude(), find_uv()
+        step("tools", "ok" if c and u else "warn", "Claude Code、uv 都在" if c and u else
+             "、".join(x for x in ("沒有 Claude Code" if not c else "", "沒有 uv" if not u else "") if x) + "（只看資料不需要；要建新教授到設定安裝）")
+        step("update", "doing")
+        try:
+            info = app.check_update()
+        except Exception as e:
+            info, err = None, str(e)
+        if app.version == "dev":
+            step("update", "skip", "開發版：用 git pull 更新")
+        elif not info or not info.get("latest"):
+            step("update", "warn", "沒辦法檢查新版（網路不通？）")
+        elif info.get("available"):
+            step("update", "new", f"有新版本 {info['latest']}（目前 {app.version}）")
+        else:
+            step("update", "ok", f"已經是最新版本 {app.version}")
     except Exception as e:
-        print(f"啟動同步失敗：{e}")
+        print(f"啟動失敗：{e}")
+        b["error"] = str(e)[:300]
     finally:
         app.syncing = False
+        b["done"] = True
 
 
 def main():
@@ -500,16 +556,14 @@ def main():
     if FROZEN:
         app.version = version
 
-        def update_loop():  # 打開時查一次，之後每 6 小時
-            while True:
+        def update_loop():  # 打開時由開機流程查一次，之後每 6 小時再查
+            while not app.quitting.wait(6 * 3600):
                 try:
                     info = app.check_update()
                     if info and info.get("available"):
                         print(f"有新版：{info['latest']}（目前 {app.version}）")
                 except Exception as e:
                     print(f"檢查更新失敗：{e}")
-                if app.quitting.wait(6 * 3600):
-                    return
         threading.Thread(target=update_loop, daemon=True).start()
     app.runs.mkdir(parents=True, exist_ok=True)
     os.environ["PHDEASY_HOLD"] = "1"  # 子程序（重建、Claude Code）同步時不要放開這台的使用中
@@ -523,7 +577,7 @@ def main():
     port = free_port(a.port)
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    url = f"http://127.0.0.1:{port}/web/index.html"
+    url = f"http://127.0.0.1:{port}/web/loading.html"  # 開機畫面：顯示每一步與進度，做完自動進首頁
     print(f"已打開：{url}")
 
     def close_all(*_):
