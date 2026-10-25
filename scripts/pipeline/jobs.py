@@ -51,7 +51,13 @@ def prompt_continue(slug):
 
 def prompt_match(slug):
     return (f"對 runs/{slug} 重新比對：照 .claude/skills/prof-match/SKILL.md，先把 work/match/draft.json 與 refute.json 移到 work/match/_old/（不要刪），"
-            "依 runs/_me/me.json 目前的研究興趣與研究計畫重新跑 2.1–2.5，完成後回報 DONE 那一行。" + UNATTENDED)
+            "依 runs/_me/me.json 目前的研究興趣與 CV（不含與教授共同討論的研究計畫）重新跑 2.1–2.5，完成後回報 DONE 那一行。" + UNATTENDED)
+
+
+def prompt_propose(slug):
+    return (f"幫 runs/{slug} 擬研究構想草稿：先跑 drive_sync；已有 work/proposal/draft.json 就先移到 work/proposal/_old/（不要刪）；"
+            "照 .claude/skills/prof-propose/SKILL.md 跑 inputs → 擬稿 → check（只修一輪）→ assemble → build_site，"
+            "只依本人的 CV 與這位教授目前期間內的經費，不要把本人與教授共同討論的研究計畫當成本人的；完成後回報 DONE 那一行。" + UNATTENDED)
 
 
 FULLTEXT_KINDS = {"abstract_only", "title_only", "no_source", "no_text", "title_mismatch", "not_main_text", "unreadable", "wrong_file"}

@@ -67,3 +67,18 @@ def test_exception_prompts_by_action():
     import pytest
     with pytest.raises(ValueError):
         prompt_exception("laranjo", {"id": "W1", "kind": "abstract_only"}, "grant_yes", "")
+
+
+def test_prompt_propose_runs_skill_and_keeps_old_draft():
+    from pipeline.jobs import UNATTENDED, prompt_propose
+    p = prompt_propose("doe-jane")
+    assert "prof-propose" in p and "runs/doe-jane" in p
+    assert "_old" in p and "不要刪" in p  # 重新產生時舊草稿只移不刪
+    assert "共同討論" in p  # 不拿與 Liliana 討論的研究計畫當本人的
+    assert p.endswith(UNATTENDED)
+
+
+def test_prompt_match_uses_interests_and_cv_only():
+    from pipeline.jobs import prompt_match
+    p = prompt_match("doe-jane")
+    assert "CV" in p and "研究興趣與研究計畫" not in p

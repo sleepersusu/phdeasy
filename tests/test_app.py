@@ -108,3 +108,18 @@ def test_settings_reports_keys_without_values_and_switches_account(tmp_path, mon
     import pytest
     with pytest.raises(ValueError):
         a.post("account", {"account": "nobody@x.com"})
+
+
+def test_propose_route_starts_job_for_known_professor(tmp_path):
+    from app import App
+    app = App(tmp_path)
+    (tmp_path / "runs" / "doe-jane").mkdir(parents=True)
+    (tmp_path / "runs" / "doe-jane" / "state.json").write_text("{}")
+    started = []
+    app.jobs.start = lambda kind, prompt, title, slug=None: started.append((kind, title, slug)) or {"ok": True}
+    app.blocked = None
+    app.post("propose", {"slug": "doe-jane"})
+    assert started == [("propose", "研究構想草稿：doe-jane", "doe-jane")]
+    import pytest
+    with pytest.raises(ValueError):
+        app.post("propose", {"slug": "nobody"})

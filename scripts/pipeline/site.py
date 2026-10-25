@@ -149,6 +149,14 @@ def _recommend(run, owner):
     return {**m, "stale": bool(owner) and m.get("fingerprint") != me_fingerprint(owner)}
 
 
+def _me_query(owner):
+    """比對表單的預填：本人 CV 摘要＋研究興趣＋能力領域（不用與教授共同討論的研究計畫）。"""
+    if not owner:
+        return None
+    tags = [i.get("en") or i.get("zh") for i in owner.get("interests") or []] + [c.get("area") for c in owner.get("capabilities") or []]
+    return {"goal": owner.get("summary") or "", "tags": ", ".join(t for t in tags if t)}
+
+
 def build_site_data(run):
     run = Path(run)
     st = load_state(run)
@@ -234,7 +242,7 @@ def build_site_data(run):
         "coauthors": net.get("coauthors") or [], "possible_splits": net.get("possible_splits") or [],
         "grants": grants, "grants_reviewed": grants_reviewed,
         "match_docs": match_docs(wlist, grants),
-        "me_query": (owner or {}).get("match"),
+        "me_query": _me_query(owner),
         "joint_proposal": (owner or {}).get("proposal") if (owner or {}).get("proposal_with") == run.name else None,
         "proposal_draft": _proposal(run, owner, grants),
         "recommend": _recommend(run, owner),

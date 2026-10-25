@@ -70,7 +70,7 @@ function recommendBlock(p){
   const link = w => `<a href="${esc(paperLink(p, w.id))}">${bi(w.title_zh, w.title)}</a>`;
   const n = k => ts.filter(t => t.fit === k).length;
   return kpis(p, `<div class="kpi"><div class="n">${n("strong")}／${n("partial")}</div><div class="l">你的 ${ts.length} 個興趣與 CV 項目：強相關／部分相關</div></div>`) +
-    (r.stale ? `<div class="card" role="status"><span class="pill y">比對過期</span> 你的研究興趣或研究計畫改過了，這份推薦是用舊的內容比的。${window.APP_REMATCH ? `<button class="btn btn-yellow" data-rematch="${esc(p.slug)}">重新比對</button>` : "請跟 Claude 說「重新比對 " + esc(p.name) + "」。"}</div>` : "") +
+    (r.stale ? `<div class="card" role="status"><span class="pill y">比對過期</span> 你的研究興趣或 CV 改過了，這份推薦是用舊的內容比的。${window.APP_REMATCH ? `<button class="btn btn-yellow" data-rematch="${esc(p.slug)}">重新比對</button>` : "請跟 Claude 說「重新比對 " + esc(p.name) + "」。"}</div>` : "") +
     (r.read_first.length ? `<div><strong>建議先看這幾篇</strong><ol>${r.read_first.map(w => `<li>${w.year ?? ""}｜${link(w)}</li>`).join("")}</ol></div>` : "") +
     `<div><strong>依你的興趣與 CV 項目</strong>${hit.map(t => `<details class="card" style="margin-top:8px" ${t.fit === "strong" ? "open" : ""}>
         <summary style="cursor:pointer;min-height:44px;display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="pill ${FIT[t.fit][0]}">${FIT[t.fit][1]}</span><strong>${esc(t.label_zh)}</strong>${t.kind === "cv" ? `<span class="small muted">（你的 CV：會的／做過的）</span>` : ""}</summary>
@@ -106,7 +106,7 @@ function renderProfs(ps){
     head.insertAdjacentHTML("beforeend", window.APP_REMATCH ? `<a class="btn btn-green" id="add-prof" href="pipeline.html#new">＋ 新增教授</a>` : "");
   }
   if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按右上角「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
-  el.innerHTML = `<p class="muted">星星是匹配程度：依你的每個研究興趣與 CV 項目計畫，看她有多少強相關、部分相關的研究。點文章標題會跳到那篇的完整解析。</p>` +
+  el.innerHTML = `<p class="muted">星星是匹配程度：依你的每個研究興趣與 CV 項目，看她有多少強相關、部分相關的研究。點文章標題會跳到那篇的完整解析。</p>` +
     ps.map(p => {
       const c = p.counts || {};
       return `<article class="prof">

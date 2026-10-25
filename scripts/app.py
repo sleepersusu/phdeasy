@@ -33,7 +33,7 @@ from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
 from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, prompt_continue,
-                           prompt_exception, prompt_match, prompt_new)
+                           prompt_exception, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
 FROZEN = getattr(sys, "frozen", False)  # Windows 安裝版（PyInstaller）
@@ -370,7 +370,7 @@ class App:
             return self.login_claude()
         if path == "open-secrets":
             return self.open_secrets()
-        if path in ("new", "continue", "reply", "match", "exception") and self.blocked:
+        if path in ("new", "continue", "reply", "match", "propose", "exception") and self.blocked:
             raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
         if path == "new":
             name, inst = (body.get("name") or "").strip(), (body.get("institution") or "").strip()
@@ -398,6 +398,11 @@ class App:
             if not (self.runs / slug / "state.json").exists():
                 raise ValueError(f"沒有這位教授：{slug}")
             return self.jobs.start("match", prompt_match(slug), f"重新比對：{slug}", slug=slug)
+        if path == "propose":
+            slug = (body.get("slug") or "").strip()
+            if not slug or not (self.runs / slug / "state.json").exists():
+                raise ValueError(f"沒有這位教授：{slug}")
+            return self.jobs.start("propose", prompt_propose(slug), f"研究構想草稿：{slug}", slug=slug)
         if path == "reply":
             last = self.jobs.latest()
             if not last or not last.get("session"):

@@ -30,7 +30,9 @@ def test_site_data_has_match_docs_and_me_query(tmp_path):
     d = build_site_data(runs / "demo")
     assert {x["id"] for x in d["match_docs"] if x["kind"] == "paper"} == {"W1", "W2"}
     assert any(x["kind"] == "grant" for x in d["match_docs"])
-    assert d["me_query"]["goal"] == "mHealth study for women"
+    # 預填只用本人的興趣與 CV，不用與 Liliana 共同討論的研究計畫（me.match.goal 由計畫書摘出）
+    assert d["me_query"]["goal"] == "s"
+    assert d["me_query"]["tags"] == "Digital Health, Quant"
     assert d["home_href"] == "../../../index.html"
 
 

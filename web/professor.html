@@ -174,7 +174,7 @@ const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升�
                  tags: "chatbot、physical activity、women、cardiovascular、health disparities", methods: ["pilot-rct", "quasi-experimental"]};
 
 function recommendHTML(){
-  /* prof-match：Claude 依你的興趣與 CV 項目計畫挑出的推薦（核對過出處、推翻過） */
+  /* prof-match：Claude 依你的興趣與 CV 項目挑出的推薦（核對過出處、推翻過） */
   const r = D.recommend;
   if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在「目標教授」頁按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
   const W = Object.fromEntries(D.works.map(w => [w.id, w])), G = Object.fromEntries(D.grants.map(g => [g.key, g]));
@@ -199,7 +199,7 @@ function match(){
   const designs = [...new Set(D.works.map(w => (w.card.fields.find(x => x.key === "design") || {}).facts).filter(Boolean).map(f => f["設計類型"]).filter(Boolean))];
   if (!$("#mf")){
     el.innerHTML = recommendHTML() + `<h3>${D.recommend ? "自己輸入想做的研究（用詞比對，參考用）" : ""}</h3>
-      ${D.me_query && !store.get("match") ? `<div class="item" style="margin-bottom:12px">${pill("g", "已套用")} 已自動帶入你首頁的研究計畫與興趣，可以直接修改後重新比對。</div>` : ""}
+      ${D.me_query && !store.get("match") ? `<div class="item" style="margin-bottom:12px">${pill("g", "已套用")} 已自動帶入你的 CV 摘要、研究興趣與能力領域，可以直接修改後重新比對。</div>` : ""}
       <p class="muted">輸入你想做的研究，頁面會在你的瀏覽器裡跟這位教授的文章、計畫、合作者與方法比對，列出重疊之處和證據。比對只看主題與用詞的重疊程度，<strong>不是</strong>「適不適合」的判斷；你輸入的內容只存在這台電腦的瀏覽器。</p>
       <form id="mf" class="match-form">
         <div><label for="m-goal">我想做的研究 <span class="hint">（中文或英文都可以；寫族群、介入方式、想看的結果會更準）</span></label>
@@ -567,14 +567,31 @@ function progressView(){
     <h3>三個研究</h3>${(p.studies || []).map(st => `<div class="item"><strong>${bi(st.name_zh, st.name, "div")}</strong><div class="small" style="margin-top:4px">${bi(st.detail_zh, st.detail, "div")}</div></div>`).join("")}`;
 }
 
+function proposeButton(d){
+  /* 應用程式裡才有：請 Claude Code 依你的 CV 與她目前的經費擬（或重擬）草稿 */
+  if (!APP) return "";
+  const label = d ? "重新產生研究構想草稿" : "產生研究構想草稿";
+  return `<div class="row" style="margin-top:10px"><button class="btn ${d && !d.stale ? "btn-yellow" : "btn-green"}" data-propose>${label}</button>
+    <span class="small muted">約 10–20 分鐘，進度在「工作進度」頁${d ? "；舊的草稿會保留在備份資料夾" : ""}</span></div>`;
+}
+document.addEventListener("click", async ev => {
+  const b = ev.target.closest("[data-propose]");
+  if (!b) return;
+  if (APP.running){ alert("已經有一個工作在跑，等它跑完再按"); return; }
+  if (!confirm(`請 Claude Code 依你的 CV（會的、做過的）與 ${D.professor.name} 目前期間內的經費，擬一份研究構想草稿？`)) return;
+  b.disabled = true;
+  try { await APIX("propose", {slug: SLUG}); location.href = "pipeline.html"; }
+  catch (e) { alert(e.message); b.disabled = false; }
+});
+
 function draftView(){
   const el = body("draft"), d = D.proposal_draft;
-  if (!d){ el.innerHTML = `<div class="empty">還沒產生研究構想草稿。${APP ? "到「工作進度」頁可以請 Claude Code 產生；或" : ""}跟 Claude 說「幫我擬 ${esc(D.professor.name)} 的研究構想」。</div>`; return; }
+  if (!d){ el.innerHTML = `<div class="empty">還沒產生研究構想草稿。${APP ? "" : `在應用程式裡打開可以按按鈕產生；或跟 Claude 說「幫我擬 ${esc(D.professor.name)} 的研究構想」。`}${proposeButton(d)}</div>`; return; }
   const sec = (t, x) => x ? `<h3>${t}</h3>${bi(x.zh, x.en, "div")}${(x.refs || []).length ? `<div class="small muted">依據：${x.refs.map(r => /^W\d+$/.test(r) ? `<a href="#paper-${esc(r)}">${esc(r)}</a>` : esc(r)).join("、")}</div>` : ""}` : "";
   el.innerHTML = `<div class="item attn">${pill("y", "草稿")} 這是 AI 依你的 CV、你做過與會的事、以及她目前的經費擬的構想，<strong>只是素材</strong>，要寄給教授前請自己改寫。${d.stale ? " 你的 CV 或她的資料改過，這份可能過期。" : ""}</div>
     <h3 style="margin-top:12px">${bi(d.title && d.title.zh, d.title && d.title.en, "div")}</h3>
     ${sec("對應的經費", d.funding)}${sec("背景與缺口", d.background)}${sec("研究目的", d.aims)}${sec("研究設計與方法", d.methods)}
-    ${sec("樣本與變項", d.sample)}${sec("預期貢獻", d.contribution)}${sec("我能做的部分（依你的 CV）", d.my_role)}${sec("時程", d.timeline)}${sec("風險與限制", d.risks)}`;
+    ${sec("樣本與變項", d.sample)}${sec("預期貢獻", d.contribution)}${sec("我能做的部分（依你的 CV）", d.my_role)}${sec("時程", d.timeline)}${sec("風險與限制", d.risks)}${proposeButton(d)}`;
 }
 
 function openFromHash(){
@@ -633,7 +650,7 @@ async function loadData(){
   else { setupViews(); }            // 應用程式：教授首頁是按鈕，一個按鈕進一個區塊
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
-  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); } } catch (e) {}  // 離線單檔版沒有 /api
+  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); draftView(); } } catch (e) {}  // 離線單檔版沒有 /api
 })();
 </script>
 </body>
