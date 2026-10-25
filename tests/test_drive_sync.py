@@ -111,6 +111,7 @@ def test_cli_waits_for_release_before_giving_up(tmp_path, monkeypatch):
     from pipeline.drive_sync import release
     drive = tmp_path / "drive"
     (tmp_path / "runs").mkdir()
+    (tmp_path / "other").mkdir()
     sync(tmp_path / "other", drive, my_id="pcB", device="Win")  # 別台佔著
     monkeypatch.setattr(cli, "target", lambda runs, *a, **k: drive)
     calls = []
