@@ -41,9 +41,8 @@ def main():
     md.mkdir(parents=True, exist_ok=True)
     me, inputs = _load(run)
     if a.cmd == "inputs":
-        (md / "inputs.json").write_text(json.dumps({**inputs, "me_goal": (me.get("match") or {}).get("goal"),
-                                                    "me_proposal_title": (me.get("proposal") or {}).get("title")}, ensure_ascii=False, indent=1))
-        print(f"DONE 比對對象 {len(inputs['targets'])}（興趣＋研究）；文章 {len(inputs['papers'])}；計畫 {len(inputs['grants'])}")
+        (md / "inputs.json").write_text(json.dumps({**inputs, "me_summary": me.get("summary")}, ensure_ascii=False, indent=1))
+        print(f"DONE 比對對象 {len(inputs['targets'])}（興趣＋CV）；文章 {len(inputs['papers'])}；計畫 {len(inputs['grants'])}")
         return
     draft = _j(md / "draft.json")
     if draft is None:

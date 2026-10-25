@@ -1,6 +1,6 @@
 ---
 name: prof-match
-description: 教授研究檔案流水線的比對推薦階段（自動段）。prof-profile 組裝完、prof-verify 之前執行；本人改了研究興趣或研究計畫（runs/_me/me.json）、或在應用程式按「重新比對」時也執行。依本人的每個研究興趣與研究計畫的每個研究，從該教授的解析卡與計畫中挑出「該先看的文章與計畫」並寫理由；腳本核對每筆都指到真的文章／計畫且理由引得到原文，推翻者逐筆推翻，組裝成 out/match.json，首頁教授卡片顯示。
+description: 教授研究檔案流水線的比對推薦階段（自動段）。prof-profile 組裝完、prof-verify 之前執行；本人改了研究興趣或 CV（runs/_me/me.json）、或在應用程式按「重新比對」時也執行。依本人的每個研究興趣與 CV 的每個能力領域／專案（不含與 Liliana 共同討論的研究計畫），從該教授的解析卡與計畫中挑出「該先看的文章與計畫」並寫理由；腳本核對每筆都指到真的文章／計畫且理由引得到原文，推翻者逐筆推翻，組裝成 out/match.json，首頁教授卡片顯示。
 ---
 
 # prof-match（自動段：依本人興趣推薦該看的文章與計畫）
@@ -13,7 +13,7 @@ description: 教授研究檔案流水線的比對推薦階段（自動段）。p
 uv run python scripts/state_cli.py show runs/<slug>
 ```
 
-- 需要 `work/cards/*/card.json`（prof-cards 跑完）與 `runs/_me/me.json`（本人資料）。缺 me.json → 停下告訴本人先提供 CV 與研究計畫。
+- 需要 `work/cards/*/card.json`（prof-cards 跑完）與 `runs/_me/me.json`（本人資料）。缺 me.json → 停下告訴本人先提供 CV。
 
 ## 1. 準備（可接續）
 

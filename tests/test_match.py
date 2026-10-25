@@ -3,7 +3,9 @@ from pipeline.match import assemble, check_draft, me_fingerprint, targets_from_m
 
 ME = {"interests": [{"en": "Digital Health", "zh": "數位健康"}, {"en": "Healthy Ageing", "zh": "健康老化"}],
       "proposal": {"title": "Safe agentic AI", "studies": [{"name": "Study 1 — Evidence synthesis", "name_zh": "研究一：證據統整", "detail": "PRISMA review"}]},
-      "match": {"goal": "remote monitoring"}}
+      "match": {"goal": "remote monitoring"},
+      "capabilities": [{"area": "Quantitative health research", "area_zh": "健康研究量化分析", "items": ["SAS, SPSS"]}],
+      "projects": [{"name": "HomeWellness", "zh": "多 agent 健康陪伴"}]}
 INPUTS = {
     "targets": targets_from_me(ME),
     "papers": {"W1": {"title": "App trial", "text": "這是一項隨機對照試驗，評估手機 app 降低血壓。"},
@@ -17,13 +19,24 @@ def good():
         {"target": "i1", "fit": "strong", "why": "她的 app 試驗直接評估數位介入", "papers": [{"id": "W1", "why": "評估 app 降血壓", "evidence": "評估手機 app 降低血壓"}],
          "grants": [{"key": "ID:G1", "why": "計畫主軸就是數位健康", "evidence": "Digital health to support behaviour change"}]},
         {"target": "i2", "fit": "none", "why": "來源未提及與健康老化直接相關的研究", "papers": [], "grants": []},
-        {"target": "s1", "fit": "partial", "why": "她做過轉介流程的回顧", "papers": [{"id": "W2", "why": "方法相同", "evidence": "系統性回顧遠距監測的轉介流程"}], "grants": []},
+        {"target": "c1", "fit": "partial", "why": "她做過轉介流程的回顧", "papers": [{"id": "W2", "why": "方法相同", "evidence": "系統性回顧遠距監測的轉介流程"}], "grants": []},
+        {"target": "c2", "fit": "none", "why": "來源未提及多 agent 健康陪伴的研究", "papers": [], "grants": []},
     ], "read_first": ["W2", "W1"]}
 
 
-def test_targets_cover_interests_and_studies():
-    ids = [t["id"] for t in targets_from_me(ME)]
-    assert ids == ["i1", "i2", "s1"]
+def test_targets_are_interests_and_cv_not_joint_proposal():
+    # 研究計畫是本人與 Liliana 共同討論的（2026-10-26），比對只用本人的興趣與 CV（會的、做過的）
+    ts = targets_from_me(ME)
+    assert [t["id"] for t in ts] == ["i1", "i2", "c1", "c2"]
+    assert [t["kind"] for t in ts] == ["interest", "interest", "cv", "cv"]
+    assert ts[2]["label_zh"] == "健康研究量化分析" and "SAS" in ts[2]["detail"]
+    assert ts[3]["label"] == "HomeWellness"
+
+
+def test_fingerprint_ignores_joint_proposal_but_tracks_cv():
+    a = me_fingerprint(ME)
+    assert me_fingerprint({**ME, "proposal": {"title": "other", "studies": []}, "match": {"goal": "x"}}) == a
+    assert me_fingerprint({**ME, "capabilities": []}) != a
 
 
 def test_good_draft_passes():

@@ -1,4 +1,5 @@
-"""比對推薦：依本人的每個研究興趣與研究計畫的每個研究，從教授的解析卡與計畫中挑出「該先看的文章／計畫」。
+"""比對推薦：依本人的每個研究興趣與 CV（會的、做過的），從教授的解析卡與計畫中挑出「該先看的文章／計畫」。
+研究計畫是本人與 Liliana 共同討論的（2026-10-26），不算本人的，不拿來比對。
 
 LLM（比對者）負責判斷相關、寫理由；腳本負責核對：
 - 每個興趣／研究都有一筆回答（沒有相關就寫 fit=none，不硬湊）
@@ -14,21 +15,28 @@ import re
 FITS = ("strong", "partial", "none")
 
 
+def _cv_targets(me):
+    """CV 的每個能力領域與每個專案各一個（c1…）。"""
+    out = []
+    for c in (me or {}).get("capabilities") or []:
+        out.append({"label": c.get("area"), "label_zh": c.get("area_zh") or c.get("area"), "detail": "; ".join(c.get("items") or [])})
+    for p in (me or {}).get("projects") or []:
+        out.append({"label": p.get("name"), "label_zh": p.get("name"), "detail": p.get("zh") or p.get("en") or ""})
+    return [{"id": f"c{i}", "kind": "cv", **t} for i, t in enumerate(out, 1)]
+
+
 def targets_from_me(me):
-    """比對的對象：本人的每個研究興趣（i1…）與研究計畫的每個研究（s1…）。"""
+    """比對的對象：本人的每個研究興趣（i1…）與 CV 的每個能力領域／專案（c1…）。"""
     out = []
     for i, it in enumerate((me or {}).get("interests") or [], 1):
         out.append({"id": f"i{i}", "kind": "interest", "label": it.get("en") or it.get("zh"), "label_zh": it.get("zh") or it.get("en")})
-    for i, st in enumerate(((me or {}).get("proposal") or {}).get("studies") or [], 1):
-        out.append({"id": f"s{i}", "kind": "study", "label": st.get("name"), "label_zh": st.get("name_zh") or st.get("name"),
-                    "detail": st.get("detail")})
-    return out
+    return out + _cv_targets(me)
 
 
 def me_fingerprint(me):
-    """興趣或研究計畫改了，推薦就過期了（前端會提示重新比對）。"""
-    key = json.dumps({"interests": (me or {}).get("interests"), "studies": ((me or {}).get("proposal") or {}).get("studies"),
-                      "goal": ((me or {}).get("match") or {}).get("goal")}, ensure_ascii=False, sort_keys=True)
+    """興趣或 CV 改了，推薦就過期了（前端會提示重新比對）。"""
+    key = json.dumps({"interests": (me or {}).get("interests"), "cv": _cv_targets(me), "summary": (me or {}).get("summary")},
+                     ensure_ascii=False, sort_keys=True)
     return hashlib.sha256(key.encode()).hexdigest()[:16]
 
 

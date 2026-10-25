@@ -183,7 +183,7 @@ function recommendHTML(){
   return `${r.stale ? `<div class="item attn">${pill("y", "比對過期")} 你的研究興趣或研究計畫改過了，這份推薦是用舊的內容比的。</div>` : ""}
     <h3>建議先看這幾篇</h3><ol>${r.read_first.map(id => `<li>${paper(id)}</li>`).join("")}</ol>
     <h3>依你的興趣與研究</h3>
-    ${r.targets.filter(t => t.fit !== "none").map(t => `<details class="item" ${t.fit === "strong" ? "open" : ""}><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(FITL[t.fit][0], FITL[t.fit][1])}<strong>${esc(t.label_zh)}</strong>${t.kind === "study" ? `<span class="small muted">（你的研究計畫）</span>` : ""}</summary>
+    ${r.targets.filter(t => t.fit !== "none").map(t => `<details class="item" ${t.fit === "strong" ? "open" : ""}><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(FITL[t.fit][0], FITL[t.fit][1])}<strong>${esc(t.label_zh)}</strong>${t.kind === "cv" ? `<span class="small muted">（你的 CV：會的／做過的）</span>` : ""}</summary>
       <div class="small">${esc(t.why)}</div>
       <ul>${t.papers.map(x => `<li>${paper(x.id)}<div class="small muted">${esc(x.why)}</div></li>`).join("")}
       ${t.grants.map(x => `<li>${G[x.key] ? bi(G[x.key].title_zh || G[x.key].funder_zh, G[x.key].title || G[x.key].funder) : esc(x.key)}<div class="small muted">${esc(x.why)}</div></li>`).join("")}</ul></details>`).join("")}
