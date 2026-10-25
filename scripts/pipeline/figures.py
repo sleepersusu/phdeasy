@@ -18,7 +18,8 @@ def _looks_like_caption(label, rest):
     rest = rest.strip()
     if not rest:
         return True
-    if re.match(r"^(shows?|presents?|summari[sz]es|lists?|illustrates?|depicts?|and|or|in|of|for|was|were|is|are|\)|,|;)\b", rest, re.I):
+    # 內文提到圖表時後面接小寫的動詞或連接詞（Table 1 shows…、Figure 2 and…）；標題後面通常是大寫開頭（Table 2  OR of…）
+    if re.match(r"^(shows?|presents?|summari[sz]es|lists?|illustrates?|depicts?|displays?|and|or|in|of|for|was|were|is|are)\b", rest) or re.match(r"^[),;]", rest):
         return False
     return True
 
@@ -27,15 +28,18 @@ def captions_from_blocks(blocks):
     """blocks: [(頁碼, 文字)]，依閱讀順序。回傳 [{label, caption, page}]，同一個 label 只留第一個像標題的。"""
     out, seen = [], set()
     for page, text in blocks:
-        m = CAPTION.match(text or "")
-        if not m:
-            continue
-        label, rest = norm_label(m.group(1)), m.group(2)
-        if label.lower() in seen or not _looks_like_caption(label, rest):
-            continue
-        seen.add(label.lower())
-        cap = re.sub(r"\s+", " ", f"{m.group(1)} {rest}").strip()
-        out.append({"label": label, "caption": cap[:800], "page": page})
+        lines = (text or "").split("\n")
+        for i in range(len(lines)):  # 標題不一定在區塊開頭（PDF 常把上一段和表題併成一塊）
+            m = CAPTION.match("\n".join(lines[i:]))
+            if not m:
+                continue
+            label, rest = norm_label(m.group(1)), m.group(2)
+            if label.lower() in seen or not _looks_like_caption(label, rest):
+                continue
+            seen.add(label.lower())
+            cap = re.sub(r"\s+", " ", f"{m.group(1)} {rest}").strip()
+            out.append({"label": label, "caption": cap[:800], "page": page})
+            break
     return out
 
 

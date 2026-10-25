@@ -14,7 +14,7 @@ uv run python scripts/figures.py extract runs/<slug>
 uv run python scripts/digest.py todo runs/<slug>
 ```
 
-`todo` 列出還沒寫重點的文章（有全文或摘要的才寫；只有標題的不寫）與每篇的圖表清單。
+`todo` 列出還沒寫重點的文章（PDF 全文的摘要位置是 `p.1`，只有摘要的文章才用 `abs`）（有全文或摘要的才寫；只有標題的不寫）與每篇的圖表清單。
 
 ## 2. 整理（每個 agent 4–5 篇，同時最多 5 個）
 

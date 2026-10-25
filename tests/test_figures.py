@@ -27,3 +27,8 @@ def test_jats_figs_and_tables():
       <table-wrap id="t1"><label>Table 1</label><caption><title>Baseline</title></caption></table-wrap></body></article>"""
     items = from_jats(xml)
     assert [i["label"] for i in items] == ["Figure 1", "Table 1"] and "Study flow" in items[0]["caption"]
+
+
+def test_caption_in_the_middle_of_a_block_is_found():
+    blocks = [(5, "Results were consistent.\nTable 2  OR of cardiovascular disease according to menopause category\nAge-adjusted model")]
+    assert [c["label"] for c in captions_from_blocks(blocks)] == ["Table 2"]
