@@ -28,9 +28,10 @@ def main(argv=None, runs=RUNS):
     if fails:
         return 1
     d["faculty"] = {"fetched": datetime.now().astimezone().isoformat(timespec="seconds"), "src": f["src"],
-                    "people": [{k: p.get(k) for k in ("name", "title", "profile_url", "research", "orcid")} for p in f["people"]]}
+                    "people": [{k: p.get(k) for k in ("name", "title", "profile_url", "expertise", "interests", "research", "orcid") if p.get(k)} for p in f["people"]]}
     tp.write_text(json.dumps(t, ensure_ascii=False, indent=1))
-    print(f"DONE {d['name']}：教員 {len(f['people'])} 位")
+    ppl = f["people"]
+    print(f"DONE {d['name']}：教員 {len(ppl)} 位；有專長 {sum(1 for p in ppl if p.get('expertise'))}、有研究興趣 {sum(1 for p in ppl if p.get('interests'))}")
     return 0
 
 

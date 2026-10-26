@@ -56,7 +56,7 @@ function jobsHTML(st, ready){
   /* 每個工作一列（最多同時 3 個在跑；每位教授一次一個）：狀態、進度條與預估時間、停止、回報、過程紀錄、回覆 */
   /* 舊版的程式（還沒重開）只給 job／running／log／progress：轉成一個工作的清單，畫面才看得到 */
   const jobs = st.jobs || (st.job ? [{...st.job, running: !!st.running, log: st.log || [], progress: st.progress || null}] : []);
-  if (!jobs.length) return setRow("row-job", "目前的工作", '<span class="small muted">沒有在跑的工作</span>', '<div class="small muted">在「目標教授」新增教授、或在文件頁按 AI 編修，工作就會出現在這裡。可以同時跑 3 個（每位教授一次一個）。</div>');
+  if (!jobs.length) return setRow("row-job", "目前的工作", '<span class="small muted">沒有在跑的工作</span>', '<div class="small muted">在「申請目標」新增教授、或在文件頁按 AI 編修，工作就會出現在這裡。可以同時跑 3 個（每位教授一次一個）。</div>');
   const nrun = jobs.filter(j => j.running).length;
   return `<div class="small muted" style="margin:4px 0">${nrun ? `${nrun} 個工作在跑（最多同時 3 個）` : "沒有在跑的工作"}</div>` + jobs.map(job => {
     const running = job.running, id = esc(job.id);
@@ -145,7 +145,7 @@ function renderPipeline(st){
         <span class="pill ${WAITING.has(p.stage) ? "y" : p.stage === "stop2" ? "g" : ""}">${esc(STAGE_ZH[p.stage] || p.stage)}</span>
         ${p.report ? `<a class="btn btn-green btn-sm" href="../runs/${esc(p.slug)}/${esc(p.report)}" target="_blank" rel="noopener">看${p.stage === "stop1" ? "停 1" : ""}報告</a>` : ""}
         ${p.stage !== "stop2" ? `<button class="btn btn-green btn-sm" data-continue="${esc(p.slug)}" ${!ready || busy.has(p.slug) ? "disabled" : ""}>${p.stage === "halted" ? "我看過了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
-        : `<div class="empty">還沒有教授。到「目標教授」按「＋ 新增教授」。</div>`) +
+        : `<div class="empty">還沒有教授。到「申請目標」按「＋ 新增教授」。</div>`) +
     setRow("row-tools", "這台電腦的工具", tools === 3 ? '<span class="pill g">✓ 齊全</span>' : `<span class="pill y">${3 - tools} 項沒裝</span>`, `<ul class="checks">
       ${check(st.claude, `Claude Code：${esc(st.claude)}`, `找不到 Claude Code。請先安裝並登入：<a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a>，裝好後重開這個程式。`)}
       ${check(st.uv, `uv：${esc(st.uv)}`, `找不到 uv（流水線的 Python 工具）。<button class="btn btn-yellow" id="install-uv">安裝 uv</button>`)}
@@ -218,7 +218,7 @@ function renderSettings(st){
        <p class="small muted">查博士學程時，學費、獎學金、申請條件、截止日都照這個身分寫（國際生和本地生常常不同）。</p>`) +
     setRow("row-notion", "Notion", g.notion ? `<span class="pill g">✓ 已連接</span> <span class="small muted">${g.notion.fetched ? "匯入於 " + esc(g.notion.fetched.slice(0, 16).replace("T", " ")) : ""}</span>` : '<span class="pill">沒連接</span>',
       g.notion ? `<div class="row"><a class="btn btn-sm" href="${esc(g.notion.db_url || "#")}" target="_blank" rel="noopener">打開「博士申請追蹤」</a><button class="btn btn-green btn-sm" id="notion-import">立刻匯入</button></div>
-          <p class="small muted">在 Notion 填教授、學程、截止日、狀態、會議；按「立刻匯入」（打開程式時也會自動匯入）。還沒建檔的教授會出現在「目標教授」等你按建檔。</p>`
+          <p class="small muted">在 Notion 填教授、學程、截止日、狀態、會議；按「立刻匯入」（打開程式時也會自動匯入）。還沒建檔的教授會出現在「申請目標」等你按建檔。</p>`
         : `<ol class="small"><li>到 <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">notion.so/profile/integrations</a> 按「新增整合」（Internal），複製「Internal Integration Secret」</li>
             <li>在 Notion 開一個頁面（例：「博士申請」），右上角「…」→「連線」（Connections）→ 加入剛建的整合</li>
             <li>在那個頁面右上角「分享」→「複製連結」</li><li>把金鑰和連結貼在下面，按「連接」：程式會在那頁建「博士申請追蹤」資料庫，放進已建檔的教授</li></ol>

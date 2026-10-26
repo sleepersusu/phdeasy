@@ -35,6 +35,10 @@ h3{font-size:1.05rem;margin:20px 0 8px}
 .kpi .l{color:var(--muted);font-size:.9rem}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;min-width:44px;padding:0 14px;border-radius:8px;border:2px solid transparent;font:inherit;font-weight:600;cursor:pointer;text-decoration:none;transition:filter .15s}
 .btn:hover{filter:brightness(.92)}
+.btn.btn-icon{width:44px;padding:0;gap:0;background:#fff;color:var(--fg);border-color:#d5d8dc}
+.btn.btn-icon.btn-green{background:var(--green);color:var(--on-green);border-color:transparent}
+.btn.btn-icon.btn-sm{width:34px;min-width:34px;min-height:34px}
+.btn.btn-icon svg{display:block}
 .btn-green{background:var(--green);color:var(--on-green)}
 .btn-yellow{background:var(--yellow);color:var(--on-yellow)}
 .btn-red{background:var(--red);color:var(--on-red)}
@@ -196,7 +200,7 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 <footer class="wrap" id="foot"></footer>
 <!-- 大意 --><!-- 研究設計 --><!-- 研究樣本 --><!-- 研究缺口 --><!-- 解決什麼 --><!-- 發現 --><!-- 研究限制 -->
 <script id="inline-data" type="application/json">__INLINE__</script>
-<script src="site_match.js"></script>
+<script src="site_match.js"></script><script src="icons.js"></script>
 <script>
 /* 資料：應用程式從 runs/<slug>/out/site/data.json 讀；離線單檔版把資料內嵌在 #inline-data */
 let D = null;
@@ -266,7 +270,7 @@ const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升�
 function recommendHTML(){
   /* prof-match 的推薦（核對過出處、推翻過）：以「文章」為單位，每篇只出現一次，標上它對到你的哪些興趣／CV 項目 */
   const r = D.recommend;
-  if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在「目標教授」頁按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
+  if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在「申請目標」頁按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
   const W = Object.fromEntries(D.works.map(w => [w.id, w])), G = Object.fromEntries(D.grants.map(g => [g.key, g]));
   const hits = r.targets.filter(t => t.fit !== "none"), miss = r.targets.filter(t => t.fit === "none");
   const byPaper = new Map(), byGrant = new Map();
@@ -535,7 +539,7 @@ function paperHtml(w){
       <div class="row" style="margin:12px 0">
         ${w.pdf_href ? `<a class="btn btn-green" href="${esc(w.pdf_href)}" target="_blank" rel="noopener">開啟全文</a>` : `<span class="btn btn-red" aria-disabled="true">沒有全文檔</span>`}
         ${w.doi ? `<a class="btn btn-green" href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">期刊頁（DOI）</a>` : ""}
-        <a class="btn btn-yellow" href="#paper-${w.id}" data-copy="${w.id}">複製這篇的連結</a>
+        <a class="btn btn-icon" href="#paper-${w.id}" data-copy="${w.id}" title="複製這篇的連結" aria-label="複製這篇的連結">${icon("link")}</a>
       </div>
       <h3>解析</h3>${cardHtml(w)}
       <h3>合作作者（${w.authors.length} 位）</h3><p class="small">${authors || "來源未提及"}</p>
@@ -584,7 +588,7 @@ function papers(){
   deepBar();
   $("#plist").querySelectorAll("[data-copy]").forEach(a => a.onclick = ev => {
     ev.preventDefault(); const url = location.href.split("#")[0] + "#paper-" + a.dataset.copy;
-    navigator.clipboard?.writeText(url).then(() => { a.textContent = "已複製"; }, () => { location.hash = "paper-" + a.dataset.copy; });
+    navigator.clipboard?.writeText(url).then(() => { a.title = "已複製"; a.innerHTML = "✓"; }, () => { location.hash = "paper-" + a.dataset.copy; });
   });
 }
 
@@ -716,7 +720,7 @@ async function meetingsCard(){
   const now = new Date().toISOString(), when = x => esc(new Date(x).toLocaleString([], {dateStyle: "medium", timeStyle: x.length > 10 ? "short" : undefined}));
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   el.hidden = false;
-  el.innerHTML = `<div class="row" style="justify-content:space-between"><strong>會議</strong>${APP && gc.connected ? `<button class="btn btn-green btn-sm" id="mt-new">新增會議</button>` : ""}</div>
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><strong>會議</strong>${APP && gc.connected ? `<button type="button" class="btn btn-icon btn-green" id="mt-new" title="新增會議" aria-label="新增會議">${icon("calendar")}</button>` : ""}</div>
     ${evs.length ? `<ul class="small" style="margin:8px 0 0;padding-left:18px">${evs.map(e => `<li style="margin:4px 0">${(e.end || e.start) >= now ? pill("g", "即將") + " " : ""}<strong>${when(e.start)}</strong>　${esc(e.summary)}
       ${e.meet ? ` <a href="${esc(e.meet)}" target="_blank" rel="noopener">Meet</a>` : ""}${e.link ? ` <a href="${esc(e.link)}" target="_blank" rel="noopener">日曆</a>` : ""}</li>`).join("")}</ul>` : `<div class="small muted" style="margin-top:6px">日曆裡還沒有跟她的會議</div>`}
     <form id="mt-form" class="match-form" hidden style="max-width:none;margin-top:10px">
@@ -764,7 +768,7 @@ function programDialog(p){
   if (!d){ d = document.createElement("dialog"); d.id = "prog-dialog"; d.style.cssText = "max-width:640px;width:calc(100% - 32px);border:1px solid #ddd;border-radius:12px;padding:20px";
     d.addEventListener("click", ev => { if (ev.target === d) d.close(); }); document.body.appendChild(d); }
   d.innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px">
-      <h3 style="margin:0">${esc(p.name)}</h3><button type="button" class="btn btn-sm" aria-label="關閉" onclick="this.closest('dialog').close()">✕</button></div>
+      <h3 style="margin:0">${esc(p.name)}</h3><button type="button" class="btn btn-icon btn-sm" title="關閉" aria-label="關閉" onclick="this.closest('dialog').close()">${icon("x")}</button></div>
     <div style="margin:8px 0">${dept ? pill("y", "系所的博士班（教授本人沒掛名）") : pill("g", "教授本人掛名")} ${pill(c, t + (f.years ? `・${f.years} 年` : ""))}</div>
     <dl class="small" style="margin:0">
       ${row("透過", p.via ? esc(p.via) : "")}
@@ -781,7 +785,7 @@ function programDialog(p){
 document.addEventListener("click", ev => { const b = ev.target.closest("[data-prog]"); if (b) programDialog(PROGS[+b.dataset.prog]); });
 function programsHTML(pg){
   /* 她本人掛名、可以收博士生的學程（官方教員名單為證）與各學程的資助；能不能收你、有沒有錢看的是學程，不是全校 */
-  const btn = APP ? ` <button class="btn btn-sm" data-programs>${pg ? "重新查" : "查博士學程"}</button>` : "";
+  const btn = APP ? ` <button type="button" class="btn btn-icon btn-sm" data-programs title="${pg ? "重新查博士學程" : "查博士學程"}" aria-label="${pg ? "重新查博士學程" : "查博士學程"}">${icon(pg ? "refresh" : "search")}</button>` : "";
   if (!pg) return `<span class="muted">還沒查</span>${btn}`;
   if (!(pg.programs || []).length) return `<span class="muted">查過，她本人沒掛名的學程，所屬系所的博士班也查不到${pg.checked ? `（${esc(pg.checked)}）` : ""}</span>${btn}`;
   return programRows(pg.programs)

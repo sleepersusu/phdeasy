@@ -224,3 +224,10 @@ body.lang-both .facts .ll .t-en{display:none}
 #exp-form label,.prof-edit label{display:block;margin:6px 0;font-size:.9rem;color:var(--muted)}
 #exp-form label input,#exp-form label textarea,.prof-edit label input{display:block;width:100%;margin-top:4px;color:var(--fg)}
 #exp-form .row>label{min-width:0}
+/* icon 按鈕：方形、跟一般按鈕同高；觸控目標至少 40px */
+.btn.btn-icon{width:40px;min-width:40px;padding:0;gap:0}
+.btn.btn-icon.btn-sm{width:34px;min-width:34px;min-height:34px}
+.btn.btn-icon svg{display:block}
+.btn-red.btn-icon,.btn-icon.danger{color:#b42318}
+.btn-icon.danger{background:#fff}
+.btn-icon.danger:hover{background:#fef3f2;border-color:#f3b8b3}

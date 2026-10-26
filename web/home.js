@@ -59,7 +59,7 @@ function splitSentences(t, zh){
 function renderMeEdit(m){
   /* 本人自己改簡介與研究興趣（例：不想做某個領域就刪掉）；存檔後舊版留在 runs/_me/history/ */
   const row = (i, it) => `<div class="row int-row" style="flex-wrap:nowrap;margin:6px 0"><input type="text" value="${esc(it.zh || "")}" placeholder="中文" style="flex:1">
-    <input type="text" value="${esc(it.en || "")}" placeholder="English" style="flex:1"><button type="button" class="btn btn-sm" data-int-del aria-label="刪掉這個興趣">刪掉</button></div>`;
+    <input type="text" value="${esc(it.en || "")}" placeholder="English" style="flex:1">${ibtn("trash", "刪掉這個興趣 Delete", "data-int-del", "btn-sm danger")}</div>`;
   body("me").innerHTML = `<form id="me-form" class="match-form" style="max-width:none">
     <div><label for="me-sum-zh">簡介（中文）</label><textarea id="me-sum-zh" rows="3">${esc(m.summary_zh || "")}</textarea></div>
     <div><label for="me-sum-en">簡介（English）</label><textarea id="me-sum-en" rows="3">${esc(m.summary || "")}</textarea></div>
@@ -67,7 +67,7 @@ function renderMeEdit(m){
       <button type="button" class="btn btn-sm" id="int-add">＋ 新增興趣</button></div>
     <div class="row"><button class="btn btn-green" type="submit">儲存</button><button class="btn" type="button" id="me-cancel">取消</button><span class="small" id="me-msg"></span></div></form>`;
   const f = document.getElementById("me-form");
-  f.addEventListener("click", ev => { if (ev.target.matches("[data-int-del]")) ev.target.closest(".int-row").remove(); });
+  f.addEventListener("click", ev => { if (ev.target.closest("[data-int-del]")) ev.target.closest(".int-row").remove(); });
   document.getElementById("int-add").onclick = () => { document.getElementById("int-list").insertAdjacentHTML("beforeend", row(0, {})); document.querySelector("#int-list .int-row:last-child input").focus(); };
   document.getElementById("me-cancel").onclick = () => renderMe(m);
   f.onsubmit = async ev => {
@@ -98,7 +98,7 @@ function renderMe(m){
         <ul class="small" style="margin:4px 0 0;padding-left:18px">${p.overview.map(o => `<li style="margin:4px 0">${bi(o.zh, o.en, "div")}</li>`).join("")}</ul></details>` : ""}</li>`).join("")}</ul>`;
   const head = document.querySelector("#me h2");
   if (window.APP_REMATCH && head && !document.getElementById("me-edit")){
-    head.insertAdjacentHTML("afterend", `<div id="me-edit-wrap" style="text-align:right;margin:-34px 0 8px"><button class="btn btn-sm" id="me-edit">編輯簡介與研究興趣</button></div>`);
+    head.insertAdjacentHTML("afterend", `<div id="me-edit-wrap" style="text-align:right;margin:-34px 0 8px">${ibtn("edit", "編輯簡介與研究興趣 Edit", 'id="me-edit"')}</div>`);
     document.getElementById("me-edit").onclick = () => renderMeEdit(H.me);
   }
 }
@@ -111,7 +111,7 @@ function renderProposal(){
   const el = body("proposal");
   if (!el) return;
   const ps = H.professors || [];
-  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。</div>`; return; }
+  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有申請目標。</div>`; return; }
   el.innerHTML = ps.map(p => {
     const key = `proposal--${p.slug}`, has = !!(H.docs || {})[key], pr = p.proposal || {};
     const drafts = (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
@@ -139,10 +139,10 @@ function docTextBlocks(doc){
 function docBlocksHTML(doc, editable){
   /* 依顯示順序編號可編修的段落（跟 scripts/pipeline/mydocs.py 的 blocks_of 同順序）；計畫書有章節、圖、表 */
   let k = 0;
-  const editBtn = () => editable ? `<button class="btn btn-sm" data-doc-op="edit" data-b="${k}">${T("編輯", "Edit")}</button>
-    <button class="btn btn-sm" data-doc-op="insert_after" data-b="${k}">${T("下面加一段", "Add below")}</button>
-    <button class="btn btn-sm btn-red" data-doc-op="delete" data-b="${k}">${T("刪除", "Delete")}</button>
-    <button class="btn btn-sm btn-green" data-doc-edit="${k}">AI 編修</button>` : "";
+  const editBtn = () => editable ? `${ibtn("edit", "編輯這段 Edit", `data-doc-op="edit" data-b="${k}"`, "btn-sm")}
+    ${ibtn("plus", "下面加一段 Add below", `data-doc-op="insert_after" data-b="${k}"`, "btn-sm")}
+    ${ibtn("trash", "刪除這段 Delete", `data-doc-op="delete" data-b="${k}"`, "btn-sm danger")}
+    ${ibtn("sparkles", "AI 編修這段 AI edit", `data-doc-edit="${k}"`, "btn-sm btn-green")}` : "";
   const block = b => {
     if (["p", "h2", "h3", "note"].includes(b.type)){
       const html = `<div class="docb ${b.type}" data-block="${k}">${b.type === "note" ? '<span class="pill y">待填</span> ' : ""}${lrHTML(b.zh, b.en)}<div class="docb-tools">${editBtn()}</div></div>`;
@@ -182,7 +182,7 @@ async function renderDoc(key, el, opts = {}){
       <div class="row"><label class="small" for="ver-${esc(key)}">版本</label><select id="ver-${esc(key)}" data-doc-ver="${esc(key)}">${[...vs].reverse().map(x =>
         `<option value="${x.n}" ${x.n === cur ? "selected" : ""}>第 ${x.n} 版｜${esc(ORIGIN[x.origin] || x.origin)}｜${esc((x.created || "").slice(0, 10))}${x.note ? "｜" + esc(x.note) : ""}</option>`).join("")}</select>
         ${cur !== latest ? '<span class="pill y">舊版本（只能看）</span>' : '<span class="pill g">最新版</span>'}</div>
-      <div class="row">${needZh && app ? `<button class="btn" data-doc-translate="${esc(key)}" data-v="${cur}">翻成中文</button>` : ""}${upload}</div></div>
+      <div class="row">${needZh && app ? `${ibtn("translate", "翻成中文 Translate", `data-doc-translate="${esc(key)}" data-v="${cur}"`)}` : ""}${upload}</div></div>
     ${v.base ? `<div class="small muted" style="margin:8px 0">這一版是從第 ${v.base} 版${v.note ? "：" + esc(v.note) : ""}。</div>` : ""}
     <div class="small" data-doc-msg></div>
     <h3 style="margin:14px 0 6px">${lrHTML(doc.title_zh, doc.title || nameEn)}</h3>
@@ -260,14 +260,14 @@ function renderExpEdit(){
   /* 工作經歷與學歷：新增、修改、刪除（每條條列一行一點；技能用逗號分開） */
   const m = H.me || {};
   const xrow = x => `<fieldset class="exp-row"><legend><select name="kind"><option value="professional" ${x.kind !== "research" ? "selected" : ""}>工作</option><option value="research" ${x.kind === "research" ? "selected" : ""}>研究</option></select>
-      <button type="button" class="btn btn-sm btn-red" data-row-del>刪掉這段</button></legend>
+      ${ibtn("trash", "刪掉這段 Delete", "data-row-del", "btn-sm danger")}</legend>
     <div class="row"><label style="flex:1">職稱（English）<input name="role" value="${esc(x.role || "")}"></label><label style="flex:1">職稱（中文）<input name="role_zh" value="${esc(x.role_zh || "")}"></label></div>
     <div class="row"><label style="flex:2">單位<input name="org" value="${esc(x.org || "")}"></label><label style="flex:1">地點<input name="place" value="${esc(x.place || "")}"></label><label style="flex:1">期間<input name="dates" value="${esc(x.dates || "")}" placeholder="Feb 2025 – Present"></label></div>
     <label>做了什麼（English，一行一點）<textarea name="b_en" rows="4">${esc((x.bullets || []).map(b => b.en || "").join("\n"))}</textarea></label>
     <label>做了什麼（中文，一行一點，跟上面對齊）<textarea name="b_zh" rows="3">${esc((x.bullets || []).map(b => b.zh || "").join("\n"))}</textarea></label>
     <label>Skills（逗號分開）<input name="skills" value="${esc((x.skills || []).join(", "))}"></label></fieldset>`;
   const erow = e => `<div class="row edu-row"><input name="degree" value="${esc(e.degree || "")}" placeholder="學位" style="flex:1"><input name="school" value="${esc(e.school || "")}" placeholder="學校" style="flex:2">
-    <input name="years" value="${esc(e.years || "")}" placeholder="2018–2020" style="width:8em"><button type="button" class="btn btn-sm btn-red" data-row-del>刪掉</button></div>`;
+    <input name="years" value="${esc(e.years || "")}" placeholder="2018–2020" style="width:8em">${ibtn("trash", "刪掉 Delete", "data-row-del", "btn-sm danger")}</div>`;
   body("capabilities").innerHTML = `<form id="exp-form" class="match-form" style="max-width:none">
     <h3 class="label">${T("工作經歷", "Experience")}</h3><div id="exp-list">${(m.experience || []).map(xrow).join("")}</div>
     <button type="button" class="btn btn-sm" id="exp-add">＋ 新增一段經歷</button>
@@ -275,7 +275,7 @@ function renderExpEdit(){
     <button type="button" class="btn btn-sm" id="edu-add">＋ 新增學歷</button>
     <div class="row" style="margin-top:12px"><button class="btn btn-green" type="submit">儲存</button><button class="btn" type="button" id="exp-cancel">取消</button><span class="small" id="exp-msg"></span></div></form>`;
   const f = document.getElementById("exp-form");
-  f.addEventListener("click", ev => { if (ev.target.matches("[data-row-del]")) (ev.target.closest(".exp-row") || ev.target.closest(".edu-row")).remove(); });
+  f.addEventListener("click", ev => { if (ev.target.closest("[data-row-del]")) (ev.target.closest(".exp-row") || ev.target.closest(".edu-row")).remove(); });
   document.getElementById("exp-add").onclick = () => document.getElementById("exp-list").insertAdjacentHTML("beforeend", xrow({}));
   document.getElementById("edu-add").onclick = () => document.getElementById("edu-list").insertAdjacentHTML("beforeend", erow({}));
   document.getElementById("exp-cancel").onclick = () => renderCaps();
@@ -373,7 +373,7 @@ function progDialog(p){
   if (!d){ d = document.createElement("dialog"); d.id = "dprog-dialog"; d.style.cssText = "max-width:640px;width:calc(100% - 32px);border:1px solid #ddd;border-radius:12px;padding:20px";
     d.addEventListener("click", ev => { if (ev.target === d) d.close(); }); document.body.appendChild(d); }
   d.innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px"><h3 style="margin:0">${esc(p.name)}</h3>
-      <button type="button" class="btn btn-sm" aria-label="關閉" onclick="this.closest('dialog').close()">✕</button></div>
+      ${ibtn("x", "關閉 Close", `onclick="this.closest('dialog').close()"`, "btn-sm")}</div>
     <div style="margin:8px 0"><span class="pill ${dept ? "y" : "g"}">${dept ? "系所的博士班（教授本人沒掛名）" : "教授本人掛名"}</span> <span class="pill ${k}">${t}${f.years ? `・${f.years} 年` : ""}</span></div>
     <dl class="small" style="margin:0">${row("透過", p.via && esc(p.via))}${row("入學", p.intake && esc(p.intake))}${row("修業年限", p.duration && esc(p.duration))}
       ${row("學費", p.tuition && p.tuition.text && `${esc(p.tuition.text)} ${a(p.tuition.src, "出處")}`)}
@@ -432,7 +432,7 @@ async function renderDiscover(){
         ${c.qs_rank || c.usnews_rank ? `<div class="small"><strong>排名：</strong>${c.qs_rank ? `QS #${c.qs_rank} <a href="${esc(c.qs_src)}" target="_blank" rel="noopener">出處</a>` : ""} ${c.usnews_rank ? `US News #${c.usnews_rank} <a href="${esc(c.usnews_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}
         <div class="row" style="margin-top:10px">${c.lab_url ? `<a class="btn btn-sm" href="${esc(c.lab_url)}" target="_blank" rel="noopener">🔬 實驗室網站</a>` : ""}<a class="btn btn-sm" href="https://openalex.org/${esc(c.id)}" target="_blank" rel="noopener">OpenAlex</a>
           ${c.orcid ? `<a class="btn btn-sm" href="https://orcid.org/${esc(c.orcid)}" target="_blank" rel="noopener">ORCID</a>` : ""}
-          <button class="btn btn-green btn-sm" data-disc-add="${esc(c.id)}">＋ 加入目標教授</button></div>
+          <button class="btn btn-green btn-sm" data-disc-add="${esc(c.id)}">＋ 加入申請目標</button></div>
       </div></details>`).join("") || `<div class="empty">${cs.length ? "沒有符合篩選的，放寬條件看看。" : "按「開始查詢」。"}</div>`}`;
   const re = () => renderDiscover();
   el.querySelector("#df-funded").onchange = e => { DF.funded = e.target.checked; re(); };
@@ -461,7 +461,7 @@ async function renderDiscover(){
   };
   el.querySelectorAll("[data-disc-add]").forEach(b => b.onclick = async () => {
     const c = cs.find(x => x.id === b.dataset.discAdd);
-    if (!confirm(`把 ${c.name}（${c.institution}）加入目標教授？Claude Code 會開始建她的教授檔案（約 10–30 分鐘）。`)) return;
+    if (!confirm(`把 ${c.name}（${c.institution}）加入申請目標？Claude Code 會開始建她的教授檔案（約 10–30 分鐘）。`)) return;
     b.disabled = true;
     try { await API("new", {name: c.name, institution: c.institution, orcid: c.orcid || ""}); location.href = "settings.html"; }
     catch (e) { alert(e.message); b.disabled = false; }
@@ -477,9 +477,9 @@ function renderProfs(ps){
       <span></span>
       <span class="row" style="flex-wrap:wrap;justify-content:flex-end"><label class="small" for="prof-sort">${T("排序", "Sort")}</label><select id="prof-sort">
         <option value="stars">★ ↓</option><option value="stars-asc">★ ↑</option><option value="name">A–Z</option></select>
-        ${window.APP_REMATCH ? `<button class="btn" id="disc-btn" aria-expanded="false" aria-controls="disc-panel">🔍 ${T("查詢教授", "Find professors")}</button>
-          <button class="btn btn-green" id="add-dept-btn" aria-expanded="false" aria-controls="add-dept-form">＋ ${T("新增學校／系所", "Add school")}</button>
-          <button class="btn" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ ${T("新增教授", "Add")}</button>` : ""}</span></div>
+        ${window.APP_REMATCH ? `<button class="btn btn-icon" id="disc-btn" aria-expanded="false" aria-controls="disc-panel" title="查詢教授 Find professors" aria-label="查詢教授">${icon("search")}</button>
+          <button class="btn btn-icon btn-green" id="add-dept-btn" aria-expanded="false" aria-controls="add-dept-form" title="新增學校／系所 Add school" aria-label="新增學校／系所">${icon("school")}</button>
+          <button class="btn btn-icon" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form" title="新增教授 Add professor" aria-label="新增教授">${icon("user-plus")}</button>` : ""}</span></div>
       ${window.APP_REMATCH ? `<form class="card" id="add-dept-form" hidden style="margin-bottom:12px">
         <p class="small muted" style="margin-top:0">新增後會在背景查這個系所的教員名單（每人附官方個人頁），查好後在系所底下展開「教員名單」，勾選想了解的教授再按建檔。</p>
         <label for="nd-school">學校（必填）</label><input type="text" id="nd-school" list="nd-schools" placeholder="例：University of California, San Francisco" required>
@@ -529,8 +529,8 @@ function renderProfs(ps){
   ps = ps.filter(p => !(p.owner || {}).archived);
   const removedHTML = removed.length ? `<details class="item" style="margin-top:12px"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center">${T("已移除", "Removed")}（${removed.length}）</summary>
     ${removed.map(p => `<div class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(p.name)} <span class="small muted">${esc(p.institution || "")}</span></span>
-      ${window.APP_REMATCH ? `<button class="btn btn-sm" data-prof-restore="${esc(p.slug)}">${T("還原", "Restore")}</button>` : ""}</div>`).join("")}</details>` : "";
-  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按上面的「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>` + removedHTML; return; }
+      ${window.APP_REMATCH ? `${ibtn("restore", "還原 Restore", `data-prof-restore="${esc(p.slug)}"`)}` : ""}</div>`).join("")}</details>` : "";
+  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有申請目標。按上面的「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>` + removedHTML; return; }
   const score = p => (matchStars(p.recommend) || {score: -1}).score;
   const list = [...ps].sort(PROF_SORT === "name" ? (a, b) => (a.name || "").localeCompare(b.name || "")
     : PROF_SORT === "stars-asc" ? (a, b) => score(a) - score(b) : (a, b) => score(b) - score(a));
@@ -551,9 +551,9 @@ function renderProfs(ps){
         ${top5.length ? `<div class="small muted" style="margin-bottom:4px">${T("必讀前五篇", "Top 5 to read")}</div>
           <ol class="top5">${top5.map(w => `<li><a href="${esc(paperLink(p, w.id))}">${bi(w.title_zh, w.title)}</a> <span class="small muted">${esc(w.year || "")}</span></li>`).join("")}</ol>`
           : `<div class="small muted">${T("還沒比對。", "Not matched yet.")}</div>`}
-        <div class="row" style="margin-top:10px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">${T("進入教授頁", "Open profile")} →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}
-          ${window.APP_REMATCH ? `<button class="btn" data-rematch="${esc(p.slug)}">${r ? "重新比對" : "依我的興趣比對"}</button>
-            <button class="btn btn-sm" data-prof-edit="${esc(p.slug)}">${T("編輯", "Edit")}</button><button class="btn btn-sm btn-red" data-prof-remove="${esc(p.slug)}">${T("移除", "Remove")}</button>` : ""}</div>
+        <div class="row" style="margin-top:10px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">${T("教授頁", "Profile")} ${icon("arrow", 16)}</a>` : `<span class="pill y">詳細頁尚未產生</span>`}
+          ${window.APP_REMATCH ? `${ibtn("match", r ? "重新比對 Re-match" : "依我的興趣比對 Match", `data-rematch="${esc(p.slug)}"`)}
+            ${ibtn("edit", "編輯 Edit", `data-prof-edit="${esc(p.slug)}"`)}${ibtn("trash", "移除 Remove", `data-prof-remove="${esc(p.slug)}"`, "danger")}` : ""}</div>
         <form class="prof-edit" data-slug="${esc(p.slug)}" hidden style="margin-top:10px">
           ${window.APP_REMATCH ? `<label>${T("學校系所", "Department")}<select name="dept">${deptOptions(deptOf(p.slug))}</select></label>` : ""}
           <label>${T("顯示的機構", "Institution")}<input type="text" name="institution" value="${esc((p.owner || {}).institution || p.institution || "")}"></label>
@@ -568,7 +568,7 @@ function renderProfs(ps){
 document.addEventListener("input", ev => {
   const q = ev.target.closest("[data-fac-q]"); if (!q) return;
   const v = q.value.trim().toLowerCase();
-  document.querySelectorAll(`[data-fac-list="${CSS.escape(q.dataset.facQ)}"] [data-fac-row]`).forEach(r => { r.style.display = !v || r.textContent.toLowerCase().includes(v) ? "flex" : "none"; });
+  document.querySelectorAll(`[data-fac-list="${CSS.escape(q.dataset.facQ)}"] [data-fac-row]`).forEach(r => { r.style.display = !v || r.textContent.toLowerCase().includes(v) ? "" : "none"; });
 });
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-fac-build], [data-fac-refresh], [data-dept-remove]");
@@ -593,6 +593,37 @@ document.addEventListener("click", async ev => {
     }
   } catch (e) { alert(e.message); b.disabled = false; }
 });
+function facDialog(deptId){
+  /* 教員名單彈出視窗：條列姓名、職稱、專長、研究興趣；勾選後建檔（同時最多 3 位，其他排隊） */
+  let sc, d;
+  for (const x of (H.targets || {}).schools || []) for (const y of x.departments) if (y.id === deptId){ sc = x; d = y; }
+  if (!d) return;
+  const f = d.faculty || {}, people = f.people || [], built = new Set((H.professors || []).map(p => p.slug));
+  let dlg = document.getElementById("fac-dialog");
+  if (!dlg){ dlg = document.createElement("dialog"); dlg.id = "fac-dialog";
+    dlg.style.cssText = "max-width:880px;width:calc(100% - 32px);max-height:calc(100vh - 48px);border:1px solid #ddd;border-radius:12px;padding:0";
+    dlg.addEventListener("click", ev => { if (ev.target === dlg) dlg.close(); }); document.body.appendChild(dlg); }
+  const cell = v => v ? esc(Array.isArray(v) ? v.join("、") : v) : `<span class="muted">—</span>`;
+  dlg.innerHTML = `<div style="display:flex;flex-direction:column;max-height:calc(100vh - 48px)">
+    <div style="padding:16px 20px;border-bottom:1px solid #eee"><div class="row" style="justify-content:space-between;flex-wrap:nowrap;gap:12px">
+      <div><strong style="font-size:1.1rem">${esc(d.name)}</strong><div class="small muted">${esc(sc.name)}｜${T("教員", "Faculty")} ${people.length} ${T("位", "")}${f.src ? `｜<a href="${esc(f.src)}" target="_blank" rel="noopener">${T("名單出處", "source")}</a>` : ""}</div></div>
+      <span class="row" style="gap:6px;flex:none">${ibtn("refresh", "重新查教員名單 Refresh", `data-fac-refresh="${esc(d.id)}"`)}${ibtn("x", "關閉 Close", `onclick="this.closest('dialog').close()"`)}</span></div>
+      <input type="search" data-fac-q="${esc(d.id)}" placeholder="搜尋姓名、專長或興趣" style="width:100%;margin-top:10px"></div>
+    <div style="overflow:auto;padding:4px 20px" data-fac-list="${esc(d.id)}">
+      <table class="small" style="width:100%;border-collapse:collapse">
+        <thead><tr style="text-align:left;position:sticky;top:0;background:#fff"><th style="width:32px"></th><th>${T("教授", "Name")}</th><th>${T("專長", "Expertise")}</th><th>${T("研究興趣", "Interests")}</th></tr></thead>
+        <tbody>${people.map(x => { const has = built.has(slugOfName(x.name));
+          return `<tr data-fac-row style="border-top:1px solid #f0f0f0;vertical-align:top">
+            <td style="padding:8px 4px">${has ? `<span class="pill g" title="已建檔">✓</span>` : `<input type="checkbox" data-fac="${esc(d.id)}" value="${esc(x.name)}" aria-label="選 ${esc(x.name)}" style="width:18px;height:18px">`}</td>
+            <td style="padding:8px 6px;min-width:150px">${x.profile_url ? `<a href="${esc(x.profile_url)}" target="_blank" rel="noopener"><strong>${esc(x.name)}</strong></a>` : `<strong>${esc(x.name)}</strong>`}<div class="muted">${esc(x.title || "")}</div></td>
+            <td style="padding:8px 6px">${cell(x.expertise)}</td><td style="padding:8px 6px">${cell(x.interests || x.research)}</td></tr>`; }).join("")}</tbody></table></div>
+    <div class="row" style="padding:12px 20px;border-top:1px solid #eee;justify-content:space-between">
+      <span class="small muted" data-fac-count>${T("已勾 0 位", "0 selected")}</span>
+      <button type="button" class="btn btn-green" data-fac-build="${esc(d.id)}">${T("詳細查詢勾選的教授", "Build selected")}</button></div></div>`;
+  dlg.addEventListener("change", () => { const n = dlg.querySelectorAll("[data-fac]:checked").length; const c = dlg.querySelector("[data-fac-count]"); if (c) c.textContent = `已勾 ${n} 位${n > 3 ? "（同時最多跑 3 位，其他排隊）" : ""}`; });
+  dlg.showModal();
+}
+document.addEventListener("click", ev => { const b = ev.target.closest("[data-fac-open]"); if (b) facDialog(b.dataset.facOpen); });
 function deptOptions(sel){
   return `<option value="">${T("（不分系所）", "(none)")}</option>` + ((H.targets || {}).schools || []).map(sc => `<optgroup label="${esc(sc.name)}">${sc.departments.map(d =>
     `<option value="${esc(d.id)}" ${d.id === sel ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</optgroup>`).join("");
@@ -611,18 +642,13 @@ function targetsHTML(list, card){
   const dept = d => {
     const ps = (d.members || []).map(x => by[x]).filter(Boolean); ps.forEach(p => used.add(p.slug));
     const f = d.faculty, people = (f && f.people) || [];
-    const fac = !window.APP_REMATCH ? "" : people.length ? `<details class="faculty" style="margin:6px 0 10px"><summary class="small" style="cursor:pointer;min-height:36px;display:flex;align-items:center">${T("教員名單", "Faculty")}（${people.length} 位）<span class="muted">　${T("勾選想了解的，再按建檔", "tick, then build")}</span></summary>
-        <div class="row" style="margin:6px 0"><input type="search" data-fac-q="${esc(d.id)}" placeholder="搜尋姓名或研究方向" style="flex:1">
-          <button class="btn btn-sm" data-fac-refresh="${esc(d.id)}">${T("重新查名單", "Refresh")}</button></div>
-        <div data-fac-list="${esc(d.id)}">${people.map(x => { const has = built.has(slugOfName(x.name));
-          return `<label class="small" data-fac-row style="display:flex;gap:8px;align-items:flex-start;margin:4px 0">${has ? `<span class="pill g" style="flex:none">已建檔</span>` : `<input type="checkbox" data-fac="${esc(d.id)}" value="${esc(x.name)}" style="width:18px;height:18px;flex:none;margin-top:2px">`}
-            <span><strong>${esc(x.name)}</strong> <span class="muted">${esc(x.title || "")}</span> ${x.profile_url ? `<a href="${esc(x.profile_url)}" target="_blank" rel="noopener">${T("個人頁", "profile")}</a>` : ""}${x.research ? `<div class="muted">${esc(x.research)}</div>` : ""}</span></label>`; }).join("")}</div>
-        <div class="row" style="margin-top:8px"><button class="btn btn-green btn-sm" data-fac-build="${esc(d.id)}">${T("建檔勾選的教授", "Build selected")}</button>
-          <span class="small muted">${T("同時最多跑 3 位，其他會排隊自動開始", "Up to 3 at once; the rest queue")}${f.src ? `｜<a href="${esc(f.src)}" target="_blank" rel="noopener">${T("名單出處", "source")}</a>` : ""}</span></div></details>`
-      : `<div class="row small" style="margin:6px 0 10px"><span class="muted">${T("還沒有教員名單", "No faculty list yet")}</span><button class="btn btn-sm" data-fac-refresh="${esc(d.id)}">${T("查教員名單", "Find faculty")}</button></div>`;
+    const fac = !window.APP_REMATCH ? "" : people.length
+      ? `<div class="row small" style="margin:6px 0 10px;gap:8px"><button type="button" class="btn btn-sm" data-fac-open="${esc(d.id)}">${icon("users", 16)} ${T("教員名單", "Faculty")}（${people.length}）</button>
+          <span class="muted">${T("打開勾選想詳細查詢的教授", "open to pick professors")}</span></div>`
+      : `<div class="row small" style="margin:6px 0 10px"><span class="muted">${T("還沒有教員名單", "No faculty list yet")}</span>${ibtn("users", "查教員名單 Find faculty", `data-fac-refresh="${esc(d.id)}"`)}</div>`;
     return `<details class="dept" open style="margin:8px 0 14px 4px"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center;gap:8px">
-        <strong>${esc(d.name)}</strong><span class="small muted">${ps.length} ${T("位教授", "professors")}</span>${d.url ? `<a class="small" href="${esc(d.url)}" target="_blank" rel="noopener">${T("系所網站", "site")}</a>` : ""}
-        ${window.APP_REMATCH ? `<button class="btn btn-sm" data-dept-remove="${esc(d.id)}" style="margin-left:auto">${T("移除系所", "Remove")}</button>` : ""}</summary>
+        <strong>${esc(d.name)}</strong><span class="small muted">${ps.length} ${T("位教授", "professors")}</span><span class="row" style="margin-left:auto;gap:6px">${d.url ? ilink("external", "系所網站 Department site", esc(d.url)) : ""}
+        ${window.APP_REMATCH ? ibtn("trash", "移除系所 Remove department", `data-dept-remove="${esc(d.id)}"`, "danger") : ""}</span></summary>
       ${fac}${ps.map(card).join("") || `<div class="small muted" style="margin:4px 0 8px">${T("這個系所還沒有建檔的教授", "No professors yet")}</div>`}</details>`;
   };
   const schools = (t.schools || []).map(sc => `<section class="school" style="margin-bottom:18px"><h3 style="margin:6px 0 2px">🏛 ${esc(sc.name)}</h3>${sc.departments.map(dept).join("")}</section>`).join("");
@@ -722,17 +748,17 @@ async function loadHome(){
 }
 
 let OFFLINE_HOME = false;
-const PAGES = [["index.html", T("簡介", "Profile")], ["professors.html", T("目標教授", "Professors")], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
+const PAGES = [["index.html", T("簡介", "Profile")], ["professors.html", T("申請目標", "Applications")], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
 const MORE = [["settings.html", "設定與工作進度"]];
 const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "proposals.html": ["proposal"],
                        "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline", "settings"], "settings.html": ["pipeline", "settings"]};
 function setupHomeViews(){
-  /* 頁籤（參考 USyd 教授個人頁）：簡介｜目標教授｜Research Proposal｜Personal Statement｜Statement of Purpose；設定與工作進度在右上角齒輪。
+  /* 頁籤（參考 USyd 教授個人頁）：簡介｜申請目標｜Research Proposal｜Personal Statement｜Statement of Purpose；設定與工作進度在右上角齒輪。
      離線單檔版全部在一頁，頁籤變成頁內連結 */
   const tabs = document.getElementById("tabs");
   const here = location.pathname.split("/").pop() || "index.html";
   if (OFFLINE_HOME){
-    tabs.innerHTML = [["me", T("簡介", "Profile")], ["professors", T("目標教授", "Professors")], ["proposal", "Research Proposal"], ["ps", "Personal Statement"], ["sop", "Statement of Purpose"]].map(([id, l]) => `<a href="#${id}">${l}</a>`).join("");
+    tabs.innerHTML = [["me", T("簡介", "Profile")], ["professors", T("申請目標", "Applications")], ["proposal", "Research Proposal"], ["ps", "Personal Statement"], ["sop", "Statement of Purpose"]].map(([id, l]) => `<a href="#${id}">${l}</a>`).join("");
     return;
   }
   const cur = here === "me.html" ? "index.html" : here;
