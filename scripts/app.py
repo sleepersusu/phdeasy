@@ -185,7 +185,7 @@ class App:
         self.codex_test = None
         self.port = 8790
         self._rebuild_lock = threading.Lock()
-        self.queue = []  # 同時已有 3 個工作在跑時，勾選建檔的教授先排隊，有空位就自動開始
+        self.queue = self._load_queue()  # 同時已有 3 個工作在跑時先排隊，有空位就自動開始；存成檔，重開程式還在
         self._prog_samples = {}  # {工作 id: {步驟: (第一次看到的時間, 當時做完幾項)}}
         self.gcal_pending = None
         self.jobs.on_done = self.after_job
@@ -202,6 +202,20 @@ class App:
                      "order": [k for k, _ in BOOT_STEPS], "step": "drive", "sync": {}, "done": False}
         self.update_state = {"stage": "", "got": 0, "total": 0, "error": ""}
 
+    def _queue_file(self):
+        return self.runs / "_app" / "queue.json"
+
+    def _load_queue(self):
+        try:
+            return json.loads(self._queue_file().read_text())
+        except (OSError, ValueError):
+            return []
+
+    def _save_queue(self):
+        p = self._queue_file()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(self.queue, ensure_ascii=False, indent=1))
+
     def start_or_queue(self, kind, prompt, title, slug=None, key=None):
         """有空位就開始；已有 3 個工作在跑就排隊（同一位教授已在跑則照樣回錯誤）。"""
         try:
@@ -211,6 +225,7 @@ class App:
                 raise
             if not any(q["title"] == title for q in self.queue):
                 self.queue.append({"kind": kind, "prompt": prompt, "title": title, "slug": slug, "key": key})
+                self._save_queue()
             return {"queued": True, "title": title, "position": len(self.queue)}
 
     def _drain_queue(self):
@@ -223,6 +238,7 @@ class App:
                     return
                 print(f"排隊的工作開不了：{q['title']}：{e}")
             self.queue.pop(0)
+            self._save_queue()
 
     def _targets(self):
         p = self.runs / "_me" / "targets.json"
@@ -270,7 +286,16 @@ class App:
             if j["id"] in ids or k in seen or len(out) >= 15:
                 continue
             seen.add(k)
-            out.append({**j, "status": "failed"} if j["status"] == "running" else j)
+            if j["status"] == "running":
+                j = {**j, "status": "failed"}
+            elif j["status"] == "done" and j.get("slug") and j["kind"] in ("new", "reply", "continue", "exception", "deep"):
+                st_p = self.runs / j["slug"] / "state.json"  # 建檔停下（熔斷）不算跑完
+                try:
+                    if json.loads(st_p.read_text()).get("stage") == "halted":
+                        j = {**j, "status": "halted"}
+                except (OSError, ValueError):
+                    pass
+            out.append(j)
         return [{**{k: v for k, v in j.items() if k != "prompt"}, "running": j["id"] in ids,
                  "log": self.jobs.log_tail(j["id"], 80 if j["id"] in ids or j["status"] != "done" else 30),
                  "progress": self.job_progress(j) if j["id"] in ids else None} for j in out]
@@ -905,7 +930,7 @@ class App:
             slug = (body.get("slug") or "").strip()
             if not (self.runs / slug / "state.json").exists():
                 raise ValueError(f"沒有這位教授：{slug}")
-            return self.jobs.start("continue", prompt_continue(slug), f"繼續：{slug}", slug=slug)
+            return self.start_or_queue("continue", prompt_continue(slug), f"繼續：{slug}", slug=slug)
         if path == "exception":
             slug = (body.get("slug") or "").strip()
             stp = self.runs / slug / "state.json"

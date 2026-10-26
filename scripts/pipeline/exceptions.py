@@ -41,8 +41,11 @@ def open_exceptions(run):
     return [e for e in load_state(run)["exceptions"] if not e.get("resolved")]
 
 
+NOT_CIRCUIT = {"abstract_only", "no_source"}  # 必讀沒有免費全文：照用摘要做、事後按鈕再找，不熔斷（本人 2026-10-26）
+
+
 def exception_ratio(run, total):
-    ids = {e["id"] for e in open_exceptions(run) if e["kind"] not in INFO_KINDS}
+    ids = {e["id"] for e in open_exceptions(run) if e["kind"] not in INFO_KINDS | NOT_CIRCUIT}
     return len(ids) / total if total else 0
 
 

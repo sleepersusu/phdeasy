@@ -54,3 +54,14 @@ def test_resolve_missing_returns_false(tmp_path):
     from pipeline.exceptions import resolve_exception
     run = init_run(tmp_path / "x", professor={})
     assert resolve_exception(run, "W9", "ingest", "no_source", "") is False
+
+
+def test_missing_fulltext_does_not_trip_circuit(tmp_path):
+    """本人 2026-10-26：只精讀 5 篇、不停下；必讀沒有免費全文改用摘要（abstract_only）不算熔斷，教授頁有「再找全文／上傳 PDF」按鈕。"""
+    run = init_run(tmp_path / "x", professor={})
+    add_exception(run, "W1", "ingest", "abstract_only", "")
+    add_exception(run, "W2", "ingest", "abstract_only", "")
+    assert check_circuit(run, total=5, limit=0.3) == (False, None)
+    add_exception(run, "W3", "ingest", "no_text", "")
+    add_exception(run, "W4", "ingest", "title_mismatch", "")
+    assert check_circuit(run, total=5, limit=0.3)[0]  # 讀不出字、拿錯檔案這種真的錯仍會停

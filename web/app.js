@@ -61,7 +61,7 @@ function jobsHTML(st, ready){
   const row = job => {
     const running = job.running, id = esc(job.id);
     return setRow("row-job-" + job.id, running ? "▶ " + esc(job.title) : esc(job.title),
-      `${running ? (job.progress ? `<span class="pill y">${job.progress.percent}%｜還要${dur(job.progress.eta_s)}</span>` : '<span class="pill y">執行中</span>') : job.status === "done" ? '<span class="pill g">跑完了</span>' : '<span class="pill r">中斷</span>'}`, `
+      `${running ? (job.progress ? `<span class="pill y">${job.progress.percent}%｜還要${dur(job.progress.eta_s)}</span>` : '<span class="pill y">執行中</span>') : job.status === "done" ? '<span class="pill g">跑完了</span>' : job.status === "halted" ? '<span class="pill y">停下，等你處理</span>' : '<span class="pill r">中斷</span>'}`, `
       ${running && job.progress ? progressHTML(job.progress) : ""}
       <div class="row">${running ? `<button class="btn btn-red btn-sm" data-job-stop="${id}">停止</button>` : ""}
         ${!running && job.status !== "done" && job.slug ? `<button class="btn btn-green btn-sm" data-continue="${esc(job.slug)}" ${!ready ? "disabled" : ""}>繼續跑</button><span class="small muted">從中斷的地方接著跑，已完成的不會重做</span>` : ""}

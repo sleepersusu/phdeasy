@@ -431,3 +431,22 @@ def test_targets_faculty_build_and_queue(tmp_path):
     started.clear()
     app.after_job({"id": "x"})
     assert started and started[0][:2] == ("new", "hong-julian") and app.queue == []
+
+
+def test_halted_build_shows_unfinished_and_queue_survives_restart(tmp_path):
+    """建檔停下（熔斷）的不能算「跑完了」；排隊清單存成檔，重開程式還在；繼續跑滿了也排隊。"""
+    import json
+    import app as appmod
+    app, _ = _lib_app(tmp_path)
+    r = tmp_path / "runs" / "doe-jane"
+    r.mkdir(parents=True, exist_ok=True)
+    (r / "state.json").write_text(json.dumps({"stage": "halted"}))
+    job = {"id": "J1", "kind": "new", "title": "建檔：Jane Doe", "slug": "doe-jane", "key": "doe-jane", "status": "done", "started": 1}
+    (app.jobs.dir / "J1.json").write_text(json.dumps(job))
+    app.jobs.active = lambda: []
+    got = {j["id"]: j for j in app.job_list()}
+    assert got["J1"]["status"] == "halted"
+    app.jobs.start = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("已經有 3 個工作在跑，等其中一個到停點或跑完再開新的"))
+    assert app.post("continue", {"slug": "doe-jane"})["queued"]
+    app2 = appmod.App(tmp_path)
+    assert [q["title"] for q in app2.queue] == ["繼續：doe-jane"]
