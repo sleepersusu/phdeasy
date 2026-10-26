@@ -28,10 +28,12 @@ function initLangMenu(onPick){
 
 
 function renderMe(m){
-  $("#name").textContent = m.name + (m.name_zh ? `（${m.name_zh}）` : "");
-  $("#headline").innerHTML = bi(m.headline_zh, m.headline);
   const c = m.contact || {};
-  $("#contact").innerHTML = [c.location && esc(c.location), c.email && esc(c.email), c.github && `<a href="https://${esc(c.github)}" target="_blank" rel="noopener">${esc(c.github)}</a>`].filter(Boolean).join("｜");
+  if ($("#name")){  // 只有首頁的頁首放個人資料；子頁是「← 我的首頁 › 這一頁」
+    $("#name").textContent = m.name + (m.name_zh ? `（${m.name_zh}）` : "");
+    $("#headline").innerHTML = bi(m.headline_zh, m.headline);
+    $("#contact").innerHTML = [c.location && esc(c.location), c.email && esc(c.email), c.github && `<a href="https://${esc(c.github)}" target="_blank" rel="noopener">${esc(c.github)}</a>`].filter(Boolean).join("｜");
+  }
   body("me").innerHTML = `
     <div class="card">${bi(m.summary_zh, m.summary, "div")}<div class="src">出處：${esc(m.summary_src || "CV")}</div></div>
     <h3>研究興趣</h3><div class="chips">${(m.interests || []).map(i => `<span class="pill">${bi(i.zh, i.en)}</span>`).join("")}</div>
@@ -198,9 +200,11 @@ function setupHomeViews(){
       </div>`;
   } else {
     document.getElementById("hub")?.remove();
-    const back = document.createElement("div");
-    back.innerHTML = `<a class="btn btn-green" href="index.html" style="margin-top:12px">← 回首頁</a>`;
-    document.querySelector("main").prepend(back);
+    /* 返回放在最上面：← 我的首頁 › 這一頁；個人資料只在首頁顯示，子頁不重複 */
+    const head = document.querySelector("header.top .wrap > div");
+    const label = (PAGES.find(([f]) => f === here) || [])[1] || "";
+    head.innerHTML = `<nav class="crumbs" aria-label="目前位置"><a href="index.html">← 我的首頁</a><span class="sep">›</span><span aria-current="page">${esc(label)}</span></nav><h1>${esc(label)}</h1>`;
+    document.querySelectorAll("main > section > h2").forEach(h => { if (h.textContent.trim() === label) h.hidden = true; });  // 頁首已經有，不重複
   }
 }
 
@@ -212,7 +216,7 @@ function setupHomeViews(){
   OFFLINE_HOME = document.getElementById("inline-data")?.textContent.trim() !== "__INLINE__";
   setupHomeViews();
   if (!H.me){
-    $("#name").textContent = "我的博士申請首頁";
+    if ($("#name")) $("#name").textContent = "我的博士申請首頁";
     body("me").innerHTML = `<div class="empty">還沒有你的個人資料。請把 CV 與研究計畫交給 Claude，它會整理成 runs/_me/me.json。</div>`;
     renderProposal(null); renderCaps([]);
   } else {

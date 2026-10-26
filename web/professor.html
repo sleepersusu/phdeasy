@@ -148,11 +148,28 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 .langmenu .menu button::before{content:"";display:inline-block;width:1em}
 .langmenu .menu button[aria-checked="true"]{font-weight:600;color:#14532d}
 .langmenu .menu button[aria-checked="true"]::before{content:"✓"}
+
+/* 位置列（麵包屑）：返回放在最上面 */
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.9rem;color:var(--muted);margin:0 0 8px}
+.crumbs a{color:var(--muted);text-decoration:none;min-height:32px;display:inline-flex;align-items:center}
+.crumbs a:hover{color:var(--fg);text-decoration:underline}
+.crumbs .sep{color:#b8bcc2}
+.crumbs [aria-current]{color:var(--fg);font-weight:600}
+
+/* 計畫書內文：段落、小標、圖、表 */
+.doc-sec .doc-p{margin:0 0 12px}
+.doc-sec .doc-h2{font-size:1.02rem;margin:18px 0 8px}
+.doc-sec .doc-h3{font-size:.96rem;margin:14px 0 6px;color:var(--muted)}
+.doc-fig,.doc-tbl{margin:14px 0}
+.doc-fig img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
+.doc-fig figcaption,.doc-tbl figcaption{margin:6px 0;color:var(--muted)}
+.doc-tbl td,.doc-tbl th{font-size:.9rem}
+.doc-refs{padding-left:1.4em}
 </style>
 </head>
 <body>
 <a class="sr" href="#papers">跳到文章解析</a>
-<header class="top"><div class="wrap"><div><a class="btn btn-green" href="index.html" id="home-link" style="margin-bottom:8px">← 回我的首頁</a><h1 id="title"></h1><div class="meta" id="meta"></div></div>
+<header class="top"><div class="wrap"><div><nav class="crumbs" id="crumbs" aria-label="目前位置"></nav><h1 id="title"></h1><div class="meta" id="meta"></div></div>
   <div class="langmenu">
     <button type="button" class="iconbtn" id="lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" aria-label="切換內容語言" title="內容語言">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
@@ -630,6 +647,16 @@ function basicHTML(){
   </section>`;
 }
 
+let HOME_HREF = "index.html";
+function crumbs(v){
+  /* 我的首頁 › 教授 › 目前這一塊（返回都在最上面，不另外放按鈕） */
+  const el = document.getElementById("crumbs");
+  if (!el) return;
+  const name = esc(D.professor.name || ""), cur = (VIEWS.find(x => x[0] === v) || [])[1];
+  el.innerHTML = `<a href="${HOME_HREF}">← 我的首頁</a><span class="sep">›</span>` +
+    (v && cur ? `<a href="${viewHref("")}">${name}</a><span class="sep">›</span><span aria-current="page">${esc(cur)}</span>` : `<span aria-current="page">${name}</span>`);
+}
+
 function setupViews(){
   const v = VIEW(), main = document.querySelector("main");
   const nav = document.querySelector("nav.sections .wrap");
@@ -645,12 +672,8 @@ function setupViews(){
         <div class="row" style="justify-content:space-between"><strong style="font-size:1.1rem">${label}</strong><span class="pill">${esc(n(D) || "看")}</span></div>
         <div class="small muted" style="margin-top:6px">${hint}</div></a>`).join("")}</div>`;
     main.prepend(hub);
-  } else {
-    const back = document.createElement("div");
-    back.id = "hub";
-    back.innerHTML = `<a class="btn btn-green" href="${viewHref("")}" style="margin-top:12px">← ${esc(D.professor.name || "")} 教授首頁</a>`;
-    main.prepend(back);
   }
+  crumbs(v);
   window.scrollTo(0, 0);
 }
 
@@ -681,15 +704,42 @@ document.addEventListener("click", ev => {
 });
 let PROP_VER = null;
 
+const ME_BASE = () => OFFLINE ? "../../../_me/" : "../runs/_me/";  // 計畫書的圖檔在 runs/_me/proposal/figures/
+function docBlock(b){
+  /* 計畫書的一個區塊：段落、小標、圖（原始圖檔）、表（真的表格）、參考文獻 */
+  if (b.type === "p") return `<div class="doc-p">${bi(b.zh, b.en, "div")}</div>`;
+  if (b.type === "h2") return `<h4 class="doc-h2">${bi(b.zh, b.en, "div")}</h4>`;
+  if (b.type === "h3") return `<h5 class="doc-h3">${bi(b.zh, b.en, "div")}</h5>`;
+  if (b.type === "ref") return `<li class="small" lang="en">${esc(b.en)}</li>`;
+  if (b.type === "figure") return `<figure class="doc-fig"><a href="${esc(ME_BASE() + b.src)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(ME_BASE() + b.src)}" alt="${esc(b.caption_en || "圖")}"></a>
+      <figcaption class="small">${bi(b.caption_zh, b.caption_en, "div")}</figcaption></figure>`;
+  if (b.type === "table"){
+    const rz = b.rows_zh || [];
+    const cell = (r, c) => bi((rz[r] || [])[c], b.rows[r][c], "div");
+    return `<figure class="doc-tbl"><figcaption class="small">${bi(b.caption_zh, b.caption_en, "div")}</figcaption><div class="tablebox"><table>
+      <thead><tr>${b.rows[0].map((_, c) => `<th>${cell(0, c)}</th>`).join("")}</tr></thead>
+      <tbody>${b.rows.slice(1).map((row, i) => `<tr>${row.map((_, c) => `<td>${cell(i + 1, c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></figure>`;
+  }
+  return "";
+}
+function docSection(s){
+  const blocks = s.blocks || [];
+  const refs = blocks.filter(b => b.type === "ref"), rest = blocks.filter(b => b.type !== "ref");
+  return rest.map(docBlock).join("") + (refs.length ? `<ol class="doc-refs">${refs.map(r => docBlock({...r, en: r.en.replace(/^\d+\.\s*/, "")})).join("")}</ol>` : "")
+    + (!blocks.length && (s.en || s.zh) ? `<div style="white-space:pre-line">${bi(s.zh || "", s.en, "div")}</div>` : "");
+}
+
 function jointHTML(p){
-  /* 跟教授討論過的計畫書：照原本的分段放上去 */
+  /* 跟教授定案的計畫書：照原檔的分段、圖與表放上去（來源：本人的 Word 檔，只存在本人的雲端硬碟） */
   const doc = p.document || [];
-  const secs = doc.length ? doc.map((s, i) => `<details class="item" ${i < 2 ? "open" : ""}><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>${esc(s.heading_zh)}｜${esc(s.heading_en)}</strong></summary>
-      <div style="margin-top:8px;white-space:pre-line">${bi(s.zh || "", s.en, "div")}</div></details>`).join("")
+  const secs = doc.length ? doc.map((s, i) => `<details class="item doc-sec" ${s.key === "references" ? "" : "open"}><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>${esc(s.heading_zh)}｜<span lang="en">${esc(s.heading_en)}</span></strong></summary>
+      <div style="margin-top:8px">${docSection(s)}</div></details>`).join("")
     : `<h3>研究缺口</h3><ol>${(p.gaps || []).map(g => `<li>${bi(g.zh, g.en, "div")}</li>`).join("")}</ol>
        ${(p.studies || []).map(st => `<div class="item"><strong>${bi(st.name_zh, st.name, "div")}</strong><div class="small" style="margin-top:4px">${bi(st.detail_zh, st.detail, "div")}</div></div>`).join("")}`;
+  const meta = (p.document_meta || [p.supervisor]).filter(Boolean);
   return `<div class="card"><div class="row">${pill("g", "已定案")}<span class="small muted">出處：${esc(p.document_src || p.src || "研究計畫書")}</span></div>
-    <h3 style="margin-top:10px">${bi(p.title_zh, p.title, "div")}</h3><div class="small muted">${esc(p.subtitle || "")}</div><div class="small">${esc(p.supervisor || "")}</div>
+    <h3 style="margin-top:10px">${bi(p.title_zh, p.title, "div")}</h3><div class="small muted" lang="en">${esc(p.subtitle || "")}</div>
+    ${meta.map(m => `<div class="small" lang="en">${esc(m)}</div>`).join("")}
     ${doc.length ? "" : `<div style="margin-top:8px">${bi(p.synopsis_zh, p.synopsis, "div")}</div>`}</div>${secs}`;
 }
 
@@ -875,7 +925,7 @@ async function loadData(){
   try { D = await loadData(); }
   catch (e) { document.querySelector("main").innerHTML = `<div class="empty" role="alert">${esc(e.message)}</div>`; return; }
   OFFLINE = document.getElementById("inline-data").textContent.trim() !== "__INLINE__";
-  if (OFFLINE) document.getElementById("home-link").href = "../../../index.html";
+  if (OFFLINE) HOME_HREF = "../../../index.html";
   document.title = (D.professor.name || "") + " 研究檔案";
   setLang(store.get("lang") || "both");
   initLangMenu(setLang);

@@ -100,3 +100,10 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 .langmenu .menu button::before{content:"";display:inline-block;width:1em}
 .langmenu .menu button[aria-checked="true"]{font-weight:600;color:#14532d}
 .langmenu .menu button[aria-checked="true"]::before{content:"✓"}
+
+/* 位置列（麵包屑）：返回放在最上面 */
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.9rem;color:var(--muted);margin:0 0 8px}
+.crumbs a{color:var(--muted);text-decoration:none;min-height:32px;display:inline-flex;align-items:center}
+.crumbs a:hover{color:var(--fg);text-decoration:underline}
+.crumbs .sep{color:#b8bcc2}
+.crumbs [aria-current]{color:var(--fg);font-weight:600}

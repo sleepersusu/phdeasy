@@ -78,11 +78,18 @@ details>summary{list-style:none}details>summary::-webkit-details-marker{display:
 details.item>summary::before{content:"›";display:inline-block;width:1em;color:var(--muted);transition:transform .15s}
 details.item[open]>summary::before{transform:rotate(90deg)}
 header.top{border-bottom:1px solid var(--line)}
+
+/* 位置列（麵包屑）：返回放在最上面 */
+.crumbs{display:flex;flex-wrap:wrap;align-items:center;gap:6px;font-size:.9rem;color:var(--muted);margin:0 0 8px}
+.crumbs a{color:var(--muted);text-decoration:none;min-height:32px;display:inline-flex;align-items:center}
+.crumbs a:hover{color:var(--fg);text-decoration:underline}
+.crumbs .sep{color:#b8bcc2}
+.crumbs [aria-current]{color:var(--fg);font-weight:600}
 </style>
 </head>
 <body>
 <header><div class="wrap">
-  <div class="row" style="justify-content:space-between"><a class="btn btn-green" id="back" href="#">← 回文章列表</a><span class="small muted" id="prof"></span></div>
+  <nav class="crumbs" id="crumbs" aria-label="目前位置"></nav>
   <div class="bi" style="margin-top:12px;border:none"><div class="en"><h1 id="t-en" lang="en"></h1></div><div><h1 id="t-zh"></h1></div></div>
   <div class="small muted" id="meta" style="margin-top:6px"></div>
   <div class="row" id="links" style="margin-top:8px"></div>
@@ -107,8 +114,9 @@ const pairList = (items, ordered) => {
 function render(d, w){
   document.title = w.title;
   const lib = w.library;  // 討論文獻：教授給的，不是她的文章
-  $("#back").href = `professor.html?p=${encodeURIComponent(SLUG)}&v=${lib ? "library" : "papers"}`;
-  $("#prof").textContent = d.professor.name + (lib ? " 的討論文獻" : " 的文章");
+  const prof = `professor.html?p=${encodeURIComponent(SLUG)}`;
+  $("#crumbs").innerHTML = `<a href="index.html">← 我的首頁</a><span class="sep">›</span><a href="${prof}">${esc(d.professor.name)}</a><span class="sep">›</span>` +
+    `<a href="${prof}&v=${lib ? "library" : "papers"}">${lib ? "討論文獻" : "文章解析"}</a><span class="sep">›</span><span aria-current="page">這一篇</span>`;
   $("#t-en").textContent = w.title; $("#t-zh").textContent = w.title_zh || (lib ? "" : "（還沒有中文標題）");
   $("#meta").innerHTML = (lib ? [w.year, esc(w.venue || ""), (w.authors || []).slice(0, 3).map(a => esc(a.name)).join(", "),
       [lib.given_by && `${esc(lib.given_by)} 給的`, lib.discussion && `${esc(lib.discussion)} 討論`].filter(Boolean).join("，"),
