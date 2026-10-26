@@ -62,6 +62,13 @@ async function pipelinePanel(){
 function check(ok, good, bad){ return `<li>${ok ? `<span class="pill g">✓</span> ${good}` : `<span class="pill r">✗</span> ${bad}`}</li>`; }
 
 let lastShape = "";
+/* 設定與工作進度（本人 2026-10-26 合併成一頁）：每一項是一列，摘要在列上，點開才看到可以改的東西 */
+const OPEN_ROWS = new Set(["row-job"]);
+function setRow(id, title, status, inner){
+  return `<details class="setrow" id="${id}" ${OPEN_ROWS.has(id) ? "open" : ""}><summary><span class="setrow-t">${title}</span><span class="setrow-s">${status}</span></summary><div class="setrow-b">${inner}</div></details>`;
+}
+document.addEventListener("toggle", ev => { const d = ev.target; if (d.classList && d.classList.contains("setrow")) d.open ? OPEN_ROWS.add(d.id) : OPEN_ROWS.delete(d.id); }, true);
+
 function renderPipeline(st){
   const el = document.querySelector("#pipeline:not([hidden]) .body");
   if (!el) return;  // 這一頁沒有「建新教授」區
@@ -80,25 +87,10 @@ function renderPipeline(st){
   const ready = st.claude && st.uv;
   const job = st.job, running = st.running;
   const profs = st.professors || [];
-  el.innerHTML = `
-    <div class="card"><h3 style="margin-top:0">這台電腦</h3><ul class="checks">
-      ${check(st.claude, `Claude Code：${esc(st.claude)}`, `找不到 Claude Code。請先安裝並登入：<a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a>，裝好後重開這個程式。`)}
-      ${check(st.uv, `uv：${esc(st.uv)}`, `找不到 uv（流水線的 Python 工具）。<button class="btn btn-yellow" id="install-uv">安裝 uv</button>`)}
-      ${check(st.drive, `Google 雲端硬碟：${esc(st.drive)}`, "找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入。沒有也能跑，但結果不會同步到別台。")}
-      ${st.blocked ? `<li><span class="pill y">!</span> 另一台電腦（${esc(st.blocked)}）正在用：這台先不同步，那台關掉後重開這個程式。</li>` : ""}
-    </ul></div>
-
-    <div class="card" style="margin-top:12px"><h3 style="margin-top:0">各教授進度</h3>
-      ${profs.length ? `<ul>${profs.map(p => `<li class="row" style="margin:6px 0"><strong>${esc(p.name || p.slug)}</strong>
-        <span class="pill ${WAITING.has(p.stage) ? "y" : p.stage === "stop2" ? "g" : ""}">${esc(STAGE_ZH[p.stage] || p.stage)}</span>
-        ${p.report ? `<a class="btn btn-green" href="../runs/${esc(p.slug)}/${esc(p.report)}" target="_blank" rel="noopener">看${p.stage === "stop1" ? "停 1" : "停 2"}報告</a>` : ""}
-        ${p.stage !== "stop2" ? `<button class="btn btn-green" data-continue="${esc(p.slug)}" ${!ready || running ? "disabled" : ""}>${WAITING.has(p.stage) ? "我確認了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
-        : `<div class="empty">還沒有教授。用上面的表單建第一位。</div>`}
-    </div>
-
-    ${job ? `<div class="card" style="margin-top:12px"><h3 style="margin-top:0">目前的工作：${esc(job.title)}</h3>
-      <div class="row">${running ? `<span class="pill y">執行中</span><button class="btn btn-red" id="job-stop">停止</button>`
-        : job.status === "done" ? `<span class="pill g">這一段跑完了</span>` : `<span class="pill r">中斷（${esc(job.status)}）</span>`}
+  const tools = [st.claude, st.uv, st.drive].filter(Boolean).length;
+  el.innerHTML =
+    (job ? setRow("row-job", "目前的工作", `${running ? '<span class="pill y">執行中</span>' : job.status === "done" ? '<span class="pill g">跑完了</span>' : `<span class="pill r">中斷</span>`} <span class="small muted">${esc(job.title)}</span>`, `
+      <div class="row">${running ? `<button class="btn btn-red" id="job-stop">停止</button>` : ""}
         ${job.cost_usd != null ? `<span class="small muted">本段用量約 US$${Number(job.cost_usd).toFixed(2)}</span>` : ""}</div>
       ${job.result && !running ? `<h3>Claude Code 的回報</h3><div class="card" style="white-space:pre-wrap">${esc(job.result)}</div>` : ""}
       <details ${running ? "open" : ""}><summary class="small" style="cursor:pointer;min-height:44px;display:flex;align-items:center">過程紀錄（${(st.log || []).length} 行）</summary>
@@ -106,8 +98,20 @@ function renderPipeline(st){
       ${!running && job.session ? `<label for="reply">回覆 Claude Code（例：停 1 的決定、要它修什麼）</label>
         <textarea id="reply" placeholder="例：身分確認是這位；外部候選兩篇都加入；其他照你的建議，繼續跑到停 2。"></textarea>
         <div class="row" style="margin-top:8px"><button class="btn btn-green" id="reply-send" ${!ready ? "disabled" : ""}>送出並繼續</button>
-        <span class="small muted">會接著同一個對話跑；停 1 確認後它會一路跑到停 2。</span></div>` : ""}
-    </div>` : ""}`;
+        <span class="small muted">會接著同一個對話跑；停 1 確認後它會一路跑到停 2。</span></div>` : ""}`)
+      : setRow("row-job", "目前的工作", '<span class="small muted">沒有在跑的工作</span>', '<div class="small muted">在「目標教授」新增教授、或在文件頁按 AI 編修，工作就會出現在這裡。</div>')) +
+    setRow("row-profs", "各教授進度", `<span class="small muted">${profs.length} 位${profs.some(p => WAITING.has(p.stage)) ? "｜有等你確認的" : ""}</span>`,
+      profs.length ? `<ul>${profs.map(p => `<li class="row" style="margin:6px 0"><strong>${esc(p.name || p.slug)}</strong>
+        <span class="pill ${WAITING.has(p.stage) ? "y" : p.stage === "stop2" ? "g" : ""}">${esc(STAGE_ZH[p.stage] || p.stage)}</span>
+        ${p.report ? `<a class="btn btn-green btn-sm" href="../runs/${esc(p.slug)}/${esc(p.report)}" target="_blank" rel="noopener">看${p.stage === "stop1" ? "停 1" : "停 2"}報告</a>` : ""}
+        ${p.stage !== "stop2" ? `<button class="btn btn-green btn-sm" data-continue="${esc(p.slug)}" ${!ready || running ? "disabled" : ""}>${WAITING.has(p.stage) ? "我確認了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
+        : `<div class="empty">還沒有教授。到「目標教授」按「＋ 新增教授」。</div>`) +
+    setRow("row-tools", "這台電腦的工具", tools === 3 ? '<span class="pill g">✓ 齊全</span>' : `<span class="pill y">${3 - tools} 項沒裝</span>`, `<ul class="checks">
+      ${check(st.claude, `Claude Code：${esc(st.claude)}`, `找不到 Claude Code。請先安裝並登入：<a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a>，裝好後重開這個程式。`)}
+      ${check(st.uv, `uv：${esc(st.uv)}`, `找不到 uv（流水線的 Python 工具）。<button class="btn btn-yellow" id="install-uv">安裝 uv</button>`)}
+      ${check(st.drive, `Google 雲端硬碟：${esc(st.drive)}`, "找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入。沒有也能跑，但結果不會同步到別台。")}
+      ${st.blocked ? `<li><span class="pill y">!</span> 另一台電腦（${esc(st.blocked)}）正在用：這台先不同步，那台關掉後重開這個程式。</li>` : ""}
+    </ul>`);
 
   if (keep.reply && el.querySelector("#reply")) el.querySelector("#reply").value = keep.reply;
   const log = el.querySelector(".log"); if (log) log.scrollTop = running ? log.scrollHeight : (keep.logTop || 0);
@@ -138,9 +142,8 @@ function renderSettings(st){
   if (shape === lastSettings) return;
   lastSettings = shape;
   const t = g.claude_test;
-  el.innerHTML = `
-    <div class="grid">
-      <div class="card"><h3 style="margin-top:0">Google 雲端硬碟</h3>
+  el.innerHTML =
+    setRow("row-drive", "Google 雲端硬碟", g.account ? `<span class="small muted">${esc(g.account)}${st.syncing ? "｜同步中" : ""}</span>` : '<span class="pill r">沒有帳號</span>', `
         ${g.drives && g.drives.length ? `<p class="small">教授檔案放在：<br><span class="muted">${esc(g.folder || "（還沒選帳號）")}</span></p>
           <div class="small" style="margin-bottom:6px">這台電腦登入的帳號（按一下就換成這個帳號）：</div>
           <div class="row">${g.drives.map(a => a === g.account ? `<span class="pill g">✓ ${esc(a)}（使用中）</span>`
@@ -149,32 +152,26 @@ function renderSettings(st){
           <div class="row"><button class="btn btn-green" id="sync-now" ${st.syncing ? "disabled" : ""}>${st.syncing ? "同步中…" : "立刻同步"}</button>
           ${st.blocked ? `<span class="pill y">另一台（${esc(st.blocked)}）正在用：只拉不推</span>` : ""}</div>`
         : `<p><span class="pill r">✗</span> 這台電腦找不到 Google 雲端硬碟。</p>
-          <ol class="small"><li>安裝 <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive 電腦版</a></li><li>用你的 Google 帳號登入</li><li>重開這個程式</li></ol>`}
-      </div>
-      <div class="card"><h3 style="margin-top:0">AI（Claude Code）</h3>
+          <ol class="small"><li>安裝 <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive 電腦版</a></li><li>用你的 Google 帳號登入</li><li>重開這個程式</li></ol>`}`) +
+    setRow("row-ai", "AI（Claude Code）", st.claude ? (t ? (t.ok ? '<span class="pill g">✓ 可以用</span>' : '<span class="pill r">✗ 不能用</span>') : '<span class="pill">已安裝，還沒測試</span>') : '<span class="pill r">沒裝</span>', `
         ${st.claude ? `<p class="small"><span class="pill g">✓</span> 已安裝：<span class="muted">${esc(st.claude)}</span></p>
           ${t ? `<p class="small">${t.ok ? `<span class="pill g">✓ 可以用</span>` : `<span class="pill r">✗ 不能用</span>`} ${esc(t.msg)}</p>` : `<p class="small muted">還沒測試過能不能用。</p>`}
           <div class="row"><button class="btn btn-green" id="claude-test">測試能不能用</button><button class="btn btn-yellow" id="claude-login">登入／換帳號</button></div>
           <p class="small muted">「登入／換帳號」會開一個終端機視窗跑 Claude Code：照畫面登入（瀏覽器會跳出 Claude 的登入頁）；要換帳號就在裡面輸入 <code>/logout</code> 再登入。完成後關掉那個視窗，回來按「測試能不能用」。</p>`
         : `<p><span class="pill r">✗</span> 這台還沒裝 Claude Code（只看資料不需要；要建新教授、處理例外才需要）。</p>
-          <ol class="small"><li>到 <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a> 照說明安裝</li><li>重開這個程式，再回來按「登入」</li></ol>`}
-      </div>
-      <div class="card"><h3 style="margin-top:0">金鑰</h3>
+          <ol class="small"><li>到 <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a> 照說明安裝</li><li>重開這個程式，再回來按「登入」</li></ol>`}`) +
+    setRow("row-keys", "金鑰", g.keys && g.keys.S2_API_KEY ? '<span class="pill g">✓ Semantic Scholar 已設定</span>' : '<span class="pill y">沒設定</span>', `
         <p class="small">Semantic Scholar：${g.keys && g.keys.S2_API_KEY ? `<span class="pill g">✓ 已設定</span>` : `<span class="pill y">沒設定</span>（不設也能用，只是常被限流）`}</p>
         <button class="btn btn-green" id="open-secrets">打開金鑰檔</button>
-        <p class="small muted">金鑰檔在你的雲端硬碟裡，每台電腦都會同步到；程式不會顯示金鑰內容。打開後在等號後面貼上 key、存檔即可。</p>
-      </div>
-      <div class="card"><h3 style="margin-top:0">版本</h3>
+        <p class="small muted">金鑰檔在你的雲端硬碟裡，每台電腦都會同步到；程式不會顯示金鑰內容。打開後在等號後面貼上 key、存檔即可。</p>`) +
+    setRow("row-version", "版本", `<span class="small muted">${esc(st.version || "dev")}${st.update && st.update.available ? "｜有新版" : ""}</span>`, `
         <p class="small">目前版本：<strong>${esc(st.version || "dev")}</strong>${st.update && st.update.latest ? `｜最新：${esc(st.update.latest)}` : ""}</p>
         ${st.version && st.version !== "dev" ? `<button class="btn btn-green" id="check-update">檢查更新</button><div class="small" id="update-result" style="margin-top:8px" aria-live="polite">${window.UPDATE_MSG || ""}</div><p class="small muted">打開程式時與每 6 小時會自動檢查；有新版會出現在最上方。</p>`
-          : `<p class="small muted">開發版（從 repo 直接跑）：用 git pull 更新。</p>`}
-      </div>
-      <div class="card"><h3 style="margin-top:0">流水線工具（uv）</h3>
+          : `<p class="small muted">開發版（從 repo 直接跑）：用 git pull 更新。</p>`}`) +
+    setRow("row-uv", "流水線工具（uv）", st.uv ? '<span class="pill g">✓ 已安裝</span>' : '<span class="pill r">沒裝</span>', `
         ${st.uv ? `<p class="small"><span class="pill g">✓</span> 已安裝：<span class="muted">${esc(st.uv)}</span></p>`
           : `<p class="small"><span class="pill r">✗</span> 沒有 uv（要建新教授才需要）。</p><button class="btn btn-yellow" id="install-uv2">安裝 uv</button>`}
-        <p class="small muted">流水線放在：${esc(g.workspace || "")}</p>
-      </div>
-    </div>`;
+        <p class="small muted">流水線放在：${esc(g.workspace || "")}</p>`);
   const act = fn => async ev => { const b = ev.currentTarget; b.disabled = true; try { await fn(); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); b.disabled = false; } };
   el.querySelectorAll("[data-switch]").forEach(b => b.onclick = act(async () => {
     if (!confirm(`換成 ${b.dataset.switch} 的雲端硬碟？會從那個帳號重新同步教授檔案。`)) throw new Error("已取消");

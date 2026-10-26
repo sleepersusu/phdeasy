@@ -389,11 +389,11 @@ async function loadHome(){
 
 let OFFLINE_HOME = false;
 const PAGES = [["index.html", "簡介"], ["professors.html", "目標教授"], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
-const MORE = [["pipeline.html", "工作進度"], ["settings.html", "設定"]];
+const MORE = [["settings.html", "設定與工作進度"]];
 const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "proposals.html": ["proposal"],
-                       "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline"], "settings.html": ["settings"]};
+                       "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline", "settings"], "settings.html": ["pipeline", "settings"]};
 function setupHomeViews(){
-  /* 頁籤（參考 USyd 教授個人頁）：簡介｜目標教授｜計畫書｜Personal Statement｜SOP；工作進度與設定在右上角。
+  /* 頁籤（參考 USyd 教授個人頁）：簡介｜目標教授｜Research Proposal｜Personal Statement｜Statement of Purpose；設定與工作進度在右上角齒輪。
      離線單檔版全部在一頁，頁籤變成頁內連結 */
   const tabs = document.getElementById("tabs");
   const here = location.pathname.split("/").pop() || "index.html";

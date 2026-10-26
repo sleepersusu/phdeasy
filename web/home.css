@@ -201,3 +201,12 @@ ul.bullets.cols2 li{break-inside:avoid}
 .exp:last-of-type{border-bottom:0}
 .exp-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
 .exp .skills{margin-top:6px;line-height:2}
+/* 設定與工作進度：一列一項，點開才改 */
+.setrow{border-bottom:1px solid var(--line)}
+.setrow>summary{list-style:none;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:52px;padding:4px 2px}
+.setrow>summary::-webkit-details-marker{display:none}
+.setrow>summary .setrow-t{font-weight:600}
+.setrow>summary .setrow-t::before{content:"›";display:inline-block;width:1em;color:var(--muted);transition:transform .15s}
+.setrow[open]>summary .setrow-t::before{transform:rotate(90deg)}
+.setrow-b{padding:4px 0 16px 1em}
+#pipeline .body,#settings .body{margin-top:-4px}
