@@ -123,6 +123,32 @@ def apply_edit(root, key, base, block, en, zh, note=None):
     return _write(root, key, doc, {"origin": "ai-edit", "base": base, "changed": [block], "note": note})
 
 
+def change(root, key, base, op, block, en=None, zh=None, note=None):
+    """本人自己改：edit（改這一段）、delete（刪這一段）、insert_after（在這一段後面加一段）。每次都存成新版本，舊版不動。"""
+    if op not in ("edit", "delete", "insert_after"):
+        raise ValueError(f"不支援的動作：{op}")
+    doc = load(root, key, base)
+    items = blocks_of(doc)
+    if not 0 <= block < len(items):
+        raise ValueError(f"第 {base} 版沒有第 {block + 1} 段")
+    (si, bi), b = items[block]
+    seq = doc["blocks"] if si is None else doc["sections"][si]["blocks"]
+    if op in ("edit", "insert_after"):
+        if not (en or "").strip() and not (zh or "").strip():
+            raise ValueError("內容不能空白")
+        new = {"type": b["type"] if op == "edit" else "p", "en": (en or "").strip(), "zh": (zh or "").strip()}
+        if op == "edit":
+            seq[bi] = {**b, **new}
+        else:
+            seq.insert(bi + 1, new)
+    else:
+        del seq[bi]
+    origin = {"edit": "edit", "delete": "delete", "insert_after": "insert"}[op]
+    changed = [] if op == "delete" else [block if op == "edit" else block + 1]
+    return _write(root, key, doc, {"origin": origin, "base": base, "changed": changed, "note": note or {"edit": f"改第 {block + 1} 段",
+                  "delete": f"刪掉第 {block + 1} 段", "insert_after": f"在第 {block + 1} 段後面加一段"}[op]})
+
+
 def index(root):
     """首頁讀的索引：每份文件的版本清單與最新版內容（舊版內容按需要再讀 v<N>/doc.json）。"""
     root = Path(root)

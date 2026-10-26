@@ -64,3 +64,23 @@ def test_ai_edit_makes_new_version_and_keeps_old(tmp_path):
         apply_edit(root, "ps", base=2, block=9, en="x", zh="x")
     with pytest.raises(ValueError):  # 數字對不上：中英要一致
         apply_edit(root, "ps", base=2, block=0, en="We enrolled 120.", zh="收了 100 人。")
+
+
+def test_manual_edit_delete_insert_each_make_new_versions(tmp_path):
+    from pipeline.mydocs import change
+    src = docx(tmp_path / "ps.docx", ["Name", "Title", "One.", "Two.", "Three."])
+    root = tmp_path / "docs"
+    new_version(root, "ps", parse_upload(src), source=src)
+    v2 = change(root, "ps", base=1, op="edit", block=1, en="Two, better.", zh="第二段改好。")
+    v3 = change(root, "ps", base=2, op="delete", block=0)
+    v4 = change(root, "ps", base=3, op="insert_after", block=0, en="New para.", zh="新的一段。")
+    assert [v["origin"] for v in (v2, v3, v4)] == ["edit", "delete", "insert"]
+    texts = lambda n: [b["en"] for b in json.loads((root / "ps" / f"v{n}" / "doc.json").read_text())["blocks"]]
+    assert texts(2) == ["One.", "Two, better.", "Three."]
+    assert texts(3) == ["Two, better.", "Three."]
+    assert texts(4) == ["Two, better.", "New para.", "Three."]
+    assert texts(1) == ["One.", "Two.", "Three."]  # 舊版不動
+    with pytest.raises(ValueError):
+        change(root, "ps", base=4, op="edit", block=0, en="")
+    with pytest.raises(ValueError):
+        change(root, "ps", base=4, op="drop-table", block=0)

@@ -95,7 +95,7 @@ function renderMe(m){
     <ul class="bullets">${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${bi(p.zh, p.en, "div")}</div></li>`).join("")}</ul>`;
   const head = document.querySelector("#me h2");
   if (window.APP_REMATCH && head && !document.getElementById("me-edit")){
-    head.insertAdjacentHTML("afterend", `<div style="text-align:right;margin:-34px 0 8px"><button class="btn btn-sm" id="me-edit">編輯簡介與研究興趣</button></div>`);
+    head.insertAdjacentHTML("afterend", `<div id="me-edit-wrap" style="text-align:right;margin:-34px 0 8px"><button class="btn btn-sm" id="me-edit">編輯簡介與研究興趣</button></div>`);
     document.getElementById("me-edit").onclick = () => renderMeEdit(H.me);
   }
 }
@@ -113,7 +113,8 @@ function renderProposal(){
     const key = `proposal--${p.slug}`, has = !!(H.docs || {})[key], pr = p.proposal || {};
     const drafts = (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
         return `<li><span class="pill ${c[0]}">${c[1]}</span> <strong>${esc(v.id)}</strong>｜${bi(v.direction_zh, v.direction_en)}</li>`; }).join("")}</ul>` : "";
-    return `<details class="profcard" ${has ? "open" : ""}><summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc(p.institution || "")}</div></div>
+    return `<details class="profcard" ${has ? "open" : ""}><summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc((p.owner || {}).institution || p.institution || "")}</div>
+          ${(p.owner || {}).note ? `<div class="small" style="margin-top:2px">📝 ${esc(p.owner.note)}</div>` : ""}</div>
         ${has ? `<span class="pill g">第 ${(H.docs[key].versions.slice(-1)[0] || {}).n} 版</span>` : (pr.versions || []).length ? `<span class="pill y">AI 草稿 ${pr.versions.length} 版</span>` : `<span class="pill">還沒有</span>`}</div></summary>
       <div class="pc-body" data-doc-root>${has ? "" : drafts ? `<div class="small muted">AI 依她的方向與經費擬的草稿（<a href="professor.html?p=${encodeURIComponent(p.slug)}&v=proposal">到她的頁面看全文</a>）：</div>${drafts}` : ""}<div data-doc-slot="${esc(key)}"></div></div></details>`;
   }).join("");
@@ -125,10 +126,17 @@ const DOC_NAMES = {proposal: ["Research Proposal", "研究計畫書"], ps: ["Per
 const ME_ROOT = () => OFFLINE_HOME ? "_me/" : "../runs/_me/";
 const DOC_VIEW = {};  // key → 正在看的版本號
 function lrHTML(zh, en){ return `<div class="lr"><div class="en" lang="en">${esc(en || "")}</div><div class="zh">${zh ? esc(zh) : '<span class="muted">（翻譯中／尚無中文）</span>'}</div></div>`; }
+const DOC_CUR = {};  // key → 正在顯示的那一版內容（本人編輯時拿原文）
+function docTextBlocks(doc){
+  return (doc.sections ? doc.sections.flatMap(x => x.blocks || []) : doc.blocks || []).filter(b => ["p", "h2", "h3", "note"].includes(b.type));
+}
 function docBlocksHTML(doc, editable){
   /* 依顯示順序編號可編修的段落（跟 scripts/pipeline/mydocs.py 的 blocks_of 同順序）；計畫書有章節、圖、表 */
   let k = 0;
-  const editBtn = () => editable ? `<button class="btn btn-sm" data-doc-edit="${k}">AI 編修</button>` : "";
+  const editBtn = () => editable ? `<button class="btn btn-sm" data-doc-op="edit" data-b="${k}">${T("編輯", "Edit")}</button>
+    <button class="btn btn-sm" data-doc-op="insert_after" data-b="${k}">${T("下面加一段", "Add below")}</button>
+    <button class="btn btn-sm btn-red" data-doc-op="delete" data-b="${k}">${T("刪除", "Delete")}</button>
+    <button class="btn btn-sm btn-green" data-doc-edit="${k}">AI 編修</button>` : "";
   const block = b => {
     if (["p", "h2", "h3", "note"].includes(b.type)){
       const html = `<div class="docb ${b.type}" data-block="${k}">${b.type === "note" ? '<span class="pill y">待填</span> ' : ""}${lrHTML(b.zh, b.en)}<div class="docb-tools">${editBtn()}</div></div>`;
@@ -163,17 +171,18 @@ async function renderDoc(key, el, opts = {}){
   const v = vs.find(x => x.n === cur) || vs[vs.length - 1];
   const texts = (doc.sections ? doc.sections.flatMap(x => x.blocks || []) : doc.blocks || []).filter(b => ["p", "h2", "h3", "note"].includes(b.type));
   const needZh = texts.some(b => !b.zh);
-  const ORIGIN = {upload: "上傳", "ai-edit": "AI 編修"};
+  const ORIGIN = {upload: "上傳", "ai-edit": "AI 編修", edit: "手動編輯", delete: "刪段落", insert: "加段落"};
   el.innerHTML = `<div class="doc-bar">
       <div class="row"><label class="small" for="ver-${esc(key)}">版本</label><select id="ver-${esc(key)}" data-doc-ver="${esc(key)}">${[...vs].reverse().map(x =>
         `<option value="${x.n}" ${x.n === cur ? "selected" : ""}>第 ${x.n} 版｜${esc(ORIGIN[x.origin] || x.origin)}｜${esc((x.created || "").slice(0, 10))}${x.note ? "｜" + esc(x.note) : ""}</option>`).join("")}</select>
         ${cur !== latest ? '<span class="pill y">舊版本（只能看）</span>' : '<span class="pill g">最新版</span>'}</div>
       <div class="row">${needZh && app ? `<button class="btn" data-doc-translate="${esc(key)}" data-v="${cur}">翻成中文</button>` : ""}${upload}</div></div>
-    ${v.origin === "ai-edit" && v.changed ? `<div class="small muted" style="margin:8px 0">這一版是從第 ${v.base} 版 AI 編修第 ${v.changed.map(i => i + 1).join("、")} 段而來${v.note ? "：" + esc(v.note) : ""}。</div>` : ""}
+    ${v.base ? `<div class="small muted" style="margin:8px 0">這一版是從第 ${v.base} 版${v.note ? "：" + esc(v.note) : ""}。</div>` : ""}
     <div class="small" data-doc-msg></div>
     <h3 style="margin:14px 0 6px">${lrHTML(doc.title_zh, doc.title || nameEn)}</h3>
     <div class="doc-body" data-doc-key="${esc(key)}" data-v="${cur}">${docBlocksHTML(doc, app && cur === latest)}</div>`;
-  if (v.origin === "ai-edit") (v.changed || []).forEach(i => el.querySelector(`.docb[data-block="${i}"]`)?.classList.add("changed"));
+  DOC_CUR[key] = doc;
+  if (v.base) (v.changed || []).forEach(i => el.querySelector(`.docb[data-block="${i}"]`)?.classList.add("changed"));
 }
 function renderStatement(kind){
   const el = body(kind);
@@ -196,6 +205,26 @@ document.addEventListener("change", async ev => {
   }
 });
 document.addEventListener("click", async ev => {
+  const op = ev.target.closest("[data-doc-op]");
+  if (op){  // 本人自己改：編輯、刪除、下面加一段 → 存成新版本
+    const box = op.closest(".docb"), bodyEl = op.closest(".doc-body"), key = bodyEl.dataset.docKey, v = +bodyEl.dataset.v, b = +op.dataset.b;
+    if (op.dataset.docOp === "delete"){
+      if (!confirm(`刪掉第 ${b + 1} 段？會存成新版本，舊版還在。`)) return;
+      try { await API("doc-change", {key, version: v, op: "delete", block: b}); location.reload(); } catch (e) { alert(e.message); }
+      return;
+    }
+    if (box.querySelector(".doc-form")) return;
+    const cur = op.dataset.docOp === "edit" ? docTextBlocks(DOC_CUR[key])[b] || {} : {};
+    box.insertAdjacentHTML("beforeend", `<form class="doc-form match-form" style="max-width:none;margin-top:8px">
+      <label>English<textarea name="en" rows="4">${esc(cur.en || "")}</textarea></label>
+      <label>中文<textarea name="zh" rows="3">${esc(cur.zh || "")}</textarea></label>
+      <div class="row"><button class="btn btn-green btn-sm" type="submit">${T("存成新版本", "Save as new version")}</button><button class="btn btn-sm" type="button" onclick="this.closest('.doc-form').remove()">${T("取消", "Cancel")}</button></div></form>`);
+    const f = box.querySelector(".doc-form");
+    f.en.focus();
+    f.onsubmit = async e => { e.preventDefault();
+      try { await API("doc-change", {key, version: v, op: op.dataset.docOp, block: b, en: f.en.value, zh: f.zh.value}); location.reload(); } catch (err) { alert(err.message); } };
+    return;
+  }
   const ed = ev.target.closest("[data-doc-edit]"), tr = ev.target.closest("[data-doc-translate]"), go = ev.target.closest("[data-doc-go]");
   if (ed){
     const box = ed.closest(".docb");
@@ -221,6 +250,46 @@ document.addEventListener("click", async ev => {
   }
 });
 
+function renderExpEdit(){
+  /* 工作經歷與學歷：新增、修改、刪除（每條條列一行一點；技能用逗號分開） */
+  const m = H.me || {};
+  const xrow = x => `<fieldset class="exp-row"><legend><select name="kind"><option value="professional" ${x.kind !== "research" ? "selected" : ""}>工作</option><option value="research" ${x.kind === "research" ? "selected" : ""}>研究</option></select>
+      <button type="button" class="btn btn-sm btn-red" data-row-del>刪掉這段</button></legend>
+    <div class="row"><label style="flex:1">職稱（English）<input name="role" value="${esc(x.role || "")}"></label><label style="flex:1">職稱（中文）<input name="role_zh" value="${esc(x.role_zh || "")}"></label></div>
+    <div class="row"><label style="flex:2">單位<input name="org" value="${esc(x.org || "")}"></label><label style="flex:1">地點<input name="place" value="${esc(x.place || "")}"></label><label style="flex:1">期間<input name="dates" value="${esc(x.dates || "")}" placeholder="Feb 2025 – Present"></label></div>
+    <label>做了什麼（English，一行一點）<textarea name="b_en" rows="4">${esc((x.bullets || []).map(b => b.en || "").join("\n"))}</textarea></label>
+    <label>做了什麼（中文，一行一點，跟上面對齊）<textarea name="b_zh" rows="3">${esc((x.bullets || []).map(b => b.zh || "").join("\n"))}</textarea></label>
+    <label>Skills（逗號分開）<input name="skills" value="${esc((x.skills || []).join(", "))}"></label></fieldset>`;
+  const erow = e => `<div class="row edu-row"><input name="degree" value="${esc(e.degree || "")}" placeholder="學位" style="flex:1"><input name="school" value="${esc(e.school || "")}" placeholder="學校" style="flex:2">
+    <input name="years" value="${esc(e.years || "")}" placeholder="2018–2020" style="width:8em"><button type="button" class="btn btn-sm btn-red" data-row-del>刪掉</button></div>`;
+  body("capabilities").innerHTML = `<form id="exp-form" class="match-form" style="max-width:none">
+    <h3 class="label">${T("工作經歷", "Experience")}</h3><div id="exp-list">${(m.experience || []).map(xrow).join("")}</div>
+    <button type="button" class="btn btn-sm" id="exp-add">＋ 新增一段經歷</button>
+    <h3 class="label">${T("學歷", "Education")}</h3><div id="edu-list">${(m.education || []).map(erow).join("")}</div>
+    <button type="button" class="btn btn-sm" id="edu-add">＋ 新增學歷</button>
+    <div class="row" style="margin-top:12px"><button class="btn btn-green" type="submit">儲存</button><button class="btn" type="button" id="exp-cancel">取消</button><span class="small" id="exp-msg"></span></div></form>`;
+  const f = document.getElementById("exp-form");
+  f.addEventListener("click", ev => { if (ev.target.matches("[data-row-del]")) (ev.target.closest(".exp-row") || ev.target.closest(".edu-row")).remove(); });
+  document.getElementById("exp-add").onclick = () => document.getElementById("exp-list").insertAdjacentHTML("beforeend", xrow({}));
+  document.getElementById("edu-add").onclick = () => document.getElementById("edu-list").insertAdjacentHTML("beforeend", erow({}));
+  document.getElementById("exp-cancel").onclick = () => renderCaps();
+  f.onsubmit = async ev => {
+    ev.preventDefault();
+    const val = (el, n) => el.querySelector(`[name="${n}"]`).value.trim();
+    const experience = [...f.querySelectorAll(".exp-row")].map(r => {
+      const en = val(r, "b_en").split("\n").map(x => x.trim()), zh = val(r, "b_zh").split("\n").map(x => x.trim());
+      const old = (m.experience || []).find(x => x.org === val(r, "org") && x.role === val(r, "role")) || {};
+      const skills = val(r, "skills").split(",").map(x => x.trim()).filter(Boolean);
+      return {kind: val(r, "kind"), role: val(r, "role"), role_zh: val(r, "role_zh"), org: val(r, "org"), place: val(r, "place"), dates: val(r, "dates"),
+              bullets: en.map((e, i) => ({en: e, zh: zh[i] || ""})).filter(b => b.en || b.zh), skills,
+              skills_zh: JSON.stringify(skills) === JSON.stringify(old.skills || []) ? old.skills_zh || [] : []};
+    });
+    const education = [...f.querySelectorAll(".edu-row")].map(r => ({degree: val(r, "degree"), school: val(r, "school"), years: val(r, "years")})).filter(e => e.degree || e.school);
+    try { await API("me-update", {experience, education}); document.getElementById("exp-msg").textContent = "已儲存。"; setTimeout(() => location.reload(), 600); }
+    catch (e) { document.getElementById("exp-msg").textContent = "儲存失敗：" + e.message; }
+  };
+}
+
 function renderCaps(){
   /* 工作經歷（本人 2026-10-26：取代「我能做到的事」）：每段經歷條列，最後一行 Skills */
   const xs = (H.me || {}).experience || [];
@@ -232,6 +301,11 @@ function renderCaps(){
       <ul class="bullets">${(x.bullets || []).map(b => `<li>${bi(b.zh, b.en, "div")}</li>`).join("")}</ul>
       ${(x.skills || []).length ? `<div class="small skills"><span class="sk-ic" aria-hidden="true">⚙</span><span class="sk-l">Skills:</span> ${x.skills.map((sk, i) => `<span class="pill">${bi((x.skills_zh || [])[i], sk)}</span>`).join(" ")}</div>` : ""}</div>`).join("")}` : "";
   };
+  if (window.APP_REMATCH && !document.getElementById("exp-edit-wrap")){
+    const h = document.querySelector("#capabilities h2");
+    h?.insertAdjacentHTML("afterend", `<div id="exp-edit-wrap" style="text-align:right;margin:-34px 0 8px"><button class="btn btn-sm" id="exp-edit">${T("編輯工作經歷與學歷", "Edit experience & education")}</button></div>`);
+    document.getElementById("exp-edit").onclick = renderExpEdit;
+  }
   body("capabilities").innerHTML = xs.length ? group("professional", T("工作", "Professional")) + group("research", T("研究", "Research"))
     : `<div class="empty">${T("還沒有工作經歷。", "No experience yet.")}</div>`;
 }
@@ -359,7 +433,7 @@ function renderProfs(ps){
         <label for="np-orcid">ORCID（選填）</label><input type="text" id="np-orcid" placeholder="0000-0000-0000-0000">
         <div class="row" style="margin-top:12px"><button class="btn btn-green" type="submit">開始建檔</button><button class="btn" type="button" id="np-cancel">取消</button></div>
       </form>` : ""}`);
-    document.getElementById("prof-sort").onchange = ev => { PROF_SORT = ev.target.value; renderProfs(ps); };
+    document.getElementById("prof-sort").onchange = ev => { PROF_SORT = ev.target.value; renderProfs(H.professors); };
     const form = document.getElementById("add-prof-form"), btn = document.getElementById("add-prof-btn");
     if (form){  // 點「＋ 新增教授」才打開填寫欄位
       const toggle = open => { form.hidden = !open; btn.setAttribute("aria-expanded", String(open)); if (open) form.querySelector("#np-name").focus(); };
@@ -377,7 +451,12 @@ function renderProfs(ps){
     const dbtn = document.getElementById("disc-btn"), dpanel = document.getElementById("disc-panel");
     if (dbtn) dbtn.onclick = () => { dpanel.hidden = !dpanel.hidden; dbtn.setAttribute("aria-expanded", String(!dpanel.hidden)); if (!dpanel.hidden) renderDiscover(); };
   }
-  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按上面的「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
+  const removed = ps.filter(p => (p.owner || {}).archived);
+  ps = ps.filter(p => !(p.owner || {}).archived);
+  const removedHTML = removed.length ? `<details class="item" style="margin-top:12px"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center">${T("已移除", "Removed")}（${removed.length}）</summary>
+    ${removed.map(p => `<div class="row" style="justify-content:space-between;margin:6px 0"><span>${esc(p.name)} <span class="small muted">${esc(p.institution || "")}</span></span>
+      ${window.APP_REMATCH ? `<button class="btn btn-sm" data-prof-restore="${esc(p.slug)}">${T("還原", "Restore")}</button>` : ""}</div>`).join("")}</details>` : "";
+  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按上面的「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>` + removedHTML; return; }
   const score = p => (matchStars(p.recommend) || {score: -1}).score;
   const list = [...ps].sort(PROF_SORT === "name" ? (a, b) => (a.name || "").localeCompare(b.name || "")
     : PROF_SORT === "stars-asc" ? (a, b) => score(a) - score(b) : (a, b) => score(b) - score(a));
@@ -388,17 +467,38 @@ function renderProfs(ps){
     const facts = [c.works != null && T(`${c.works} 篇`, `${c.works} papers`), c.grants_pi != null && T(`主持計畫 ${c.grants_pi}`, `${c.grants_pi} grants as PI`),
                    c.coauthors != null && T(`合作者 ${c.coauthors}`, `${c.coauthors} co-authors`), r && T(`強 ${strong}／部分 ${partial}`, `${strong} strong / ${partial} partial`)].filter(Boolean);
     return `<details class="profcard">
-      <summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc(p.institution || "")}</div>
-          <div class="small" style="margin-top:4px">${facts.join(" · ")}</div></div>${starsHTML(r)}</div></summary>
+      <summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc((p.owner || {}).institution || p.institution || "")}</div>
+          ${(p.owner || {}).note ? `<div class="small" style="margin-top:2px">📝 ${esc(p.owner.note)}</div>` : ""}
+          <div class="small facts" style="margin-top:4px">${facts.join(" · ")}</div></div>${starsHTML(r)}</div></summary>
       <div class="pc-body">
         ${top5.length ? `<div class="small muted" style="margin-bottom:4px">${T("必讀前五篇", "Top 5 to read")}</div>
           <ol class="top5">${top5.map(w => `<li><a href="${esc(paperLink(p, w.id))}">${bi(w.title_zh, w.title)}</a> <span class="small muted">${esc(w.year || "")}</span></li>`).join("")}</ol>`
           : `<div class="small muted">${T("還沒比對。", "Not matched yet.")}</div>`}
         <div class="row" style="margin-top:10px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">${T("進入教授頁", "Open profile")} →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}
-          ${window.APP_REMATCH ? `<button class="btn" data-rematch="${esc(p.slug)}">${r ? "重新比對" : "依我的興趣比對"}</button>` : ""}</div>
+          ${window.APP_REMATCH ? `<button class="btn" data-rematch="${esc(p.slug)}">${r ? "重新比對" : "依我的興趣比對"}</button>
+            <button class="btn btn-sm" data-prof-edit="${esc(p.slug)}">${T("編輯", "Edit")}</button><button class="btn btn-sm btn-red" data-prof-remove="${esc(p.slug)}">${T("移除", "Remove")}</button>` : ""}</div>
+        <form class="prof-edit" data-slug="${esc(p.slug)}" hidden style="margin-top:10px">
+          <label>${T("顯示的機構", "Institution")}<input type="text" name="institution" value="${esc((p.owner || {}).institution || p.institution || "")}"></label>
+          <label>${T("備註", "Note")}<input type="text" name="note" value="${esc((p.owner || {}).note || "")}" placeholder="例：11/3 面談、想申請 2027 入學"></label>
+          <div class="row" style="margin-top:6px"><button class="btn btn-green btn-sm" type="submit">${T("儲存", "Save")}</button><button class="btn btn-sm" type="button" data-cancel>${T("取消", "Cancel")}</button></div></form>
       </div></details>`;
-  }).join("");
+  }).join("") + removedHTML;
 }
+document.addEventListener("click", async ev => {
+  const ed = ev.target.closest("[data-prof-edit]"), rm = ev.target.closest("[data-prof-remove]"), rs = ev.target.closest("[data-prof-restore]"), cn = ev.target.closest(".prof-edit [data-cancel]");
+  if (ed){ const f = document.querySelector(`.prof-edit[data-slug="${ed.dataset.profEdit}"]`); f.hidden = !f.hidden; return; }
+  if (cn){ cn.closest(".prof-edit").hidden = true; return; }
+  try {
+    if (rm){ if (!confirm("移除這位教授？檔案都會留著，之後可以在「已移除」還原。")) return; await API("prof-remove", {slug: rm.dataset.profRemove}); location.reload(); }
+    if (rs){ await API("prof-restore", {slug: rs.dataset.profRestore}); location.reload(); }
+  } catch (e) { alert(e.message); }
+});
+document.addEventListener("submit", async ev => {
+  const f = ev.target.closest(".prof-edit");
+  if (!f) return;
+  ev.preventDefault();
+  try { await API("prof-update", {slug: f.dataset.slug, institution: f.institution.value, note: f.note.value}); location.reload(); } catch (e) { alert(e.message); }
+});
 
 function designCode(w){
   const f = (w.card.fields || []).find(x => x.key === "design") || {};
@@ -446,7 +546,8 @@ async function loadHome(){
   const docs = await getJSON("../runs/_me/docs/index.json").catch(() => ({}));
   const profs = [];
   for (const p of list){
-    try { profs.push(summarize(p, await getJSON("../runs/" + p.data), me)); }
+    const owner = await getJSON(`../runs/${p.slug}/owner.json`).catch(() => ({}));
+    try { profs.push({...summarize(p, await getJSON("../runs/" + p.data), me), owner}); }
     catch (e) { profs.push({slug: p.slug, name: p.name, institution: p.institution, built: false, counts: {}, n_strong: 0, n_overlap_papers: 0, shared_terms: [], top_papers: [], top_grants: [], design_overlap: []}); }
   }
   return {me, professors: profs, docs};

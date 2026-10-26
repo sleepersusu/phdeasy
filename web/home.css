@@ -215,3 +215,12 @@ body.lang-both .ll .t-en{display:inline;color:inherit;font-size:inherit;margin:0
 body.lang-both .ll .t-en::before{content:"｜"}
 .skills .sk-ic{color:var(--green);margin-right:4px}
 .skills .sk-l{font-weight:600;margin-right:4px}
+.exp-row{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:10px 0}
+.exp-row legend{display:flex;gap:8px;align-items:center;padding:0 6px}
+.edu-row{margin:6px 0;flex-wrap:nowrap}
+.docb-tools{gap:6px;flex-wrap:wrap}
+/* 資料列（篇數、計畫數…）雙語時只顯示中文，不重複 */
+body.lang-both .facts .ll .t-en{display:none}
+#exp-form label,.prof-edit label{display:block;margin:6px 0;font-size:.9rem;color:var(--muted)}
+#exp-form label input,#exp-form label textarea,.prof-edit label input{display:block;width:100%;margin-top:4px;color:var(--fg)}
+#exp-form .row>label{min-width:0}

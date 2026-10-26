@@ -42,12 +42,20 @@ function appBanner(st){
 async function pipelinePanel(){
   let st;
   try { st = await API("status"); } catch (e) { return; }  // 不是在應用程式裡：不顯示
-  window.APP_REMATCH = true;  // 教授卡片顯示「重新比對」按鈕
-  if (document.getElementById("professors") && !document.getElementById("professors").hidden) renderProfs(H.professors);
+  window.APP_REMATCH = true;  // 在應用程式裡：顯示只有應用程式才能用的按鈕（新增／查詢教授、編輯簡介、上傳文件、AI 編修）
+  ["prof-tools", "add-prof-form", "disc-panel", "me-edit-wrap", "exp-edit-wrap"].forEach(id => document.getElementById(id)?.remove());  // 先前沒有這些按鈕的版本拿掉，重畫
+  const redraw = (id, fn) => { if (document.querySelector(`#${id} .body`)) try { fn(); } catch (e) { console.error(e); } };  // 這一頁沒有的區塊不畫；一塊出錯不影響其他塊
+  if (typeof H !== "undefined" && H){
+    redraw("professors", () => renderProfs(H.professors));
+    if (H.me){ redraw("me", () => renderMe(H.me)); redraw("capabilities", () => renderCaps()); }
+    redraw("proposal", () => renderProposal());
+    redraw("ps", () => renderStatement("ps"));
+    redraw("sop", () => renderStatement("sop"));
+  }
   document.getElementById("professors")?.addEventListener("click", async ev => {
     const b = ev.target.closest("[data-rematch]");
     if (!b) return;
-    if (!confirm("請 Claude Code 依你目前的研究興趣與 CV 項目重新比對這位教授？約需 10–20 分鐘，進度在「建新教授」那一區。")) return;
+    if (!confirm("請 Claude Code 依你目前的研究興趣與 CV 項目重新比對這位教授？約需 10–20 分鐘，進度在右上角齒輪「設定與工作進度」。")) return;
     b.disabled = true;
     try { await API("match", {slug: b.dataset.rematch}); location.href = "pipeline.html"; }
     catch (e) { alert(e.message); b.disabled = false; }

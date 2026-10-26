@@ -232,3 +232,49 @@ def test_discover_runs_search_in_background_with_safe_args(tmp_path):
     assert r["started"] and ran == [["--query", "digital twin", "--from", "2023"]]
     with pytest.raises(ValueError):
         app.post("discover", {"since": "abc"})
+
+
+def test_doc_change_runs_directly_and_updates_index(tmp_path):
+    import json, zipfile, pytest
+    from pipeline.mydocs import new_version, parse_upload
+    app, calls = _lib_app(tmp_path)
+    W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    f = tmp_path / "ps.docx"
+    with zipfile.ZipFile(f, "w") as z:
+        z.writestr("word/document.xml", f"<w:document {W}><w:body>" + "".join(f"<w:p><w:r><w:t>{t}</w:t></w:r></w:p>" for t in ["N", "T", "A.", "B."]) + "</w:body></w:document>")
+        z.writestr("word/_rels/document.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')
+    root = tmp_path / "runs" / "_me" / "docs"
+    new_version(root, "ps", parse_upload(f), source=f)
+    r = app.post("doc-change", {"key": "ps", "version": 1, "op": "delete", "block": 0})
+    assert r["version"] == 2
+    idx = json.loads((root / "index.json").read_text())
+    assert [b["en"] for b in idx["ps"]["latest"]["blocks"]] == ["B."]
+    with pytest.raises(ValueError):
+        app.post("doc-change", {"key": "ps", "version": 2, "op": "rm -rf", "block": 0})
+
+
+def test_professor_edit_remove_restore_keeps_files(tmp_path):
+    import json
+    app, calls = _lib_app(tmp_path)
+    run = tmp_path / "runs" / "doe-jane"
+    app.post("prof-update", {"slug": "doe-jane", "note": "11/3 面談", "institution": "Uni X"})
+    o = json.loads((run / "owner.json").read_text())
+    assert o["note"] == "11/3 面談" and o["institution"] == "Uni X"
+    app.post("prof-remove", {"slug": "doe-jane"})
+    assert json.loads((run / "owner.json").read_text())["archived"] is True and (run / "state.json").exists()
+    app.post("prof-restore", {"slug": "doe-jane"})
+    assert json.loads((run / "owner.json").read_text())["archived"] is False
+
+
+def test_me_update_experience_and_education(tmp_path):
+    import json, pytest
+    app, calls = _lib_app(tmp_path)
+    me = tmp_path / "runs" / "_me"
+    me.mkdir(parents=True)
+    (me / "me.json").write_text(json.dumps({"name": "A", "experience": [], "education": []}))
+    app.post("me-update", {"experience": [{"role": "Engineer", "org": "Co", "dates": "2025–", "bullets": [{"en": "Built X."}], "skills": ["Python"]}],
+                           "education": [{"degree": "M.S.", "school": "NTUNHS", "years": "2018–2020"}]})
+    d = json.loads((me / "me.json").read_text())
+    assert d["experience"][0]["role"] == "Engineer" and d["education"][0]["school"] == "NTUNHS"
+    with pytest.raises(ValueError):
+        app.post("me-update", {"experience": [{"role": "", "org": ""}]})

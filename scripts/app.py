@@ -429,7 +429,7 @@ class App:
         return {"ok": True, "key": key, "version": n, "translating": started, "result": out}
 
     def me_update(self, body):
-        """本人在首頁編輯簡介：只改摘要、標題列、研究興趣；舊的 me.json 先備份到 runs/_me/history/。"""
+        """本人在首頁編輯：摘要、標題列、研究興趣、工作經歷、學歷；舊的 me.json 先備份到 runs/_me/history/。"""
         mep = self.runs / "_me" / "me.json"
         me = json.loads(mep.read_text())
         new = {}
@@ -441,6 +441,27 @@ class App:
             if any(not (i["en"] or i["zh"]) for i in ints):
                 raise ValueError("研究興趣不能空白")
             new["interests"] = ints
+        if "experience" in body:
+            xs = []
+            for x in body["experience"] or []:
+                role, org = str(x.get("role") or "").strip()[:200], str(x.get("org") or "").strip()[:200]
+                if not role and not org:
+                    raise ValueError("工作經歷要有職稱或單位")
+                bullets = [{"en": str(b.get("en") or "").strip()[:1500], "zh": str(b.get("zh") or "").strip()[:1500]}
+                           for b in x.get("bullets") or [] if (b.get("en") or b.get("zh"))]
+                xs.append({"kind": x.get("kind") if x.get("kind") in ("professional", "research") else "professional", "role": role,
+                           "role_zh": str(x.get("role_zh") or "").strip()[:200], "org": org, "place": str(x.get("place") or "").strip()[:200],
+                           "dates": str(x.get("dates") or "").strip()[:100], "bullets": bullets,
+                           "skills": [str(k).strip()[:80] for k in x.get("skills") or [] if str(k).strip()],
+                           "skills_zh": [str(k).strip()[:80] for k in x.get("skills_zh") or [] if str(k).strip()]})
+            new["experience"] = xs
+        if "education" in body:
+            eds = []
+            for e in body["education"] or []:
+                if not (e.get("degree") or e.get("school")):
+                    raise ValueError("學歷要有學位或學校")
+                eds.append({k: str(e.get(k) or "").strip()[:300] for k in ("degree", "school", "years", "note")})
+            new["education"] = eds
         if not new:
             raise ValueError("沒有要改的內容")
         hist = mep.parent / "history"
@@ -457,7 +478,35 @@ class App:
                 subprocess.run([uv, "run", "python", "scripts/discover.py", *args], cwd=str(self.workspace), capture_output=True, timeout=900)
         threading.Thread(target=go, daemon=True).start()
 
+    def doc_change(self, body):
+        """本人自己改文件的一段：改、刪、在後面加一段。直接存成新版本（不用 AI），更新索引。"""
+        import re as _re
+        from pipeline.mydocs import change, index
+        key, v, b, op = body.get("key") or "", body.get("version"), body.get("block"), body.get("op")
+        if not _re.fullmatch(r"(ps|sop|proposal)(--[a-z0-9-]+)?", key) or not isinstance(v, int) or not isinstance(b, int) or b < 0:
+            raise ValueError("文件、版本或段落不對")
+        root = self.runs / "_me" / "docs"
+        meta = change(root, key, v, op, b, en=body.get("en"), zh=body.get("zh"))
+        (root / "index.json").write_text(json.dumps(index(root), ensure_ascii=False, indent=1))
+        return {"ok": True, "version": meta["n"]}
+
+    def prof_owner(self, slug, **upd):
+        """本人對這位教授的註記（owner.json）：備註、顯示用的機構、移除（只是收起來，檔案都留著，可以還原）。"""
+        slug = self._lib_slug(slug)
+        p = self.runs / slug / "owner.json"
+        o = json.loads(p.read_text()) if p.exists() else {}
+        o.update(upd)
+        p.write_text(json.dumps(o, ensure_ascii=False, indent=1))
+        return {"ok": True, **o}
+
     def post(self, path, body):
+        if path == "doc-change":
+            return self.doc_change(body)
+        if path == "prof-update":
+            upd = {k: str(body[k]).strip()[:500] for k in ("note", "institution") if k in body}
+            return self.prof_owner(body.get("slug"), **upd)
+        if path in ("prof-remove", "prof-restore"):
+            return self.prof_owner(body.get("slug"), archived=path == "prof-remove")
         if path == "discover":
             q = str(body.get("query") or "").strip()[:200]
             since = body.get("since") or datetime.now().year - 4
