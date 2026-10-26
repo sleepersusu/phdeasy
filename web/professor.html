@@ -816,10 +816,7 @@ function setupViews(){
   if (!v){
     const hub = document.createElement("section");
     hub.id = "hub";
-    hub.innerHTML = basicHTML() + `<section class="card" id="meetings-card" aria-label="會議" style="margin-top:12px" hidden></section>` + `<p class="muted" style="margin-top:16px">選一個想看的部分，按進去就只顯示那一塊；上方的列可以隨時切換。</p>
-      <div class="mgrid">${VIEWS.map(([id, label, hint, n]) => `<a class="card" href="${viewHref(id)}" style="padding:16px">
-        <div class="row" style="justify-content:space-between"><strong style="font-size:1.1rem">${label}</strong><span class="pill">${esc(n(D) || "看")}</span></div>
-        <div class="small muted" style="margin-top:6px">${hint}</div></a>`).join("")}</div>`;
+    hub.innerHTML = basicHTML() + `<section class="card" id="meetings-card" aria-label="會議" style="margin-top:12px" hidden></section>`;  // 各部分用上方的分頁進入，這裡不再放方塊按鈕
     main.prepend(hub);
   }
   crumbs(v);
