@@ -80,6 +80,8 @@ def estimate(run, kind, samples=None, now=None):
     if kind in ("new", "reply") and stage in (None, "setup", "stop1", "halted") and not any(
             s["done"] for s in steps if s["key"] not in SETUP_ONLY):
         steps = [s for s in steps if s["key"] in SETUP_ONLY]
+    if kind == "deep":  # 教授頁勾選完全解析：只跑全文、轉文字、解析卡、重點
+        steps = [s for s in steps if s["key"] in ("fulltext", "ingest", "cards", "digest")]
     current = next((s["key"] for s in steps if s["total"] and s["done"] < s["total"]), None)
     total_s = left_s = 0.0
     for s in steps:

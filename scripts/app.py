@@ -35,7 +35,7 @@ from urllib.parse import unquote, urlparse
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
-from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue, prompt_programs, slug_of,
+from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue, prompt_deep, prompt_programs, slug_of,
                            prompt_discover_enrich, prompt_doc_edit, prompt_doc_translate, prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
@@ -236,7 +236,7 @@ class App:
     def job_progress(self, job):
         """執行中的流水線工作：進度條與預估時間（看批次資料夾裡已產生的檔案；速度用這次輪詢量到的）。"""
         from pipeline.progress import estimate
-        if not job or job.get("status") != "running" or job.get("kind") not in ("new", "reply", "continue", "exception"):
+        if not job or job.get("status") != "running" or job.get("kind") not in ("new", "reply", "continue", "exception", "deep"):
             return None
         slug = job.get("slug")
         if not slug:  # 新建檔時還不知道資料夾：用這個工作開始後最近有動的批次
@@ -829,7 +829,7 @@ class App:
             return self.login_claude()
         if path == "open-secrets":
             return self.open_secrets()
-        if path in ("new", "continue", "reply", "match", "propose", "exception") and self.blocked:
+        if path in ("new", "continue", "reply", "match", "propose", "exception", "deep") and self.blocked:
             raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
         if path == "new":
             name, inst = (body.get("name") or "").strip(), (body.get("institution") or "").strip()
@@ -857,6 +857,24 @@ class App:
                 raise ValueError("找不到這筆未解決的例外（可能已經處理過，重新整理看看）")
             return self.jobs.start("exception", prompt_exception(slug, exc, body.get("action"), body.get("note") or ""),
                                    f"例外：{slug} {exc['id']}", slug=slug)
+        if path == "deep":  # 教授頁勾選「完全解析」：加進必讀，背景只處理這幾篇
+            import re as _re
+            slug = self._lib_slug(body.get("slug"))
+            ids = [i for i in body.get("ids") or [] if isinstance(i, str) and _re.fullmatch(r"W\d+", i)]
+            if not ids or len(ids) > 20:
+                raise ValueError("勾 1–20 篇")
+            works = {w["id"]: w for w in json.loads((self.runs / slug / "work" / "works.json").read_text())}
+            ids = [i for i in ids if i in works and works[i].get("kind") == "title"]
+            if not ids:
+                raise ValueError("勾的文章都已經是完全解析了")
+            uv = find_uv()
+            if not uv:
+                raise ValueError("這台還沒有 uv，先到「設定」安裝")
+            r = subprocess.run([uv, "run", "python", "scripts/focus.py", "add", f"runs/{slug}", "--ids", ",".join(ids)], cwd=str(self.workspace),
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+            if r.returncode:
+                raise ValueError((r.stdout + r.stderr).strip()[-300:])
+            return self.jobs.start("deep", prompt_deep(slug, ids), f"完全解析 {len(ids)} 篇：{slug}", slug=slug)
         if path == "programs":
             slug = self._lib_slug(body.get("slug"))
             pr = (json.loads((self.runs / slug / "state.json").read_text()) or {}).get("professor") or {}

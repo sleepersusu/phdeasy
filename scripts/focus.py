@@ -3,6 +3,7 @@
   uv run python scripts/focus.py inputs runs/<slug> [--n 5]   # 寫 work/focus/inputs.json（本人的興趣與 CV＋每篇標題、摘要）給挑選者
   uv run python scripts/focus.py check  runs/<slug> [--n 5]   # 核對挑選者寫的 work/focus/draft.json
   uv run python scripts/focus.py apply  runs/<slug> [--ids W1,W2,...]   # 套用（不給 --ids 就用 draft.json）；停 1 本人換篇也用這個
+  uv run python scripts/focus.py add    runs/<slug> --ids W7,W9          # 本人在教授頁勾選要完全解析的：加進必讀，原本的照留
 
 套用後 work/focus.json 記下哪幾篇與理由；works.json 其他文章 kind 改成 "title"（原本的種類記在 kind_orig）。
 """
@@ -29,7 +30,7 @@ def _me():
 
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["inputs", "check", "apply"])
+    ap.add_argument("cmd", choices=["inputs", "check", "apply", "add"])
     ap.add_argument("run")
     ap.add_argument("--n", type=int, default=5)
     ap.add_argument("--ids", default="")
@@ -52,13 +53,20 @@ def main(argv=None):
             print(f"FAIL {f['where']} {f['why']} {f.get('detail', '')}")
         print("PASS" if not fails else f"{len(fails)} 個問題")
         return 1 if fails else 0
+    if a.cmd == "add" and not a.ids:
+        print("FAIL add 要給 --ids")
+        return 1
     if a.ids:
         ids = [i.strip() for i in a.ids.split(",") if i.strip()]
+        if a.cmd == "add":
+            cur = json.loads((run / "work" / "focus.json").read_text()).get("ids", []) if (run / "work" / "focus.json").exists() else \
+                [w["id"] for w in works if w.get("kind") != "title"]
+            ids = cur + [i for i in ids if i not in cur]
         old = json.loads((run / "work" / "focus.json").read_text()) if (run / "work" / "focus.json").exists() else {}
         reasons = {p["id"]: p for p in (old.get("picks") or [])}
         draft = json.loads((fd / "draft.json").read_text()) if (fd / "draft.json").exists() else {}
         reasons.update({p["id"]: p for p in draft.get("picks") or []})
-        picks = [reasons.get(i) or {"id": i, "reason": "本人在停 1 指定", "quote": None} for i in ids]
+        picks = [reasons.get(i) or {"id": i, "reason": "本人在教授頁勾選" if a.cmd == "add" else "本人在停 1 指定", "quote": None} for i in ids]
     else:
         picks = json.loads((fd / "draft.json").read_text()).get("picks") or []
         fails = check_picks(picks, works, a.n)

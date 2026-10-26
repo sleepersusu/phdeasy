@@ -135,6 +135,13 @@ def prompt_discover_enrich():
             "每位教授掛名的博士學程與資助、實驗室網址，每個值附出處 → 合成 enrich-new.json → --merge），完成後回報 DONE 那一行。" + UNATTENDED)
 
 
+def prompt_deep(slug, ids):
+    return (f"本人在教授頁勾選了要完全解析的文章：runs/{slug} 的 {', '.join(ids)}（已用 focus.py add 加進必讀）。"
+            f"只處理這幾篇：先跑 drive_sync；setup_fulltext.py runs/{slug} --only {','.join(ids)} → ingest.py → "
+            "照 prof-cards 寫解析卡（cards.py todo 只會列出還沒做的）→ 照 prof-digest 抽圖表、寫重點與研究方法、看圖解讀 → build_site.py；"
+            "已經做好的文章不要重做，總覽與比對不用重寫。完成後回報 DONE 那一行（幾篇有全文、幾篇只用摘要）。" + UNATTENDED)
+
+
 def prompt_programs(slug, name, institution, orcid=None):
     return (f"查 {name}（{institution}{'，ORCID ' + orcid if orcid else ''}）本人掛名、可以收博士生的博士學程與各學程的資助："
             f"照 .claude/skills/prof-discover/SKILL.md 的 B，寫 runs/{slug}/work/programs.json，再跑 scripts/programs.py runs/{slug}，"

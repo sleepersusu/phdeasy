@@ -492,8 +492,35 @@ function cardHtml(w){
     <dl class="card">${c.fields.map(f => `<dt>${esc(f.label)}</dt><dd>${val(f)}</dd>`).join("")}</dl>`;
 }
 const paperPage = id => `paper.html?p=${encodeURIComponent(new URLSearchParams(location.search).get("p") || "")}&id=${encodeURIComponent(id)}`;
+const DEEP = new Set();  // 勾選要完全解析的文章（只列標題的那些）
+function deepBar(){
+  /* 勾了幾篇就在下方出現按鈕：加進必讀，背景找全文、寫解析卡與重點 */
+  let bar = document.getElementById("deep-bar");
+  if (!DEEP.size){ bar?.remove(); return; }
+  if (!bar){ bar = document.createElement("div"); bar.id = "deep-bar"; bar.className = "card";
+    bar.style.cssText = "position:sticky;bottom:12px;margin-top:12px;display:flex;gap:12px;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(0,0,0,.12)";
+    body("papers").appendChild(bar); }
+  bar.innerHTML = `<span>已勾 <strong>${DEEP.size}</strong> 篇</span><span class="row"><button class="btn btn-sm" id="deep-clear">清除</button>
+    <button class="btn btn-green" id="deep-go">完全解析這 ${DEEP.size} 篇</button></span>`;
+  bar.querySelector("#deep-clear").onclick = () => { DEEP.clear(); papers(); };
+  bar.querySelector("#deep-go").onclick = async ev => {
+    if (busyHere()) return alert("這位教授已經有一個工作在跑，等它跑完再按");
+    if (!confirm(`完全解析這 ${DEEP.size} 篇：找全文、寫解析卡、重點與研究方法、圖表（每篇約幾分鐘，會用到 AI 額度）。開始？`)) return;
+    ev.target.disabled = true;
+    try { await APIX("deep", {slug: SLUG, ids: [...DEEP]}); DEEP.clear(); location.href = "settings.html"; }
+    catch (e) { alert(e.message); ev.target.disabled = false; }
+  };
+}
+
 function paperHtml(w){
   if (!OFFLINE){  // 應用程式：列表只放標題，點進去是那一篇自己的頁面（左英右中、AI 重點、圖表）
+    if (w.kind === "title")  // 不在必讀前五篇：只有標題與摘要；應用程式裡可以勾選要完全解析
+      return `<div class="paper item" id="paper-${w.id}" style="margin:8px 0">
+        <div class="row" style="align-items:flex-start;flex-wrap:nowrap;gap:10px">
+          ${APP ? `<input type="checkbox" data-deep="${w.id}" ${DEEP.has(w.id) ? "checked" : ""} aria-label="完全解析這篇" style="width:20px;height:20px;margin-top:3px;flex:none">` : ""}
+          <div style="flex:1"><span class="t" style="font-weight:600">${bi(w.title_zh, w.title)}</span>
+            <span class="row small" style="margin-top:4px">${w.year}｜${esc(TYPE[w.type] || w.type)}｜${esc(w.venue || "期刊來源未提及")}｜${esc(role(w.target_position, w.target_corresponding))} ${pill("", "只列標題")}</span>
+            ${w.abstract ? `<details><summary class="small" style="cursor:pointer;min-height:36px;display:flex;align-items:center">摘要</summary><p class="small">${esc(w.abstract)}</p></details>` : ""}</div></div></div>`;
     return `<a class="paper item" id="paper-${w.id}" href="${paperPage(w.id)}" style="display:block;text-decoration:none;margin:8px 0">
       <span class="t" style="font-weight:600">${bi(w.title_zh, w.title)}</span>
       <span class="row small" style="margin-top:4px">${w.year}｜${esc(TYPE[w.type] || w.type)}｜${esc(w.venue || "期刊來源未提及")}｜${esc(role(w.target_position, w.target_corresponding))} ${fulltextPill(w)} ${w.digest ? pill("g", "有 AI 重點") : ""} ${(w.figures || []).length ? pill("", `圖表 ${w.figures.length}`) : ""} ${w.exceptions.some(e => e.state === "open") ? pill("r", "有例外") : ""}</span></a>`;
@@ -536,6 +563,8 @@ function papers(){
         <button class="btn btn-green" data-ft="ok">有全文</button>
         <button class="btn btn-yellow" data-ft="abstract">僅摘要／短卡</button>
         <button class="btn btn-red" data-ft="exc">有例外</button>
+        <button class="btn" data-ft="deep">完全解析</button>
+        <button class="btn" data-ft="title">只列標題</button>
       </div>
       <p id="pcount" class="small muted" aria-live="polite"></p><div id="plist"></div>`;
     $("#pq").oninput = e => { PF.q = e.target.value.trim().toLowerCase(); papers(); };
@@ -547,9 +576,12 @@ function papers(){
   const list = D.works.filter(w =>
     (!PF.q || hay(w).includes(PF.q)) &&
     (PF.year === "all" || String(w.year) === PF.year) &&
-    (PF.ft === "all" || (PF.ft === "ok" && w.fulltext === "ok") || (PF.ft === "abstract" && w.fulltext !== "ok") || (PF.ft === "exc" && w.exceptions.some(e => e.state === "open"))));
-  $("#pcount").textContent = `顯示 ${list.length} / ${D.works.length} 篇`;
+    (PF.ft === "all" || (PF.ft === "ok" && w.fulltext === "ok") || (PF.ft === "abstract" && w.fulltext !== "ok") || (PF.ft === "exc" && w.exceptions.some(e => e.state === "open")) || (PF.ft === "deep" && w.kind !== "title") || (PF.ft === "title" && w.kind === "title")));
+  const nTitle = D.works.filter(w => w.kind === "title").length;
+  $("#pcount").textContent = `顯示 ${list.length} / ${D.works.length} 篇` + (nTitle ? `｜完全解析 ${D.works.length - nTitle} 篇、只列標題 ${nTitle} 篇${APP ? "（勾選想完全解析的，再按下方按鈕）" : ""}` : "");
   $("#plist").innerHTML = list.map(paperHtml).join("") || `<div class="empty">沒有符合的文章。試試清空搜尋字，或把篩選改成「全部」。</div>`;
+  $("#plist").querySelectorAll("[data-deep]").forEach(c => c.onchange = () => { c.checked ? DEEP.add(c.dataset.deep) : DEEP.delete(c.dataset.deep); deepBar(); });
+  deepBar();
   $("#plist").querySelectorAll("[data-copy]").forEach(a => a.onclick = ev => {
     ev.preventDefault(); const url = location.href.split("#")[0] + "#paper-" + a.dataset.copy;
     navigator.clipboard?.writeText(url).then(() => { a.textContent = "已複製"; }, () => { location.hash = "paper-" + a.dataset.copy; });
@@ -1021,7 +1053,7 @@ async function loadData(){
   window.addEventListener("hashchange", openFromHash);
   meetingsCard();
   try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); proposalView(); libraryView(); meetingsCard();
-    const pc = document.getElementById("prog-cell"); if (pc) pc.innerHTML = programsHTML((D.basic || {}).programs); } } catch (e) {}  // 離線單檔版沒有 /api
+    const pc = document.getElementById("prog-cell"); if (pc) pc.innerHTML = programsHTML((D.basic || {}).programs); papers(); } } catch (e) {}  // 離線單檔版沒有 /api
 })();
 </script>
 </body>

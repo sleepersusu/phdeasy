@@ -41,3 +41,19 @@ def test_title_works_skip_fulltext():
     from pipeline.fetch import needs_fulltext
     assert not needs_fulltext({"kind": "title", "short_reason": "not_led"})
     assert needs_fulltext({"kind": "full"})
+
+
+def test_focus_add_cli_keeps_existing_and_adds(tmp_path, capsys):
+    import focus
+    r = tmp_path / "runs" / "x"
+    (r / "work").mkdir(parents=True)
+    ws = json.loads(json.dumps(WORKS))
+    apply_focus(ws, ["W1", "W2"])
+    (r / "work" / "works.json").write_text(json.dumps(ws))
+    (r / "work" / "focus.json").write_text(json.dumps({"ids": ["W1", "W2"], "picks": [pick(1), pick(2)]}))
+    assert focus.main(["add", str(r), "--ids", "W0,W5"]) == 0
+    f = json.loads((r / "work" / "focus.json").read_text())
+    assert f["ids"] == ["W1", "W2", "W0", "W5"] and f["picks"][2]["reason"].startswith("本人")
+    kinds = {w["id"]: w["kind"] for w in json.loads((r / "work" / "works.json").read_text())}
+    assert kinds["W0"] == "short" and kinds["W5"] == "full" and kinds["W3"] == "title"
+    assert focus.main(["add", str(r), "--ids", "W404"]) == 1

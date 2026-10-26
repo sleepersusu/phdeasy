@@ -370,3 +370,24 @@ def test_new_professor_gets_slug_and_reply_targets_job(tmp_path):
     app.jobs.load = lambda jid: {"id": jid, "title": "建檔：Julian Hong", "session": "s-h", "slug": "hong-julian", "key": "hong-julian"} if jid == "J2" else None
     app.post("reply", {"job": "J2", "text": "範圍選 E"})
     assert [c for c in calls if c[0] == "job"][-1][1:3] == ("reply", "hong-julian")
+
+
+def test_deep_route_adds_focus_and_starts_job(tmp_path, monkeypatch):
+    import json
+    import subprocess
+    import pytest
+    import app as appmod
+    app, calls = _lib_app(tmp_path)
+    w = tmp_path / "runs" / "doe-jane" / "work"
+    w.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "runs" / "doe-jane" / "state.json").write_text("{}")
+    (w / "works.json").write_text(json.dumps([{"id": "W1", "kind": "full"}, {"id": "W2", "kind": "title"}, {"id": "W3", "kind": "title"}]))
+    ran = []
+    monkeypatch.setattr(appmod, "find_uv", lambda: "uv")
+    monkeypatch.setattr(appmod.subprocess, "run", lambda cmd, **kw: ran.append(cmd) or subprocess.CompletedProcess(cmd, 0, "DONE", ""))
+    app.post("deep", {"slug": "doe-jane", "ids": ["W1", "W2", "W3", "bad"]})
+    assert ran[-1][-1] == "W2,W3"  # 已經完全解析的與亂填的不送
+    job = [c for c in calls if c[0] == "job"][-1]
+    assert job[1:3] == ("deep", "doe-jane") and "W2, W3" in job[3]
+    with pytest.raises(ValueError):
+        app.post("deep", {"slug": "doe-jane", "ids": ["W1"]})

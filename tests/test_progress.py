@@ -58,3 +58,9 @@ def test_done_pipeline_is_100(tmp_path):
            extra=["work/network.json", "out/data/grants.csv", "work/digest/W0.json", "out/profile.md", "out/match.json"])
     e = estimate(r, "continue")
     assert e["percent"] == 100 and e["eta_s"] == 0
+
+
+def test_deep_job_span(tmp_path):
+    r = mk(tmp_path, "stop2", n=4, fulltext=4, texts=4, cards=3)
+    e = estimate(r, "deep")
+    assert [x["key"] for x in e["steps"]] == ["fulltext", "ingest", "cards", "digest"] and e["current"] == "cards"
