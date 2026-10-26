@@ -559,7 +559,7 @@ function papers(){
 let exFilter = "open";
 let APP = null;
 /* 同時可以跑 3 個工作，但同一位教授一次一個：只看這位教授有沒有工作在跑 */
-const busyHere = () => ((APP && APP.jobs) || []).find(j => j.running && j.slug === SLUG);  /* 在應用程式裡打開時是 /api/status 的內容：例外可以按按鈕請 Claude Code 處理 */
+const busyHere = () => ((APP && (APP.jobs || (APP.running && APP.job ? [{...APP.job, running: true}] : []))) || []).find(j => j.running && j.slug === SLUG);  /* 在應用程式裡打開時是 /api/status 的內容：例外可以按按鈕請 Claude Code 處理 */
 const APIX = (path, body, raw) => fetch("/api/" + path, {method: "POST", headers: {"X-Phdeasy-App": "1", "Content-Type": raw ? "application/pdf" : "application/json"},
   body: raw || JSON.stringify(body)}).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; });
 const SLUG = new URLSearchParams(location.search).get("p");

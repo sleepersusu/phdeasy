@@ -54,7 +54,8 @@ function progressHTML(p){
 
 function jobsHTML(st, ready){
   /* 每個工作一列（最多同時 3 個在跑；每位教授一次一個）：狀態、進度條與預估時間、停止、回報、過程紀錄、回覆 */
-  const jobs = st.jobs || [];
+  /* 舊版的程式（還沒重開）只給 job／running／log／progress：轉成一個工作的清單，畫面才看得到 */
+  const jobs = st.jobs || (st.job ? [{...st.job, running: !!st.running, log: st.log || [], progress: st.progress || null}] : []);
   if (!jobs.length) return setRow("row-job", "目前的工作", '<span class="small muted">沒有在跑的工作</span>', '<div class="small muted">在「目標教授」新增教授、或在文件頁按 AI 編修，工作就會出現在這裡。可以同時跑 3 個（每位教授一次一個）。</div>');
   const nrun = jobs.filter(j => j.running).length;
   return `<div class="small muted" style="margin:4px 0">${nrun ? `${nrun} 個工作在跑（最多同時 3 個）` : "沒有在跑的工作"}</div>` + jobs.map(job => {
@@ -117,10 +118,10 @@ function renderPipeline(st){
   if (!el) return;  // 這一頁沒有「建新教授」區
   /* 每 3 秒更新：只有紀錄變多時只換紀錄那一塊，不打斷你正在打字的欄位 */
   const shape = JSON.stringify({...st, log: undefined, progress: undefined, job: undefined,
-    jobs: (st.jobs || []).map(j => ({...j, log: (j.log || []).length ? 1 : 0, progress: j.progress && [j.progress.percent, j.progress.current]}))});
+    jobs: (st.jobs || (st.job ? [{...st.job, running: !!st.running, log: st.log}] : [])).map(j => ({...j, log: (j.log || []).length ? 1 : 0, progress: j.progress && [j.progress.percent, j.progress.current]}))});
   const logs = [...el.querySelectorAll("[data-job-log]")];
   if (shape === lastShape && logs.length){  // 只有紀錄或預估時間變：只換那幾塊，不打斷你正在打字的回覆
-    for (const j of st.jobs || []){
+    for (const j of st.jobs || (st.job ? [{...st.job, log: st.log}] : [])){
       const lg = el.querySelector(`[data-job-log="${CSS.escape(j.id)}"]`);
       if (!lg) continue;
       const atBottom = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 20;
@@ -133,8 +134,8 @@ function renderPipeline(st){
   const keep = {replies: Object.fromEntries([...el.querySelectorAll("[data-reply-box]")].map(t => [t.dataset.replyBox, t.value])),
                 focus: document.activeElement?.id};
   const ready = st.claude && st.uv;
-  const running = (st.jobs || []).some(j => j.running);
-  const busy = new Set((st.jobs || []).filter(j => j.running).map(j => j.slug));
+  const running = st.jobs ? st.jobs.some(j => j.running) : !!st.running;
+  const busy = new Set((st.jobs || (st.running && st.job ? [{...st.job, running: true}] : [])).filter(j => j.running).map(j => j.slug));
   const profs = st.professors || [];
   const tools = [st.claude, st.uv, st.drive].filter(Boolean).length;
   el.innerHTML =
