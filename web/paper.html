@@ -145,6 +145,17 @@ function render(d, w){
     h += `<div class="empty">這篇還沒有 AI 重點整理${w.text_source === "none" ? "（沒有全文也沒有摘要，只有標題）" : "（由「單篇重點」階段產生）"}。下面是解析卡的大意。</div>`;
     if (F.summary) h += `<div style="margin-top:8px">${pair(F.summary.text_en, F.summary.text)}</div>`;
   }
+  // 1b. 研究發現（白話）：一句話結論＋每一項結果（原文數字與白話說明）
+  if (g && (g.bottom_line || (g.findings || []).length)){
+    h += `<h2>研究發現（白話）</h2>`;
+    if (g.bottom_line) h += `<div class="card" style="margin:8px 0;border-left:4px solid #15803d"><div class="small muted">一句話結論</div>${pair(g.bottom_line.en, g.bottom_line.zh)}${cites(g.bottom_line.citations)}</div>`;
+    (g.findings || []).forEach((f, i) => {
+      h += `<div class="field"><div class="name">發現 ${i + 1}</div>${pair(f.plain_en, f.plain_zh)}
+        <div class="small muted" style="margin-top:4px">原文結果：</div>${pair(f.en, f.zh)}${cites(f.citations)}</div>`;
+    });
+  } else if (g){
+    h += `<h2>研究發現（白話）</h2><div class="empty">這篇還沒有白話的研究發現（舊的整理沒有這一段）。在教授頁「工作進度」回覆「補研究發現」就會補上。</div>`;
+  }
   // 2. 研究方法（詳細）：設計、場域、對象、樣本、介入、變項、測量、分析、限制
   if (g && g.method && g.method.length){
     h += `<h2>研究方法（詳細）</h2>`;

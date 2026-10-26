@@ -51,6 +51,10 @@ def check_method(m, text):
 def _items(d):
     for i, k in enumerate(d.get("key_points") or []):
         yield f"key_points[{i}]", k
+    if d.get("bottom_line"):
+        yield "bottom_line", d["bottom_line"]
+    for i, f in enumerate(d.get("findings") or []):
+        yield f"findings[{i}]", f
     if d.get("design"):
         yield "design", d["design"]
     for i, f in enumerate(d.get("figures") or []):
@@ -73,6 +77,17 @@ def check_digest(d, text, figure_labels):
             fails.append({"path": f"figure:{lab}", "why": "figure_not_in_paper"})
     if len(got) != len(set(got)):
         fails.append({"path": "figures", "why": "figure_duplicate"})
+    # 研究發現（本人 2026-10-26）：一句白話結論＋每一項結果（事實＋白話說明），都要中英、引句
+    if not d.get("bottom_line"):
+        fails.append({"path": "bottom_line", "why": "missing_bottom_line"})
+    if not d.get("findings"):
+        fails.append({"path": "findings", "why": "missing_findings"})
+    for i, f in enumerate(d.get("findings") or []):
+        pe, pz = (f.get("plain_en") or "").strip(), (f.get("plain_zh") or "").strip()
+        if not pe or not pz:
+            fails.append({"path": f"findings[{i}]", "why": "need_plain"})
+        elif not numbers_match(pz, pe):
+            fails.append({"path": f"findings[{i}]", "why": "plain_numbers_differ"})
     if "method" in d:
         fails += check_method(d["method"], text)
     else:  # 重點與研究方法由同一個 agent 一次寫完（本人 2026-10-26），不能缺
@@ -104,10 +119,15 @@ def check_digest(d, text, figure_labels):
 def assemble_digest(d, text, figure_labels, figures):
     """拿掉核對不過的條目（記下來給 rejected），圖表說明併入圖片位置與標題，給前端直接用。"""
     bad = {f["path"].split(".citations")[0] for f in check_digest(d, text, figure_labels)
-           if f["why"] not in ("need_3_to_6", "figure_missing", "figure_not_in_paper", "figure_duplicate", "missing_method")}
+           if f["why"] not in ("need_3_to_6", "figure_missing", "figure_not_in_paper", "figure_duplicate", "missing_method",
+                               "missing_findings", "missing_bottom_line")}
     bad_detail = {f["path"] for f in check_digest(d, text, figure_labels) if ".detail[" in f["path"]}
     rejected = []
-    out = {"id": d.get("id"), "key_points": [], "design": None, "figures": [], "method": None}
+    out = {"id": d.get("id"), "key_points": [], "design": None, "figures": [], "method": None, "bottom_line": None, "findings": []}
+    if d.get("bottom_line") and "bottom_line" not in bad:
+        out["bottom_line"] = d["bottom_line"]
+    for i, f in enumerate(d.get("findings") or []):
+        (rejected if f"findings[{i}]" in bad else out["findings"]).append(f)
     if d.get("method"):
         mbad = {f["path"].split(".citations")[0] for f in check_method(d["method"], text)}
         out["method"] = [{"key": k, "label_en": METHOD_LABELS[k][0], "label_zh": METHOD_LABELS[k][1], **d["method"][k]}

@@ -4,7 +4,7 @@
 
 你要寫三個檔（每篇）：
 1. `runs/<slug>/work/cards/<id>/a.json`：7 欄解析卡（下面「7 個欄位」），每句中文旁邊加英文 `text_en`，最上層加 `title_zh`、`keywords_zh`、`keywords_en`（下面「中英」）。
-2. `runs/<slug>/work/digest/<id>.json`：重點、研究設計、每張圖表說明、研究方法十部分，格式照 `.claude/skills/prof-digest/digester.md` 的「怎麼寫」「研究方法十部分」「寫」三節（圖表清單在 `runs/<slug>/work/figures/<id>.json`，每個 label 都要一筆；沒有這個檔就寫 `"figures": []`）。
+2. `runs/<slug>/work/digest/<id>.json`：重點、研究設計、每張圖表說明、研究方法十部分，格式照 `.claude/skills/prof-digest/digester.md` 的「怎麼寫」「研究發現（白話）」「研究方法十部分」「寫」四節（研究發現要列出**所有**結果並白話說明）（圖表清單在 `runs/<slug>/work/figures/<id>.json`，每個 label 都要一筆；沒有這個檔就寫 `"figures": []`）。
 3. 寫完各自跑核對（見最後），有 FAIL 就照原文修。
 
 ## 讀
@@ -87,4 +87,4 @@ uv run python scripts/digest.py check runs/<slug> --ids <id>
 
 ## 回報
 
-一行：`DONE read <id>：解析卡 引句 <總數>；重點 <n> 條、圖表 <m> 張、研究方法原文未提及 <k> 個部分`。舊格式的 `DONE card-a <id>：大意 1、缺口 <n>、解決 <n>、發現 <n>、限制 自述 <n>／推論 <n>，引句 <總數>`。讀不到檔回 `BLOCKED card-a <id>：<原因>`。
+一行：`DONE read <id>：解析卡 引句 <總數>；重點 <n> 條、研究發現 <f> 項、圖表 <m> 張、研究方法原文未提及 <k> 個部分`。舊格式的 `DONE card-a <id>：大意 1、缺口 <n>、解決 <n>、發現 <n>、限制 自述 <n>／推論 <n>，引句 <總數>`。讀不到檔回 `BLOCKED card-a <id>：<原因>`。

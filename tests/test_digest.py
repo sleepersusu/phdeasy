@@ -14,7 +14,12 @@ def good():
             "design": {"en": "A randomized controlled trial.", "zh": "隨機對照試驗。", "citations": C("randomized controlled trial of conversational AI", "p.1")},
             "figures": [{"label": "Table 1", "en": "Baseline of 103 people.", "zh": "103 人的基本資料。", "citations": C("Baseline characteristics of the 103 participants", "p.4")},
                         {"label": "Figure 1", "en": "Participant flow.", "zh": "受試者流程。", "citations": C("Flowchart of participants included in the trial", "p.4")}],
-            "method": {k: {"not_reported": True, "en": "Not reported", "zh": "原文未提及"} for k in METHOD_KEYS}}
+            "method": {k: {"not_reported": True, "en": "Not reported", "zh": "原文未提及"} for k in METHOD_KEYS},
+            "bottom_line": {"en": "Conversational AI was tested with 103 people.", "zh": "對話式 AI 在 103 人身上做了測試。",
+                            "citations": C("We enrolled 103 participants in a randomized", "p.1")},
+            "findings": [{"en": "103 participants were enrolled.", "zh": "共收 103 位受試者。",
+                          "plain_en": "About a hundred people took part.", "plain_zh": "大約一百個人參加。",
+                          "citations": C("We enrolled 103 participants in a randomized", "p.1")}]}
 
 
 def test_good_digest_passes():
@@ -71,3 +76,23 @@ def test_figure_detail_is_checked_and_kept():
     d["figures"][1]["detail"] = [{"en": "Randomized 120 people.", "zh": "隨機分派 100 人。"}, {"en": "Only English."}]
     whys = {f["why"] for f in check_digest(d, TEXT, LABELS)}
     assert {"numbers_differ", "need_en_and_zh"} <= whys
+
+
+def test_plain_findings_are_required_and_checked():
+    """本人 2026-10-26：前五篇要看到研究所有發現、白話說明。缺發現或白話、白話中英數字不一致、引句不在原文都要抓到。"""
+    d = good()
+    del d["findings"]
+    del d["bottom_line"]
+    whys = {f["why"] for f in check_digest(d, TEXT, LABELS)}
+    assert {"missing_findings", "missing_bottom_line"} <= whys
+    d = good()
+    d["findings"][0]["plain_zh"] = ""
+    assert "need_plain" in {f["why"] for f in check_digest(d, TEXT, LABELS)}
+    d = good()
+    d["findings"][0]["plain_en"] = "About 200 people took part."
+    d["findings"][0]["plain_zh"] = "大約一百個人參加。"
+    assert "plain_numbers_differ" in {f["why"] for f in check_digest(d, TEXT, LABELS)}
+    d = good()
+    d["findings"][0]["citations"] = C("a sentence that is not in this paper", "p.1")
+    out, rej = assemble_digest(d, TEXT, LABELS, FIGS)
+    assert out["findings"] == [] and out["bottom_line"]["zh"] and any("plain_zh" in r for r in rej)
