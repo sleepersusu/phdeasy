@@ -260,15 +260,20 @@ class App:
                 "queue": [q["title"] for q in self.queue]}
 
     def job_list(self):
-        """工作進度頁：正在跑的全部，加上最近跑完的（每位教授／每份文件只留最新一個）；各自的紀錄與進度條。"""
+        """工作進度頁：正在跑的全部，加上最近的（每位教授／每份文件只留最新一個，最多 15 個）；各自的紀錄與進度條。
+        紀錄上寫 running、但不在這次開的程式裡跑的（程式中途關掉），當作中斷。"""
         act = self.jobs.active()
+        ids = {j["id"] for j in act}
         seen, out = {j.get("key") for j in act}, list(act)
-        for j in self.jobs.recent(12):
-            if j["status"] != "running" and j.get("key", j.get("slug") or j["kind"]) not in seen and len(out) < 6:
-                seen.add(j.get("key", j.get("slug") or j["kind"]))
-                out.append(j)
-        return [{**{k: v for k, v in j.items() if k != "prompt"}, "running": j in act,
-                 "log": self.jobs.log_tail(j["id"], 80), "progress": self.job_progress(j) if j in act else None} for j in out]
+        for j in self.jobs.recent(40):
+            k = j.get("key", j.get("slug") or j["kind"])
+            if j["id"] in ids or k in seen or len(out) >= 15:
+                continue
+            seen.add(k)
+            out.append({**j, "status": "failed"} if j["status"] == "running" else j)
+        return [{**{k: v for k, v in j.items() if k != "prompt"}, "running": j["id"] in ids,
+                 "log": self.jobs.log_tail(j["id"], 80 if j["id"] in ids or j["status"] != "done" else 30),
+                 "progress": self.job_progress(j) if j["id"] in ids else None} for j in out]
 
     def job_progress(self, job):
         """執行中的流水線工作：進度條與預估時間（看批次資料夾裡已產生的檔案；速度用這次輪詢量到的）。"""

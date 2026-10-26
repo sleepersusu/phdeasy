@@ -57,8 +57,8 @@ function jobsHTML(st, ready){
   /* 舊版的程式（還沒重開）只給 job／running／log／progress：轉成一個工作的清單，畫面才看得到 */
   const jobs = st.jobs || (st.job ? [{...st.job, running: !!st.running, log: st.log || [], progress: st.progress || null}] : []);
   if (!jobs.length) return setRow("row-job", "目前的工作", '<span class="small muted">沒有在跑的工作</span>', '<div class="small muted">在「申請目標」新增教授、或在文件頁按 AI 編修，工作就會出現在這裡。可以同時跑 3 個（每位教授一次一個）。</div>');
-  const nrun = jobs.filter(j => j.running).length;
-  return `<div class="small muted" style="margin:4px 0">${nrun ? `${nrun} 個工作在跑（最多同時 3 個）` : "沒有在跑的工作"}</div>` + jobs.map(job => {
+  const nrun = jobs.filter(j => j.running).length, queue = st.queue || [];
+  const row = job => {
     const running = job.running, id = esc(job.id);
     return setRow("row-job-" + job.id, running ? "▶ " + esc(job.title) : esc(job.title),
       `${running ? (job.progress ? `<span class="pill y">${job.progress.percent}%｜還要${dur(job.progress.eta_s)}</span>` : '<span class="pill y">執行中</span>') : job.status === "done" ? '<span class="pill g">跑完了</span>' : '<span class="pill r">中斷</span>'}`, `
@@ -72,7 +72,14 @@ function jobsHTML(st, ready){
         <textarea id="reply-${id}" data-reply-box="${id}" placeholder="例：W123 不是他的文章，拿掉；或：重新找 W456 的全文。"></textarea>
         <div class="row" style="margin-top:8px"><button class="btn btn-green" data-reply-send="${id}" ${!ready ? "disabled" : ""}>送出並繼續</button>
         <span class="small muted">會接著同一個對話跑。</span></div>` : ""}`);
-  }).join("");
+  };
+  /* 分兩類：未完成（跑中、排隊、中斷）在上面，已完成收起來 */
+  const todo = jobs.filter(j => j.running || j.status !== "done"), done = jobs.filter(j => !j.running && j.status === "done");
+  return `<h3 style="margin:8px 0 4px">未完成 <span class="small muted">${todo.length + queue.length}｜${nrun ? `${nrun} 個在跑（最多同時 3 個）` : "沒有在跑的工作"}</span></h3>`
+    + (todo.map(row).join("") || `<div class="small muted" style="margin:4px 0 8px">沒有未完成的工作</div>`)
+    + queue.map(t => `<div class="small" style="margin:6px 0"><span class="pill">排隊中</span> ${esc(t)}</div>`).join("")
+    + `<details style="margin-top:12px" ${OPEN_ROWS.has("done-jobs") ? "open" : ""} id="done-jobs" class="setrow"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center;gap:6px"><strong>已完成</strong><span class="small muted">${done.length}</span></summary>
+      ${done.map(row).join("") || `<div class="small muted">還沒有完成的工作</div>`}</details>`;
 }
 
 async function pipelinePanel(){
