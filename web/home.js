@@ -55,6 +55,31 @@ function renderCard(m){
 function splitSentences(t, zh){
   return (t || "").split(zh ? /(?<=。)/ : /(?<=\.)\s+(?=[A-Z])/).map(x => x.trim()).filter(Boolean);
 }
+function renderMeEdit(m){
+  /* 本人自己改簡介與研究興趣（例：不想做某個領域就刪掉）；存檔後舊版留在 runs/_me/history/ */
+  const row = (i, it) => `<div class="row int-row" style="flex-wrap:nowrap;margin:6px 0"><input type="text" value="${esc(it.zh || "")}" placeholder="中文" style="flex:1">
+    <input type="text" value="${esc(it.en || "")}" placeholder="English" style="flex:1"><button type="button" class="btn btn-sm" data-int-del aria-label="刪掉這個興趣">刪掉</button></div>`;
+  body("me").innerHTML = `<form id="me-form" class="match-form" style="max-width:none">
+    <div><label for="me-sum-zh">簡介（中文）</label><textarea id="me-sum-zh" rows="3">${esc(m.summary_zh || "")}</textarea></div>
+    <div><label for="me-sum-en">簡介（English）</label><textarea id="me-sum-en" rows="3">${esc(m.summary || "")}</textarea></div>
+    <div><strong>研究興趣</strong><div class="small muted">刪掉不想做的；改了之後各教授的比對會標「過期」，可以按「重新比對」。</div><div id="int-list">${(m.interests || []).map((it, i) => row(i, it)).join("")}</div>
+      <button type="button" class="btn btn-sm" id="int-add">＋ 新增興趣</button></div>
+    <div class="row"><button class="btn btn-green" type="submit">儲存</button><button class="btn" type="button" id="me-cancel">取消</button><span class="small" id="me-msg"></span></div></form>`;
+  const f = document.getElementById("me-form");
+  f.addEventListener("click", ev => { if (ev.target.matches("[data-int-del]")) ev.target.closest(".int-row").remove(); });
+  document.getElementById("int-add").onclick = () => { document.getElementById("int-list").insertAdjacentHTML("beforeend", row(0, {})); document.querySelector("#int-list .int-row:last-child input").focus(); };
+  document.getElementById("me-cancel").onclick = () => renderMe(m);
+  f.onsubmit = async ev => {
+    ev.preventDefault();
+    const interests = [...f.querySelectorAll(".int-row")].map(r => { const [zh, en] = r.querySelectorAll("input"); return {zh: zh.value.trim(), en: en.value.trim()}; }).filter(i => i.zh || i.en);
+    try {
+      await API("me-update", {summary: f.querySelector("#me-sum-en").value, summary_zh: f.querySelector("#me-sum-zh").value, interests});
+      document.getElementById("me-msg").textContent = "已儲存。";
+      setTimeout(() => location.reload(), 600);
+    } catch (e) { document.getElementById("me-msg").textContent = "儲存失敗：" + e.message; }
+  };
+}
+
 function renderMe(m){
   /* 簡介：條列式；學歷在左邊個人卡，這裡不重複 */
   const en = splitSentences(m.summary), zh = splitSentences(m.summary_zh, true);
@@ -68,6 +93,11 @@ function renderMe(m){
     <h3 class="label">專案｜Projects</h3>
     <ul class="bullets">${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul>
     <div class="src">內容出處：${esc([...new Set([m.summary_src, m.interests_src, "CV"].filter(Boolean))].join("；"))}</div>`;
+  const head = document.querySelector("#me h2");
+  if (window.APP_REMATCH && head && !document.getElementById("me-edit")){
+    head.insertAdjacentHTML("afterend", `<div style="text-align:right;margin:-34px 0 8px"><button class="btn btn-sm" id="me-edit">編輯簡介與研究興趣</button></div>`);
+    document.getElementById("me-edit").onclick = () => renderMeEdit(H.me);
+  }
 }
 
 
@@ -191,16 +221,20 @@ document.addEventListener("click", async ev => {
   }
 });
 
-function renderCaps(cs){
-  /* 我能做到的事：條列式；跟發表、專案、學歷重複的項目不再列（那些在上面或左邊個人卡） */
-  const m = H.me || {};
-  const dupKeys = [...(m.projects || []).map(p => (p.name || "").split(/\s+[—-]\s+/)[0]), ...(m.education || []).map(e => e.school)].filter(Boolean);
-  const isDup = it => (/^first-author publication/i.test(it) && (m.publications || []).length) || dupKeys.some(k => it.includes(k));
-  body("capabilities").innerHTML = (cs || []).map(c => {
-    const items = c.items.map((it, i) => [it, (c.items_zh || [])[i]]).filter(([it]) => !isDup(it));
-    return items.length ? `<h3 class="label">${esc(c.area_zh || c.area)}｜${esc(c.area)}</h3>
-      <ul class="bullets">${items.map(([it, z]) => `<li>${bi(z, it, "div")}</li>`).join("")}</ul>` : "";
-  }).join("") || `<div class="empty">還沒有資料。</div>`;
+function renderCaps(){
+  /* 工作經歷（本人 2026-10-26：取代「我能做到的事」）：每段經歷條列，括號裡是重點技能 */
+  const xs = (H.me || {}).experience || [];
+  const head = document.querySelector("#capabilities h2");
+  if (head) head.textContent = "工作經歷｜Experience";
+  const group = (k, label) => {
+    const list = xs.filter(x => x.kind === k);
+    return list.length ? `<h3 class="label">${label}</h3>${list.map(x => `<div class="exp">
+      <div class="exp-head"><div><strong>${bi(x.role_zh, x.role)}</strong><div class="small">${esc(x.org)}${x.place ? "｜" + esc(x.place) : ""}</div></div><span class="small muted">${esc(x.dates || "")}</span></div>
+      <ul class="bullets">${(x.bullets || []).map(b => `<li>${bi(b.zh, b.en, "div")}</li>`).join("")}</ul>
+      ${(x.skills || []).length ? `<div class="small skills">（重點技能：${x.skills.map((sk, i) => `<span class="pill">${bi((x.skills_zh || [])[i], sk)}</span>`).join(" ")}）</div>` : ""}</div>`).join("")}` : "";
+  };
+  body("capabilities").innerHTML = xs.length ? group("professional", "工作｜Professional") + group("research", "研究｜Research")
+    + `<div class="src">內容出處：${esc((H.me || {}).experience_src || "CV")}</div>` : `<div class="empty">還沒有工作經歷。</div>`;
 }
 
 const FIT = {strong: ["g", "強相關"], partial: ["y", "部分相關"], none: ["", "沒有相關"]};

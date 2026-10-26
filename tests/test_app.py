@@ -205,3 +205,19 @@ def test_doc_edit_job_validates_inputs(tmp_path):
     for bad in ({"key": "../x", "version": 1, "block": 0}, {"key": "ps", "version": "a", "block": 0}, {"key": "ps", "version": 1, "block": -1}):
         with pytest.raises(ValueError):
             app.post("doc-edit", bad)
+
+
+def test_me_update_saves_allowed_fields_and_keeps_backup(tmp_path):
+    import json, pytest
+    app, calls = _lib_app(tmp_path)
+    me = tmp_path / "runs" / "_me"
+    me.mkdir(parents=True)
+    (me / "me.json").write_text(json.dumps({"name": "A", "summary": "old", "interests": [{"en": "X", "zh": "甲"}, {"en": "Y", "zh": "乙"}]}))
+    app.post("me-update", {"summary": "new", "summary_zh": "新", "interests": [{"en": "Y", "zh": "乙"}], "name": "hacker"})
+    d = json.loads((me / "me.json").read_text())
+    assert d["summary"] == "new" and d["summary_zh"] == "新" and d["interests"] == [{"en": "Y", "zh": "乙"}]
+    assert d["name"] == "A"  # 只改允許的欄位
+    backups = list((me / "history").glob("me-*.json"))
+    assert len(backups) == 1 and json.loads(backups[0].read_text())["summary"] == "old"
+    with pytest.raises(ValueError):
+        app.post("me-update", {"interests": [{"en": ""}]})

@@ -196,3 +196,8 @@ ul.bullets.cols2 li{break-inside:avoid}
 .doc-tbl td,.doc-tbl th{font-size:.86rem;min-width:7em}
 .doc-refs{padding-left:1.4em}
 @media (hover:none){.docb-tools{opacity:1}}
+/* 工作經歷 */
+.exp{padding:12px 0;border-bottom:1px solid var(--line)}
+.exp:last-of-type{border-bottom:0}
+.exp-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.exp .skills{margin-top:6px;line-height:2}

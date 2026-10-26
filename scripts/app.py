@@ -428,7 +428,30 @@ class App:
             started = True
         return {"ok": True, "key": key, "version": n, "translating": started, "result": out}
 
+    def me_update(self, body):
+        """本人在首頁編輯簡介：只改摘要、標題列、研究興趣；舊的 me.json 先備份到 runs/_me/history/。"""
+        mep = self.runs / "_me" / "me.json"
+        me = json.loads(mep.read_text())
+        new = {}
+        for k in ("summary", "summary_zh", "headline", "headline_zh"):
+            if k in body:
+                new[k] = str(body[k] or "").strip()[:3000]
+        if "interests" in body:
+            ints = [{"en": str(i.get("en") or "").strip()[:200], "zh": str(i.get("zh") or "").strip()[:200]} for i in body["interests"] or []]
+            if any(not (i["en"] or i["zh"]) for i in ints):
+                raise ValueError("研究興趣不能空白")
+            new["interests"] = ints
+        if not new:
+            raise ValueError("沒有要改的內容")
+        hist = mep.parent / "history"
+        hist.mkdir(exist_ok=True)
+        (hist / f"me-{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.json").write_text(mep.read_text())
+        mep.write_text(json.dumps({**me, **new}, ensure_ascii=False, indent=2))
+        return {"ok": True, "changed": sorted(new)}
+
     def post(self, path, body):
+        if path == "me-update":
+            return self.me_update(body)
         if path in ("doc-edit", "doc-translate"):
             import re as _re
             if self.blocked:
