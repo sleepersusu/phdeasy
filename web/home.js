@@ -6,7 +6,7 @@ const bi = (zh, en, tag = "span") => (zh ? `<${tag} class="t-zh">${esc(zh)}</${t
 const body = id => $(`#${id} .body`) || document.createElement("div");  // 這一頁沒有這一區就畫到看不見的地方
 const has = id => !!document.getElementById(id);
 const paperLink = (p, id) => OFFLINE_HOME ? `${p.href}#paper-${id}` : `paper.html?p=${encodeURIComponent(p.slug)}&id=${encodeURIComponent(id)}`;
-const STATUS = {confirmed: ["g", "本人主持"], pending: ["y", "待確認"], acknowledged: ["", "論文致謝提及"], other: ["", "合作者主持"]};
+const STATUS = {confirmed: ["g", "主持人"], pending: ["y", "待確認"], acknowledged: ["", "論文致謝提及"], other: ["", "協同主持人"]};
 
 const T = (zh, en) => `<span class="ll"><span class="t-zh">${esc(zh)}</span><span class="t-en" lang="en">${esc(en)}</span></span>`;  // 介面字：跟著語言切換
 function setLang(l){
@@ -323,7 +323,7 @@ function kpis(p, middle){
   const c = p.counts || {};
   return `<div class="kpis">
     <div class="kpi"><div class="n">${c.works ?? "–"}</div><div class="l">篇文章（2022–2026）</div></div>${middle}
-    <div class="kpi"><div class="n">${c.grants_pi ?? "–"}</div><div class="l">個本人主持計畫</div></div>
+    <div class="kpi"><div class="n">${c.grants_pi ?? "–"}</div><div class="l">個主持人計畫</div></div>
     <div class="kpi"><div class="n">${c.coauthors ?? "–"}</div><div class="l">位合作者</div></div></div>`;
 }
 function recommendBlock(p){

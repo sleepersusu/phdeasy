@@ -243,10 +243,10 @@ function fulltextPill(w){
   return pill("y", "? 全文狀態不明");
 }
 function grantPill(g){
-  if (g.status === "confirmed" && (g.target_role === "pi" || g.target_role === "co_pi")) return pill("g", "✓ 本人主持（API 確認）");
+  if (g.status === "confirmed" && (g.target_role === "pi" || g.target_role === "co_pi")) return pill("g", g.target_role === "co_pi" ? "✓ 共同主持人" : "✓ 主持人");
   if (g.status === "pending") return pill("y", "? 待確認");
   if (g.status === "acknowledged") return pill("o", "論文致謝提及");
-  return pill("o", "合作者主持");
+  return pill("o", "協同主持人");
 }
 function exPill(e){ return e.state === "open" ? pill("r", "✗ 未解決") : e.state === "resolved" ? pill("g", "✓ 已解決") : pill("y", "註記"); }
 
@@ -397,7 +397,7 @@ function overview(){
       <div class="kpi"><div class="n">${c.works}</div><div class="l">篇文章（完整 ${c.full}、短卡 ${c.short}）</div></div>
       <div class="kpi"><div class="n">${c.fulltext_ok}/${c.full}</div><div class="l">有免費全文</div></div>
       <div class="kpi"><div class="n">${c.coauthors}</div><div class="l">位合作者</div></div>
-      <div class="kpi"><div class="n">${c.grants_pi}</div><div class="l">個本人主持計畫</div></div>
+      <div class="kpi"><div class="n">${c.grants_pi}</div><div class="l">個主持人計畫</div></div>
       <div class="kpi"><div class="n">${c.cards_done}/${c.works}</div><div class="l">篇解析卡完成</div></div>
       <div class="kpi"><div class="n">${D.decisions.length}</div><div class="l">件待你決定</div></div>
     </div>
@@ -465,16 +465,16 @@ function grants(){
   const el = body("grants");
   if (!D.grants.length){ el.innerHTML = `<div class="empty">還沒有研究計畫資料，由「研究計畫」階段產生。</div>`; return; }
   const groups = {
-    mine: ["本人主持", g => g.status === "confirmed" && ["pi","co_pi"].includes(g.target_role)],
+    mine: ["主持人", g => g.status === "confirmed" && ["pi","co_pi"].includes(g.target_role)],
     pending: ["待確認", g => g.status === "pending"],
     ack: ["論文致謝提及", g => g.status === "acknowledged"],
-    other: ["合作者主持", g => g.status === "other"],
+    other: ["協同主持人", g => g.status === "other"],
   };
   const btn = (k, cls) => `<button class="btn ${cls}" aria-pressed="${grantFilter === k}" data-g="${k}">${groups[k][0]}（${D.grants.filter(groups[k][1]).length}）</button>`;
   const list = D.grants.filter(groups[grantFilter][1]);
   el.innerHTML = `
     ${D.grants_reviewed ? "" : `<div class="item attn">${pill("y", "? 尚未經推翻者檢查")} 這份清單還沒跑完研究計畫階段。</div>`}
-    <p class="muted">只有 NIH／NSF 等資料庫列她為主持人、且姓名與機構都吻合的才算「本人主持」。只在論文致謝出現的不算她的計畫。</p>
+    <p class="muted">只有 NIH／NSF 等資料庫列她為主持人、且姓名與機構都吻合的才算「主持人」。只在論文致謝出現的不算她的計畫。</p>
     <div class="row" role="group" aria-label="計畫篩選">${btn("mine","btn-green")}${btn("pending","btn-yellow")}${btn("ack","btn-green")}${btn("other","btn-green")}</div>
     <ul class="list" style="margin-top:12px">${list.map(g => `<li class="item ${g.status === "pending" ? "attn" : ""}">
       <div class="row">${grantPill(g)} <strong>${g.title ? bi(g.title_zh, g.title) : bi(g.funder_zh, g.funder)}</strong></div>
@@ -680,7 +680,7 @@ const VIEWS = [
   ["match", "與我的研究比對", "依你的興趣推薦先看哪幾篇、哪個計畫", d => d.recommend ? `${d.recommend.read_first.length} 篇先看` : "還沒比對"],
   ["profile", "教授總覽", "研究主線、演變、合作、可以問的問題", d => `${(d.profile || []).length} 章`],
   ["papers", "文章解析", "每篇的大意、設計、樣本、缺口、發現、限制", d => `${d.counts.works} 篇`],
-  ["grants", "研究計畫", "她主持的、合作者主持的、論文致謝提到的", d => `本人主持 ${d.counts.grants_pi}／共 ${d.counts.grants_total}`],
+  ["grants", "研究計畫", "她是主持人、協同主持人的，以及論文致謝提到的", d => `主持人 ${d.counts.grants_pi}／共 ${d.counts.grants_total}`],
   ["coauthors", "合作者", "跟誰合作最多", d => `${d.counts.coauthors} 位`],
   ["topics", "研究領域", "領域、子領域、主題分佈", d => ""],
   ["overview", "數字總覽", "文章數、作者序、全文、流水線進度", d => ""],
@@ -688,7 +688,7 @@ const VIEWS = [
   ["exceptions", "例外紀錄", "找不到全文等，可以按按鈕請 AI 再處理", d => `未解決 ${d.counts.exceptions_open}`],
   ["files", "檔案", "報告、CSV、Zotero 匯入檔", d => ""],
 ];
-const GSTAT = {confirmed: ["g", "她主持"], pending: ["y", "待確認"], other: ["y", "合作者主持"]};
+const GSTAT = {confirmed: ["g", "主持人"], pending: ["y", "待確認"], other: ["y", "協同主持人"]};
 function grantRows(ag){
   /* 期間內的經費：分「進行中」「已結束／期間不明」兩張表，各依時間最新排（迄日晚的在前，再看起日） */
   const today = new Date().toISOString().slice(0, 10);
@@ -702,7 +702,7 @@ function grantRows(ag){
     <table class="small" style="width:100%;border-collapse:collapse;margin-bottom:6px">
       <thead><tr style="text-align:left;color:#555"><th style="padding:4px 6px;font-weight:600">計畫</th><th style="padding:4px 6px;font-weight:600;white-space:nowrap">角色</th><th style="padding:4px 6px;font-weight:600;white-space:nowrap">期間</th></tr></thead>
       <tbody>${rs.map(({g, start, end, known}) => `<tr style="border-top:1px solid #eee;vertical-align:top">
-        <td style="padding:5px 6px">${esc(g.title || g.funder || g.key)}${g.funder && g.title ? `<div class="muted">${esc(g.funder)}</div>` : ""}</td>
+        <td style="padding:5px 6px">${esc(g.title || g.funder || g.key)}${g.funder && g.title && g.funder !== g.title ? `<div class="muted">${esc(g.funder)}</div>` : ""}</td>
         <td style="padding:5px 6px;white-space:nowrap">${pill(...(GSTAT[g.status] || ["", g.status]))}</td>
         <td style="padding:5px 6px;white-space:nowrap" class="muted">${known ? esc(`${start || "?"} – ${end}`) : esc(g.period || "期間不明")}</td></tr>`).join("")}</tbody></table>` : "";
   return table("進行中", live) + table("已結束或期間不明", rest);
