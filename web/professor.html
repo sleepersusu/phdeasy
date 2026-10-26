@@ -698,8 +698,8 @@ function grantRows(ag){
   const rows = ag.map(g => ({g, ...parse(g)}));
   rows.sort((a, b) => (b.known - a.known) || (b.end || "").localeCompare(a.end || "") || (b.start || "").localeCompare(a.start || ""));
   return rows.map(({g, start, end, known}) => { const live = known && end >= today;
-    return `<div style="margin:3px 0;padding:4px 8px;border-radius:6px;${live ? "background:#ecfdf3;border-left:3px solid #15803d" : known ? "" : "color:#555"}">
-      ${live ? pill("g", "進行中") : known ? pill("", "已結束") : pill("", "期間不明")} ${pill(...(GSTAT[g.status] || ["", g.status]))} ${esc(g.title || g.funder || g.key)}
+    return `<div style="margin:3px 0;padding:4px 8px;border-radius:6px;${live ? "background:#eff6ff;border-left:3px solid #2563eb" : known ? "" : "color:#555"}">
+      ${live ? `<span style="color:#1d4ed8;font-weight:600;font-size:.85rem;white-space:nowrap">● 進行中</span>` : `<span class="muted" style="font-size:.85rem;white-space:nowrap">○ ${known ? "已結束" : "期間不明"}</span>`} ${pill(...(GSTAT[g.status] || ["", g.status]))} ${esc(g.title || g.funder || g.key)}
       <span class="muted">（${known ? esc(`${start || "?"} – ${end}`) : esc(g.period || "")}）</span></div>`; }).join("");
 }
 function basicHTML(){
