@@ -163,8 +163,15 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 .doc-fig,.doc-tbl{margin:14px 0}
 .doc-fig img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px;background:#fff}
 .doc-fig figcaption,.doc-tbl figcaption{margin:6px 0;color:var(--muted)}
-.doc-tbl td,.doc-tbl th{font-size:.9rem}
+.doc-tbl td,.doc-tbl th{font-size:.86rem;overflow-wrap:normal;word-break:normal;hyphens:auto;min-width:7em}
+.doc-tbl .lr>div{overflow-wrap:normal}
 .doc-refs{padding-left:1.4em}
+
+/* 左英右中（計畫書一律並排；窄螢幕上下排） */
+.lr{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+.lr>div{min-width:0;overflow-wrap:anywhere}
+.lr>.zh{border-left:1px solid var(--line);padding-left:20px}
+@media (max-width:760px){.lr{grid-template-columns:1fr}.lr>.zh{border-left:none;padding-left:0;margin-top:4px}}
 </style>
 </head>
 <body>
@@ -680,7 +687,7 @@ function setupViews(){
 const draftVersions = d => ((d && d.proposal_draft && d.proposal_draft.versions) || []);
 const CONF = {high: ["g", "信心 高"], medium: ["y", "信心 中"], low: ["r", "信心 低"]};
 const refLinks = refs => (refs || []).length ? `<div class="small muted">依據：${refs.map(r => /^W\d+$/.test(r) ? `<a href="${OFFLINE ? "#paper-" + esc(r) : paperPage(r)}">${esc(r)}</a>` : esc(r)).join("、")}</div>` : "";
-const para = x => x ? `${bi(x.zh, x.en, "div")}${refLinks(x.refs)}` : "";
+const para = x => x ? `${lr(x.zh, x.en)}${refLinks(x.refs)}` : "";
 
 function proposeButton(has){
   /* 應用程式裡才有：請 Claude Code 依她的方向與經費、你的興趣與做得到的事擬（或重擬）幾個版本 */
@@ -704,21 +711,23 @@ document.addEventListener("click", ev => {
 });
 let PROP_VER = null;
 
+const lr = (zh, en) => `<div class="lr"><div class="en" lang="en">${en ? esc(en) : '<span class="muted">—</span>'}</div><div class="zh">${zh ? esc(zh) : '<span class="muted">（尚無中文）</span>'}</div></div>`;  // 計畫書一律左英右中
 const ME_BASE = () => OFFLINE ? "../../../_me/" : "../runs/_me/";  // 計畫書的圖檔在 runs/_me/proposal/figures/
 function docBlock(b){
   /* 計畫書的一個區塊：段落、小標、圖（原始圖檔）、表（真的表格）、參考文獻 */
-  if (b.type === "p") return `<div class="doc-p">${bi(b.zh, b.en, "div")}</div>`;
-  if (b.type === "h2") return `<h4 class="doc-h2">${bi(b.zh, b.en, "div")}</h4>`;
-  if (b.type === "h3") return `<h5 class="doc-h3">${bi(b.zh, b.en, "div")}</h5>`;
+  if (b.type === "p") return `<div class="doc-p">${lr(b.zh, b.en)}</div>`;
+  if (b.type === "h2") return `<h4 class="doc-h2">${lr(b.zh, b.en)}</h4>`;
+  if (b.type === "h3") return `<h5 class="doc-h3">${lr(b.zh, b.en)}</h5>`;
   if (b.type === "ref") return `<li class="small" lang="en">${esc(b.en)}</li>`;
   if (b.type === "figure") return `<figure class="doc-fig"><a href="${esc(ME_BASE() + b.src)}" target="_blank" rel="noopener"><img loading="lazy" src="${esc(ME_BASE() + b.src)}" alt="${esc(b.caption_en || "圖")}"></a>
-      <figcaption class="small">${bi(b.caption_zh, b.caption_en, "div")}</figcaption></figure>`;
+      <figcaption class="small">${lr(b.caption_zh, b.caption_en)}</figcaption></figure>`;
   if (b.type === "table"){
-    const rz = b.rows_zh || [];
-    const cell = (r, c) => bi((rz[r] || [])[c], b.rows[r][c], "div");
-    return `<figure class="doc-tbl"><figcaption class="small">${bi(b.caption_zh, b.caption_en, "div")}</figcaption><div class="tablebox"><table>
-      <thead><tr>${b.rows[0].map((_, c) => `<th>${cell(0, c)}</th>`).join("")}</tr></thead>
-      <tbody>${b.rows.slice(1).map((row, i) => `<tr>${row.map((_, c) => `<td>${cell(i + 1, c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div></figure>`;
+    const table = (rows, lang) => `<div class="tablebox"><table ${lang === "en" ? 'lang="en"' : ""}>
+      <thead><tr>${rows[0].map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.slice(1).map(row => `<tr>${row.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    const rz = (b.rows_zh || []).length === b.rows.length ? b.rows_zh : null;
+    return `<figure class="doc-tbl"><figcaption class="small">${lr(b.caption_zh, b.caption_en)}</figcaption>
+      <div class="lr"><div class="en">${table(b.rows, "en")}</div><div class="zh">${rz ? table(rz, "zh") : '<span class="muted">（尚無中文）</span>'}</div></div></figure>`;
   }
   return "";
 }
@@ -738,7 +747,7 @@ function jointHTML(p){
        ${(p.studies || []).map(st => `<div class="item"><strong>${bi(st.name_zh, st.name, "div")}</strong><div class="small" style="margin-top:4px">${bi(st.detail_zh, st.detail, "div")}</div></div>`).join("")}`;
   const meta = (p.document_meta || [p.supervisor]).filter(Boolean);
   return `<div class="card"><div class="row">${pill("g", "已定案")}<span class="small muted">出處：${esc(p.document_src || p.src || "研究計畫書")}</span></div>
-    <h3 style="margin-top:10px">${bi(p.title_zh, p.title, "div")}</h3><div class="small muted" lang="en">${esc(p.subtitle || "")}</div>
+    <h3 style="margin-top:10px">${lr(p.title_zh, p.title)}</h3><div class="small muted" lang="en">${esc(p.subtitle || "")}</div>
     ${meta.map(m => `<div class="small" lang="en">${esc(m)}</div>`).join("")}
     ${doc.length ? "" : `<div style="margin-top:8px">${bi(p.synopsis_zh, p.synopsis, "div")}</div>`}</div>${secs}`;
 }
@@ -746,16 +755,16 @@ function jointHTML(p){
 function versionHTML(v, opt = {}){
   const c = CONF[(v.confidence || {}).level] || ["", "信心 ?"];
   const sec = (h, x) => x ? `<h3>${h}</h3>${para(x)}` : "";
-  return `<div class="card"><div class="row">${pill(c[0], c[1])}<strong>${bi((v.direction || {}).zh, (v.direction || {}).en)}</strong></div>
+  return `<div class="card"><div class="row">${pill(c[0], c[1])}<strong style="flex:1">${lr((v.direction || {}).zh, (v.direction || {}).en)}</strong></div>
       <div class="small" style="margin-top:6px">${para(v.confidence)}</div></div>
-    ${opt.noTitle ? "" : `<h3 style="margin-top:14px">${bi((v.title || {}).zh, (v.title || {}).en, "div")}</h3>`}<div class="small muted" style="margin-top:8px">${bi((v.subtitle || {}).zh, (v.subtitle || {}).en)}</div>
+    ${opt.noTitle ? "" : `<h3 style="margin-top:14px">${lr((v.title || {}).zh, (v.title || {}).en)}</h3>`}<div class="small muted" style="margin-top:8px">${lr((v.subtitle || {}).zh, (v.subtitle || {}).en)}</div>
     ${sec("摘要｜Synopsis", v.synopsis)}
     ${sec("1. 研究背景與缺口｜Rationale and Research Gap", v.rationale)}
     ${(v.gaps || []).length ? `<ol>${v.gaps.map(g => `<li>${para(g)}</li>`).join("")}</ol>` : ""}
     ${sec("2. 整體目的與目標｜Overall Aim and Objectives", v.aim)}
     ${(v.objectives || []).length ? `<ol>${v.objectives.map(o => `<li>${para(o)}</li>`).join("")}</ol>` : ""}
     <h3>3. 研究規劃與方法｜Research Programme and Methodology</h3>
-    ${(v.studies || []).map((st, i) => `<div class="item"><strong>3.${i + 1} ${bi((st.name || {}).zh, (st.name || {}).en)}</strong>
+    ${(v.studies || []).map((st, i) => `<div class="item"><strong>3.${i + 1}</strong>${lr((st.name || {}).zh, (st.name || {}).en)}
        <div class="small" style="margin-top:6px"><strong>目的</strong>${para(st.aim)}<strong>設計與方法</strong>${para(st.methods)}<strong>分析</strong>${para(st.analysis)}</div></div>`).join("")}
     ${sec("4. 預期貢獻｜Expected Contribution", v.contribution)}
     ${sec("5. 時程｜Timeline", v.timeline)}

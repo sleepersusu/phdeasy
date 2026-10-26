@@ -179,25 +179,17 @@ async function loadHome(){
 }
 
 let OFFLINE_HOME = false;
-const PAGES = [["index.html", "首頁"], ["me.html", "我的資料"], ["professors.html", "目標教授"], ["pipeline.html", "工作進度"], ["settings.html", "設定"]];
+const PAGES = [["index.html", "我的資料"], ["professors.html", "目標教授"], ["pipeline.html", "工作進度"], ["settings.html", "設定"]];
 function setupHomeViews(){
-  /* 應用程式：每一塊是一個頁面（me.html、professors.html…），首頁是按鈕；離線單檔版：全部在一頁 */
+  /* 應用程式：首頁是本人的個人資料，其他每一塊一個頁面（professors.html…）；離線單檔版：全部在一頁 */
   const nav = document.querySelector("nav.sections .wrap");
   const here = location.pathname.split("/").pop() || "index.html";
   if (OFFLINE_HOME){ document.getElementById("hub")?.remove(); return; }
-  nav.innerHTML = PAGES.map(([f, label]) => `<a href="${f}" ${f === here ? 'aria-current="true"' : ""}>${label}</a>`).join("");
-  if (here === "index.html"){
-    document.querySelectorAll("main > section:not(#hub)").forEach(s => s.hidden = true);
-    const hub = document.getElementById("hub");
-    const ps = H.professors || [];
-    const fit = p => p.recommend ? `${p.recommend.targets.filter(t => t.fit === "strong").length} 個興趣強相關` : "還沒比對";
-    hub.querySelector(".body").innerHTML = `
-      <div class="grid">
-        <a class="card" href="me.html" style="text-decoration:none"><strong style="font-size:1.15rem">我的資料</strong><div class="small muted">CV、研究興趣、我能做到的事</div></a>
-        <a class="card" href="professors.html" style="text-decoration:none"><strong style="font-size:1.15rem">目標教授</strong><div class="small muted">${ps.length} 位：匹配程度、該先看哪幾篇與哪個計畫；在這裡新增教授</div></a>
-        <a class="card" href="pipeline.html" style="text-decoration:none"><strong style="font-size:1.15rem">工作進度</strong><div class="small muted">Claude Code 在背景跑的工作、停點回覆</div></a>
-        <a class="card" href="settings.html" style="text-decoration:none"><strong style="font-size:1.15rem">設定</strong><div class="small muted">雲端帳號、AI、金鑰、版本</div></a>
-      </div>`;
+  nav.innerHTML = PAGES.map(([f, label]) => `<a href="${f}" ${f === here || (f === "index.html" && here === "me.html") ? 'aria-current="true"' : ""}>${label}</a>`).join("");
+  if (here === "index.html" || here === "me.html"){
+    /* 首頁就是本人的個人資料（本人 2026-10-26）；其他頁從上方的列進去 */
+    document.getElementById("hub")?.remove();
+    document.querySelectorAll("main > section").forEach(s => s.hidden = !["me", "proposal", "capabilities"].includes(s.id));
   } else {
     document.getElementById("hub")?.remove();
     /* 返回放在最上面：← 我的首頁 › 這一頁；個人資料只在首頁顯示，子頁不重複 */
