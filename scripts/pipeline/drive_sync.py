@@ -8,6 +8,7 @@
 - 雲端的 JSON 突然變得小很多（例：被空檔蓋掉）→ 不拿它蓋這台，雲端那份收到 `_同步衝突/`
 - 使用中記號（雲端 `_使用中.json`）：別台電腦 5 分鐘內同步過＝還在用，這台先不同步（先到先用），除非 force
 """
+import contextlib
 import json
 import os
 import shutil
@@ -22,7 +23,8 @@ STATE = ".drive_sync.json"
 LOCK = "_使用中.json"
 LOCK_FRESH = 5 * 60  # 開著的程式每 3 分鐘同步一次；超過 5 分鐘沒動靜就當作已關掉
 SKIP_DIRS = {"_同步衝突", "_同步刪除", "__pycache__", "_app"}  # _app：這台的背景工作紀錄，只在這台
-SKIP_FILES = {STATE, LOCK, ".DS_Store", "drive.json"}  # drive.json：每台電腦自己的雲端設定，不同步
+LOCAL_LOCK = ".drive_sync.lock"  # 這台電腦上同時只能有一個同步（定時同步、背景工作的同步會排隊）
+SKIP_FILES = {STATE, LOCK, LOCAL_LOCK, ".DS_Store", "drive.json"}  # drive.json：每台電腦自己的雲端設定，不同步
 DEVICE = (socket.gethostname() or "這台電腦").split(".")[0]
 
 
@@ -169,7 +171,50 @@ def busy_elsewhere(remote_root, my_id, now=None):
     return None
 
 
-def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_only=False, progress=None):
+@contextlib.contextmanager
+def local_lock(local_root, timeout=600):
+    """跨程序的本機鎖（runs/.drive_sync.lock）：拿不到就等，超過 timeout 秒丟 TimeoutError。"""
+    p = Path(local_root) / LOCAL_LOCK
+    p.parent.mkdir(parents=True, exist_ok=True)
+    f = open(p, "a+")
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("另一個同步一直沒結束") from None
+                time.sleep(0.1)
+        yield
+    finally:
+        try:
+            if os.name == "nt":
+                import msvcrt
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        f.close()
+
+
+def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_only=False, progress=None, lock_timeout=600):
+    """同一台電腦上同時只跑一個（local_lock）；其餘說明見 _sync。"""
+    with local_lock(local_root, timeout=lock_timeout):
+        return _sync(local_root, remote_root, my_id, device, force, pull_only, progress)
+
+
+def _sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_only=False, progress=None):
     """回傳 {動作: 數量}；別台正在用且沒有 force → 回傳 {"blocked": 那台電腦名}。
     pull_only：別台正在用時，只把雲端較新的檔拉下來看（不推、不刪、不搶使用中、不更新 base）。
     progress(第幾個, 共幾個, 檔名, {動作: 數量})：給開機畫面顯示進度。"""

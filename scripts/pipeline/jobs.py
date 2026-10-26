@@ -78,10 +78,24 @@ UNATTENDED = ("（這是應用程式在背景執行的工作，沒有人在旁�
               "到停點或熔斷之前不要結束這一輪；權限被拒就停下並說明卡在哪，不要繞路。）")
 
 
-def prompt_new(name, institution, orcid=None):
+def slug_of(name):
+    """教授資料夾名稱：<姓>-<名> 小寫（同 prof-setup）；逗號後的學位、括號裡的字、中間名都拿掉。"""
+    import re
+    import unicodedata
+    n = re.sub(r"\(.*?\)", " ", (name or "").split(",")[0])
+    n = unicodedata.normalize("NFKD", n).encode("ascii", "ignore").decode()
+    toks = [t for t in re.split(r"[^A-Za-z-]+", n) if t and not re.fullmatch(r"(?i)(dr|prof|professor|md|phd|ms|mph|rn)", t)]
+    if not toks:
+        return None
+    return re.sub(r"-+", "-", f"{toks[-1]}-{toks[0]}".lower()) if len(toks) > 1 else toks[0].lower()
+
+
+def prompt_new(name, institution, orcid=None, slug=None):
     p = f"幫我建教授檔案：{name.strip()}，{institution.strip()}"
     if orcid and orcid.strip():
         p += f"（ORCID {orcid.strip()}）"
+    if slug:
+        p += f"。批次資料夾用 runs/{slug}"
     return p + "。照 CLAUDE.md 與 prof-setup 跑到停 1，把停 1 要我決定的事列清楚後停下。" + UNATTENDED
 
 
@@ -192,6 +206,9 @@ def describe(event):
     return None
 
 
+MAX_JOBS = 3  # 同時最多幾個背景工作（每位教授一次一個）
+
+
 class Jobs:
     def __init__(self, workspace, runs, claude=None, popen=subprocess.Popen):
         self.workspace, self.dir = Path(workspace), Path(runs) / "_app" / "jobs"
@@ -199,7 +216,7 @@ class Jobs:
         self.claude, self.popen = claude, popen
         self.codex = None
         self.engine = lambda: "claude"  # 應用程式設定裡可以改成 "codex"（Claude 額度用完時的備用）
-        self.proc, self.lock = None, threading.Lock()
+        self.procs, self.lock = {}, threading.Lock()  # {工作 id: 程序}
         self.on_done = None  # 工作結束後要做的事（例：重建資料、同步雲端）
 
     def _path(self, jid):
@@ -216,10 +233,20 @@ class Jobs:
         js = sorted(self.dir.glob("*.json"), key=lambda p: p.stat().st_mtime)
         return json.loads(js[-1].read_text()) if js else None
 
-    def running(self):
-        return self.proc is not None and self.proc.poll() is None
+    def active(self):
+        """正在跑的工作（依開始時間）。"""
+        ids = [jid for jid, p in list(self.procs.items()) if p.poll() is None]
+        return sorted((j for j in (self.load(i) for i in ids) if j), key=lambda j: j["started"])
 
-    def start(self, kind, prompt, title, session=None, slug=None):
+    def running(self):
+        return any(p.poll() is None for p in list(self.procs.values()))
+
+    def recent(self, n=8):
+        js = sorted(self.dir.glob("*.json"), key=lambda p: p.stat().st_mtime)[-n:]
+        return [json.loads(p.read_text()) for p in reversed(js)]
+
+    def start(self, kind, prompt, title, session=None, slug=None, key=None):
+        """key：同一個 key 一次只能有一個工作（預設是教授 slug；文件類用文件名）。"""
         engine = self.engine()
         if engine == "codex":
             exe = self.codex or find_codex()
@@ -229,18 +256,25 @@ class Jobs:
             exe = self.claude or find_claude()
             if not exe:
                 raise RuntimeError("找不到 Claude Code：請先安裝並登入（https://claude.com/claude-code）")
+        key = key or slug or kind
         with self.lock:
-            if self.running():
-                raise RuntimeError("已經有一個工作在跑，等它到停點或跑完再開新的")
-            job = {"id": time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4], "kind": kind, "title": title,
+            act = self.active()
+            same = next((j for j in act if j.get("key") == key), None)
+            if same:
+                raise RuntimeError(f"這位教授（或這份文件）已經有一個工作在跑：{same['title']}，等它到停點或跑完再按" if slug or key.startswith("doc")
+                                   else f"已經有一個同類的工作在跑：{same['title']}")
+            if len(act) >= MAX_JOBS:
+                raise RuntimeError(f"已經有 {MAX_JOBS} 個工作在跑，等其中一個到停點或跑完再開新的")
+            job = {"id": time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4], "kind": kind, "title": title, "key": key,
                    "slug": slug, "prompt": prompt, "session": session, "status": "running",
                    "started": int(time.time()), "ended": None, "result": None, "cost_usd": None, "engine": engine}
             self._save(job)
             log = open(self.dir / f"{job['id']}.log", "a", encoding="utf-8")
             cmd = codex_cmd(exe, prompt, session) if engine == "codex" else claude_cmd(exe, prompt, session)
-            self.proc = self.popen(cmd, cwd=str(self.workspace),
-                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
-            threading.Thread(target=self._pump, args=(job, self.proc, log), daemon=True).start()
+            proc = self.popen(cmd, cwd=str(self.workspace),
+                              stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
+            self.procs[job["id"]] = proc
+            threading.Thread(target=self._pump, args=(job, proc, log), daemon=True).start()
             return job
 
     def _pump(self, job, proc, log):
@@ -281,8 +315,11 @@ class Jobs:
         p = self.dir / f"{jid}.log"
         return p.read_text(encoding="utf-8").splitlines()[-n:] if p.exists() else []
 
-    def stop(self):
-        if self.running():
-            self.proc.terminate()
-            return True
-        return False
+    def stop(self, jid=None):
+        """停一個工作；不給 id 就全部停（關掉程式時）。"""
+        hit = False
+        for i, p in list(self.procs.items()):
+            if (jid is None or i == jid) and p.poll() is None:
+                p.terminate()
+                hit = True
+        return hit

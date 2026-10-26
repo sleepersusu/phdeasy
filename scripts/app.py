@@ -35,7 +35,7 @@ from urllib.parse import unquote, urlparse
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
-from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue, prompt_programs,
+from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue, prompt_programs, slug_of,
                            prompt_discover_enrich, prompt_doc_edit, prompt_doc_translate, prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
@@ -184,6 +184,7 @@ class App:
         self.jobs.engine = self.engine  # 背景工作用哪個 AI：Claude Code（預設）或 Codex（備用）
         self.codex_test = None
         self.port = 8790
+        self._rebuild_lock = threading.Lock()
         self._prog_samples = {}  # {工作 id: {步驟: (第一次看到的時間, 當時做完幾項)}}
         self.gcal_pending = None
         self.jobs.on_done = self.after_job
@@ -202,7 +203,8 @@ class App:
 
     def after_job(self, job):
         try:
-            rebuild(self.workspace)
+            with self._rebuild_lock:  # 好幾個工作同時跑完時，一次重建一個
+                rebuild(self.workspace)
         except Exception as e:
             print(f"重建失敗：{e}")
 
@@ -218,7 +220,18 @@ class App:
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
                 "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})},
                 "settings": self.settings(), "update": self.update_info, "version": self.version,
-                "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job)}
+                "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job), "jobs": self.job_list()}
+
+    def job_list(self):
+        """工作進度頁：正在跑的全部，加上最近跑完的（每位教授／每份文件只留最新一個）；各自的紀錄與進度條。"""
+        act = self.jobs.active()
+        seen, out = {j.get("key") for j in act}, list(act)
+        for j in self.jobs.recent(12):
+            if j["status"] != "running" and j.get("key", j.get("slug") or j["kind"]) not in seen and len(out) < 6:
+                seen.add(j.get("key", j.get("slug") or j["kind"]))
+                out.append(j)
+        return [{**{k: v for k, v in j.items() if k != "prompt"}, "running": j in act,
+                 "log": self.jobs.log_tail(j["id"], 80), "progress": self.job_progress(j) if j in act else None} for j in out]
 
     def job_progress(self, job):
         """執行中的流水線工作：進度條與預估時間（看批次資料夾裡已產生的檔案；速度用這次輪詢量到的）。"""
@@ -635,9 +648,12 @@ class App:
         m = _re.search(r"第 (\d+) 版", out)
         n = int(m.group(1)) if m else None
         started = False
-        if n and not self.jobs.running() and not self.blocked:  # 馬上顯示英文；中文在背景翻
-            self.jobs.start("doc-translate", prompt_doc_translate(key, n), f"翻成中文：{key} 第 {n} 版")
-            started = True
+        if n and not self.blocked:  # 馬上顯示英文；中文在背景翻（同時已有 3 個工作在跑就先不翻，之後可按「翻成中文」）
+            try:
+                self.jobs.start("doc-translate", prompt_doc_translate(key, n), f"翻成中文：{key} 第 {n} 版", key=f"doc:{key}")
+                started = True
+            except RuntimeError:
+                pass
         return {"ok": True, "key": key, "version": n, "translating": started, "result": out}
 
     def me_update(self, body):
@@ -760,11 +776,11 @@ class App:
             if not _re.fullmatch(r"(ps|sop|proposal)(--[a-z0-9-]+)?", key) or not isinstance(v, int) or v < 1:
                 raise ValueError("文件或版本不對")
             if path == "doc-translate":
-                return self.jobs.start("doc-translate", prompt_doc_translate(key, v), f"翻成中文：{key} 第 {v} 版")
+                return self.jobs.start("doc-translate", prompt_doc_translate(key, v), f"翻成中文：{key} 第 {v} 版", key=f"doc:{key}")
             b = body.get("block")
             if not isinstance(b, int) or b < 0:
                 raise ValueError("段落不對")
-            return self.jobs.start("doc-edit", prompt_doc_edit(key, v, b, (body.get("instruction") or "")[:300]), f"AI 編修：{key} 第 {v} 版第 {b + 1} 段")
+            return self.jobs.start("doc-edit", prompt_doc_edit(key, v, b, (body.get("instruction") or "")[:300]), f"AI 編修：{key} 第 {v} 版第 {b + 1} 段", key=f"doc:{key}")
         if path in ("library-add", "zotero"):
             slug = self._lib_slug(body.get("slug"))
             if path == "zotero":
@@ -819,7 +835,12 @@ class App:
             name, inst = (body.get("name") or "").strip(), (body.get("institution") or "").strip()
             if not name or not inst:
                 raise ValueError("姓名和學校都要填")
-            return self.jobs.start("new", prompt_new(name, inst, body.get("orcid")), f"建檔：{name}")
+            slug = slug_of(name)
+            if not slug:
+                raise ValueError("看不懂這個姓名：請用英文姓名")
+            if (self.runs / slug / "state.json").exists():
+                raise ValueError(f"已經有這位教授的檔案（{slug}）：到「工作進度」按繼續跑")
+            return self.jobs.start("new", prompt_new(name, inst, body.get("orcid"), slug), f"建檔：{name}", slug=slug)
         if path == "continue":
             slug = (body.get("slug") or "").strip()
             if not (self.runs / slug / "state.json").exists():
@@ -856,15 +877,15 @@ class App:
                 raise ValueError("跟這位教授的計畫書已定案，不再產生 AI 版本")
             return self.jobs.start("propose", prompt_propose(slug), f"研究構想草稿：{slug}", slug=slug)
         if path == "reply":
-            last = self.jobs.latest()
+            last = self.jobs.load(body["job"]) if body.get("job") else self.jobs.latest()  # 回覆哪一個工作（可以同時有好幾位教授）
             if not last or not last.get("session"):
                 raise ValueError("沒有可以接續的對話，請改按「繼續跑」")
             text = (body.get("text") or "").strip()
             if not text:
                 raise ValueError("回覆是空的")
-            return self.jobs.start("reply", text + "\n" + UNATTENDED, f"回覆：{last['title'].split('：', 1)[-1]}", session=last["session"], slug=last.get("slug"))
+            return self.jobs.start("reply", text + "\n" + UNATTENDED, f"回覆：{last['title'].split('：', 1)[-1]}", session=last["session"], slug=last.get("slug"), key=last.get("key"))
         if path == "stop":
-            return {"stopped": self.jobs.stop()}
+            return {"stopped": self.jobs.stop(body.get("job") or None) if body.get("job") else False}
         if path == "install-uv":
             ok, msg = install_uv()
             return {"ok": ok, "error": None if ok else msg}

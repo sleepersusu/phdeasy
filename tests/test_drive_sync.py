@@ -1,6 +1,8 @@
 import os
 import time
 
+import pytest
+
 from pipeline.drive_sync import find_drive, plan, sync
 
 
@@ -170,3 +172,36 @@ def test_mass_delete_and_personal_files_are_refused(tmp_path):
     sync(a, drive)
     assert (a / "_me" / "me.json").exists()  # 本人資料（_me/）同步不刪；雲端少了就從這台推回去
     assert (drive / "_me" / "me.json").exists()
+
+
+def test_local_lock_serialises_syncs_on_this_machine(tmp_path):
+    """同一台電腦同時兩個同步（定時同步、背景工作的同步）會互相踩到「上次同步紀錄」：要排隊。"""
+    import threading
+    import time as _t
+    from pipeline.drive_sync import LOCAL_LOCK, SKIP_FILES, local_lock
+    assert LOCAL_LOCK in SKIP_FILES  # 鎖檔不同步
+    with local_lock(tmp_path, timeout=1):
+        with pytest.raises(TimeoutError):
+            with local_lock(tmp_path, timeout=0.3):
+                pass
+    order = []
+
+    def second():
+        with local_lock(tmp_path, timeout=5):
+            order.append("second")
+    with local_lock(tmp_path, timeout=1):
+        t = threading.Thread(target=second)
+        t.start()
+        _t.sleep(0.3)
+        order.append("first")
+    t.join(5)
+    assert order == ["first", "second"]
+
+
+def test_sync_waits_for_local_lock(tmp_path):
+    from pipeline.drive_sync import local_lock, sync
+    (tmp_path / "local").mkdir()
+    (tmp_path / "remote").mkdir()
+    with local_lock(tmp_path / "local", timeout=1):
+        with pytest.raises(TimeoutError):
+            sync(tmp_path / "local", tmp_path / "remote", lock_timeout=0.3)

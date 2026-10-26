@@ -124,3 +124,55 @@ def test_jobs_use_codex_when_chosen(tmp_path):
     done = j.load(job["id"])
     assert seen[0][0] == "/bin/codex" and done["session"] == "th-1" and done["result"] == "DONE 完成" and done["engine"] == "codex"
     assert "CLAUDE.md" in seen[0][-1]  # Codex 不會自己讀 skills：開頭告訴它規則在哪
+
+
+class HangProc:
+    """一直在跑、直到被停掉的假程序。"""
+    def __init__(self):
+        import threading
+        self.ev = threading.Event()
+        self.stdout = self
+        self.killed = False
+
+    def __iter__(self):
+        self.ev.wait(5)
+        return iter(())
+
+    def poll(self):
+        return 0 if self.ev.is_set() else None
+
+    def wait(self):
+        self.ev.wait(5)
+        return -15 if self.killed else 0
+
+    def terminate(self):
+        self.killed = True
+        self.ev.set()
+
+
+def test_jobs_run_in_parallel_up_to_three_one_per_professor(tmp_path):
+    import pytest
+    from pipeline.jobs import MAX_JOBS
+    procs = []
+    j = Jobs(tmp_path, tmp_path / "runs", claude="claude", popen=lambda *a, **k: procs.append(HangProc()) or procs[-1])
+    a = j.start("new", "p", "建檔：A", slug="a-a")
+    b = j.start("new", "p", "建檔：B", slug="b-b")
+    with pytest.raises(RuntimeError, match="這位教授"):
+        j.start("continue", "p", "繼續：a-a", slug="a-a")  # 同一位教授一次一個
+    j.start("doc-edit", "p", "AI 編修", key="doc:ps")
+    assert MAX_JOBS == 3 and len(j.active()) == 3 and j.running()
+    with pytest.raises(RuntimeError, match="3 個"):
+        j.start("new", "p", "建檔：D", slug="d-d")
+    assert j.stop(b["id"]) is True  # 只停 B
+    for _ in range(50):
+        if len(j.active()) == 2:
+            break
+        time.sleep(0.05)
+    assert {x["id"] for x in j.active()} == {a["id"], j.active()[1]["id"]} and b["id"] not in {x["id"] for x in j.active()}
+    assert j.load(b["id"])["status"] == "failed"
+    j.stop()  # 不給 id：全部停
+    for _ in range(50):
+        if not j.running():
+            break
+        time.sleep(0.05)
+    assert not j.running()

@@ -52,6 +52,28 @@ function progressHTML(p){
   </div>`;
 }
 
+function jobsHTML(st, ready){
+  /* 每個工作一列（最多同時 3 個在跑；每位教授一次一個）：狀態、進度條與預估時間、停止、回報、過程紀錄、回覆 */
+  const jobs = st.jobs || [];
+  if (!jobs.length) return setRow("row-job", "目前的工作", '<span class="small muted">沒有在跑的工作</span>', '<div class="small muted">在「目標教授」新增教授、或在文件頁按 AI 編修，工作就會出現在這裡。可以同時跑 3 個（每位教授一次一個）。</div>');
+  const nrun = jobs.filter(j => j.running).length;
+  return `<div class="small muted" style="margin:4px 0">${nrun ? `${nrun} 個工作在跑（最多同時 3 個）` : "沒有在跑的工作"}</div>` + jobs.map(job => {
+    const running = job.running, id = esc(job.id);
+    return setRow("row-job-" + job.id, running ? "▶ " + esc(job.title) : esc(job.title),
+      `${running ? (job.progress ? `<span class="pill y">${job.progress.percent}%｜還要${dur(job.progress.eta_s)}</span>` : '<span class="pill y">執行中</span>') : job.status === "done" ? '<span class="pill g">跑完了</span>' : '<span class="pill r">中斷</span>'}`, `
+      ${running && job.progress ? progressHTML(job.progress) : ""}
+      <div class="row">${running ? `<button class="btn btn-red btn-sm" data-job-stop="${id}">停止</button>` : ""}
+        ${job.cost_usd != null ? `<span class="small muted">本段用量約 US$${Number(job.cost_usd).toFixed(2)}</span>` : ""}</div>
+      ${job.result && !running ? `<h3>Claude Code 的回報</h3><div class="card" style="white-space:pre-wrap">${esc(job.result)}</div>` : ""}
+      <details ${running ? "open" : ""}><summary class="small" style="cursor:pointer;min-height:44px;display:flex;align-items:center">過程紀錄（${(job.log || []).length} 行）</summary>
+        <div class="log" aria-live="polite" data-job-log="${id}">${esc((job.log || []).join("\n"))}</div></details>
+      ${!running && job.session ? `<label for="reply-${id}">回覆 Claude Code（例：停 1 的決定、要它修什麼）</label>
+        <textarea id="reply-${id}" data-reply-box="${id}" placeholder="例：身分確認是這位；外部候選兩篇都加入；其他照你的建議，繼續跑到停 2。"></textarea>
+        <div class="row" style="margin-top:8px"><button class="btn btn-green" data-reply-send="${id}" ${!ready ? "disabled" : ""}>送出並繼續</button>
+        <span class="small muted">會接著同一個對話跑；停 1 確認後它會一路跑到停 2。</span></div>` : ""}`);
+  }).join("");
+}
+
 async function pipelinePanel(){
   let st;
   try { st = await API("status"); } catch (e) { return; }  // 不是在應用程式裡：不顯示
@@ -94,39 +116,34 @@ function renderPipeline(st){
   const el = document.querySelector("#pipeline:not([hidden]) .body");
   if (!el) return;  // 這一頁沒有「建新教授」區
   /* 每 3 秒更新：只有紀錄變多時只換紀錄那一塊，不打斷你正在打字的欄位 */
-  const shape = JSON.stringify({...st, log: undefined});
-  const logEl = el.querySelector(".log");
-  if (shape === lastShape && logEl){
-    const atBottom = logEl.scrollTop + logEl.clientHeight >= logEl.scrollHeight - 20;
-    logEl.textContent = (st.log || []).join("\n");
-    if (atBottom) logEl.scrollTop = logEl.scrollHeight;
+  const shape = JSON.stringify({...st, log: undefined, progress: undefined, job: undefined,
+    jobs: (st.jobs || []).map(j => ({...j, log: (j.log || []).length ? 1 : 0, progress: j.progress && [j.progress.percent, j.progress.current]}))});
+  const logs = [...el.querySelectorAll("[data-job-log]")];
+  if (shape === lastShape && logs.length){  // 只有紀錄或預估時間變：只換那幾塊，不打斷你正在打字的回覆
+    for (const j of st.jobs || []){
+      const lg = el.querySelector(`[data-job-log="${CSS.escape(j.id)}"]`);
+      if (!lg) continue;
+      const atBottom = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 20;
+      lg.textContent = (j.log || []).join("\n");
+      if (atBottom) lg.scrollTop = lg.scrollHeight;
+    }
     return;
   }
   lastShape = shape;
-  const keep = {reply: el.querySelector("#reply")?.value,
-                logTop: el.querySelector(".log")?.scrollTop, focus: document.activeElement?.id};
+  const keep = {replies: Object.fromEntries([...el.querySelectorAll("[data-reply-box]")].map(t => [t.dataset.replyBox, t.value])),
+                focus: document.activeElement?.id};
   const ready = st.claude && st.uv;
-  const job = st.job, running = st.running;
+  const running = (st.jobs || []).some(j => j.running);
+  const busy = new Set((st.jobs || []).filter(j => j.running).map(j => j.slug));
   const profs = st.professors || [];
   const tools = [st.claude, st.uv, st.drive].filter(Boolean).length;
   el.innerHTML =
-    (job ? setRow("row-job", "目前的工作", `${running ? '<span class="pill y">執行中</span>' : job.status === "done" ? '<span class="pill g">跑完了</span>' : `<span class="pill r">中斷</span>`} <span class="small muted">${esc(job.title)}</span>`, `
-      ${running && st.progress ? progressHTML(st.progress) : ""}
-      <div class="row">${running ? `<button class="btn btn-red" id="job-stop">停止</button>` : ""}
-        ${job.cost_usd != null ? `<span class="small muted">本段用量約 US$${Number(job.cost_usd).toFixed(2)}</span>` : ""}</div>
-      ${job.result && !running ? `<h3>Claude Code 的回報</h3><div class="card" style="white-space:pre-wrap">${esc(job.result)}</div>` : ""}
-      <details ${running ? "open" : ""}><summary class="small" style="cursor:pointer;min-height:44px;display:flex;align-items:center">過程紀錄（${(st.log || []).length} 行）</summary>
-        <div class="log" aria-live="polite">${esc((st.log || []).join("\n"))}</div></details>
-      ${!running && job.session ? `<label for="reply">回覆 Claude Code（例：停 1 的決定、要它修什麼）</label>
-        <textarea id="reply" placeholder="例：身分確認是這位；外部候選兩篇都加入；其他照你的建議，繼續跑到停 2。"></textarea>
-        <div class="row" style="margin-top:8px"><button class="btn btn-green" id="reply-send" ${!ready ? "disabled" : ""}>送出並繼續</button>
-        <span class="small muted">會接著同一個對話跑；停 1 確認後它會一路跑到停 2。</span></div>` : ""}`)
-      : setRow("row-job", "目前的工作", '<span class="small muted">沒有在跑的工作</span>', '<div class="small muted">在「目標教授」新增教授、或在文件頁按 AI 編修，工作就會出現在這裡。</div>')) +
+    jobsHTML(st, ready) +
     setRow("row-profs", "各教授進度", `<span class="small muted">${profs.length} 位${profs.some(p => WAITING.has(p.stage)) ? "｜有等你確認的" : ""}</span>`,
       profs.length ? `<ul>${profs.map(p => `<li class="row" style="margin:6px 0"><strong>${esc(p.name || p.slug)}</strong>
         <span class="pill ${WAITING.has(p.stage) ? "y" : p.stage === "stop2" ? "g" : ""}">${esc(STAGE_ZH[p.stage] || p.stage)}</span>
         ${p.report ? `<a class="btn btn-green btn-sm" href="../runs/${esc(p.slug)}/${esc(p.report)}" target="_blank" rel="noopener">看${p.stage === "stop1" ? "停 1" : "停 2"}報告</a>` : ""}
-        ${p.stage !== "stop2" ? `<button class="btn btn-green btn-sm" data-continue="${esc(p.slug)}" ${!ready || running ? "disabled" : ""}>${WAITING.has(p.stage) ? "我確認了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
+        ${p.stage !== "stop2" ? `<button class="btn btn-green btn-sm" data-continue="${esc(p.slug)}" ${!ready || busy.has(p.slug) ? "disabled" : ""}>${WAITING.has(p.stage) ? "我確認了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
         : `<div class="empty">還沒有教授。到「目標教授」按「＋ 新增教授」。</div>`) +
     setRow("row-tools", "這台電腦的工具", tools === 3 ? '<span class="pill g">✓ 齊全</span>' : `<span class="pill y">${3 - tools} 項沒裝</span>`, `<ul class="checks">
       ${check(st.claude, `Claude Code：${esc(st.claude)}`, `找不到 Claude Code。請先安裝並登入：<a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a>，裝好後重開這個程式。`)}
@@ -135,18 +152,19 @@ function renderPipeline(st){
       ${st.blocked ? `<li><span class="pill y">!</span> 另一台電腦（${esc(st.blocked)}）正在用：這台先不同步，那台關掉後重開這個程式。</li>` : ""}
     </ul>`);
 
-  if (keep.reply && el.querySelector("#reply")) el.querySelector("#reply").value = keep.reply;
-  const log = el.querySelector(".log"); if (log) log.scrollTop = running ? log.scrollHeight : (keep.logTop || 0);
+  for (const [id, v] of Object.entries(keep.replies)){ const t = el.querySelector(`[data-reply-box="${CSS.escape(id)}"]`); if (t && v) t.value = v; }
+  el.querySelectorAll("[data-job-log]").forEach(lg => { lg.scrollTop = lg.scrollHeight; });
   if (keep.focus && document.getElementById(keep.focus)) document.getElementById(keep.focus).focus();
 
   const act = (fn) => async (ev) => { ev.target.disabled = true; try { await fn(); renderPipeline(await API("status")); } catch (e) { alert(e.message); ev.target.disabled = false; } };
   el.querySelectorAll("[data-continue]").forEach(b => b.addEventListener("click", act(() => API("continue", {slug: b.dataset.continue}))));
-  el.querySelector("#reply-send")?.addEventListener("click", act(async () => {
-    const text = el.querySelector("#reply").value.trim();
+  el.querySelectorAll("[data-reply-send]").forEach(b => b.addEventListener("click", act(async () => {
+    const box = el.querySelector(`[data-reply-box="${CSS.escape(b.dataset.replySend)}"]`), text = box.value.trim();
     if (!text) throw new Error("先寫要回覆的內容");
-    await API("reply", {text}); el.querySelector("#reply").value = "";
-  }));
-  el.querySelector("#job-stop")?.addEventListener("click", act(async () => { if (confirm("確定停止？已完成的部分會保留，之後可以按「繼續跑」。")) await API("stop", {}); }));
+    await API("reply", {job: b.dataset.replySend, text}); box.value = "";
+  })));
+  el.querySelectorAll("[data-job-stop]").forEach(b => b.addEventListener("click", act(async () => {
+    if (confirm("確定停止這個工作？已完成的部分會保留，之後可以按「繼續跑」。")) await API("stop", {job: b.dataset.jobStop}); })));
   el.querySelector("#install-uv")?.addEventListener("click", act(async () => {
     if (!confirm("從 uv 官方網站（astral.sh）下載並安裝 uv 到你的使用者資料夾，不需要管理員權限。要安裝嗎？")) return;
     const r = await API("install-uv", {}); alert(r.ok ? "uv 已安裝" : "安裝失敗：" + (r.error || ""));

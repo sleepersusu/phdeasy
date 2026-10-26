@@ -47,6 +47,9 @@ def run(runs, account=None, given=None, force=False, do_release=False, hold=Fals
         return 1
     try:
         n = sync(runs, dst, force=force, progress=progress)
+    except TimeoutError:
+        print("BUSY 這台電腦上另一個同步跑了超過 10 分鐘還沒結束：這次先不同步，稍後再試")
+        return 4
     except ScanError as e:
         print(f"STOP 雲端同步停下：{e}。有資料夾讀不到時不同步，避免把讀不到的當成刪掉。"
               "Mac：系統設定 → 隱私權與安全性 → 檔案與資料夾／完整磁碟取用權，讓終端機（或本程式）可以存取 Google 雲端硬碟，再重開。")

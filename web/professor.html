@@ -557,7 +557,9 @@ function papers(){
 }
 
 let exFilter = "open";
-let APP = null;  /* 在應用程式裡打開時是 /api/status 的內容：例外可以按按鈕請 Claude Code 處理 */
+let APP = null;
+/* 同時可以跑 3 個工作，但同一位教授一次一個：只看這位教授有沒有工作在跑 */
+const busyHere = () => ((APP && APP.jobs) || []).find(j => j.running && j.slug === SLUG);  /* 在應用程式裡打開時是 /api/status 的內容：例外可以按按鈕請 Claude Code 處理 */
 const APIX = (path, body, raw) => fetch("/api/" + path, {method: "POST", headers: {"X-Phdeasy-App": "1", "Content-Type": raw ? "application/pdf" : "application/json"},
   body: raw || JSON.stringify(body)}).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; });
 const SLUG = new URLSearchParams(location.search).get("p");
@@ -573,7 +575,7 @@ function exActions(e){
 }
 
 async function startException(id, kind, action, note){
-  if (APP.running) throw new Error("已經有一個工作在跑，等它跑完再按");
+  if (busyHere()) throw new Error("這位教授已經有一個工作在跑，等它跑完再按");
   await APIX("exception", {slug: SLUG, id, kind, action, note: note || ""});
   alert("已請 Claude Code 在背景處理。進度在「建新教授」頁；做完這一頁重新整理就會更新。");
 }
@@ -586,7 +588,7 @@ function exceptions(){
   const ops = APP && exFilter === "open";
   el.innerHTML = `<p class="muted">自動段無法完成而被隔離的項目。未解決的例外超過 30% 時流水線會停下來。${ops ? "每一筆可以請 AI 再處理一次，或上傳你自己下載的 PDF。" : (APP ? "" : "在應用程式裡打開這一頁，未解決的例外會有處理按鈕。")}</p>
     <div class="row" role="group" aria-label="例外篩選">${btn("open", "btn-red", "未解決")}${btn("info", "btn-yellow", "註記")}${btn("resolved", "btn-green", "已解決")}</div>
-    ${APP && APP.running ? `<div class="card" style="margin-top:8px" role="status">${pill("y", "執行中")} 已經有一個工作在跑：${esc((APP.job || {}).title || "")}。<a href="pipeline.html">看進度</a></div>` : ""}
+    ${busyHere() ? `<div class="card" style="margin-top:8px" role="status">${pill("y", "執行中")} 這位教授有一個工作在跑：${esc(busyHere().title || "")}。<a href="pipeline.html">看進度</a></div>` : ""}
     <div class="tablebox" style="margin-top:12px"><table><thead><tr><th>狀態</th><th>項目</th><th>階段</th><th>類型</th><th>說明${ops ? "與處理" : ""}</th></tr></thead><tbody>
     ${list.map(e => `<tr><td>${exPill(e)}</td><td>${/^W\d+$/.test(e.id) ? `<a href="#paper-${e.id}">${e.id}</a>` : esc(e.id)}</td><td>${esc(e.stage)}</td><td>${esc(e.kind)}</td><td class="small">${esc(e.detail)}${e.resolved ? `<div class="muted">解決：${esc(e.resolved)}</div>` : ""}${ops ? `<div style="margin-top:8px">${exActions(e)}</div>` : ""}</td></tr>`).join("") || `<tr><td colspan="5">這一類沒有紀錄。</td></tr>`}
     </tbody></table></div>`;
@@ -725,7 +727,7 @@ function programsHTML(pg){
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-programs]");
   if (!b) return;
-  if (APP.running){ alert("已經有一個工作在跑，等它跑完再按"); return; }
+  if (busyHere()){ alert("這位教授已經有一個工作在跑，等它跑完再按"); return; }
   if (!confirm(`請 AI 上網查 ${D.professor.name} 本人掛名的博士學程（官方教員名單）與各學程的資助？約 5–10 分鐘。`)) return;
   b.disabled = true;
   try { await APIX("programs", {slug: SLUG}); location.href = "settings.html"; } catch (e) { alert(e.message); b.disabled = false; }
@@ -775,7 +777,7 @@ function proposeButton(has){
 document.addEventListener("click", async ev => {
   const b = ev.target.closest("[data-propose]");
   if (!b) return;
-  if (APP.running){ alert("已經有一個工作在跑，等它跑完再按"); return; }
+  if (busyHere()){ alert("這位教授已經有一個工作在跑，等它跑完再按"); return; }
   if (!confirm(`請 Claude Code 依 ${D.professor.name} 的研究方向與目前期間內的經費、你的興趣與做得到的事，擬 2–3 個方向的計畫書草稿？`)) return;
   b.disabled = true;
   try { await APIX("propose", {slug: SLUG}); location.href = "pipeline.html"; }
@@ -950,11 +952,11 @@ document.addEventListener("click", async ev => {
       $("#lb-msg").textContent = "加入中…";
       await APIX("library-add", {slug: SLUG, dois, source: "zotero", ...libMeta()}); await libAfterAdd(`已從 Zotero 加入 ${dois.length} 篇（PDF 會從 Zotero 附件拿）。`);
     } else if (t.matches("[data-lib-process]")){
-      if (APP.running) return alert("已經有一個工作在跑，等它跑完再按");
+      if (busyHere()) return alert("這位教授已經有一個工作在跑，等它跑完再按");
       await APIX("library-process", {slug: SLUG}); location.href = "pipeline.html";
     } else if (t.matches("[data-lib-draft]")){
       if (!LIBSEL.size) return alert("先勾選要用的文獻");
-      if (APP.running) return alert("已經有一個工作在跑，等它跑完再按");
+      if (busyHere()) return alert("這位教授已經有一個工作在跑，等它跑完再按");
       if (!confirm(`用勾選的 ${LIBSEL.size} 篇與她的文章，照 Liliana 改過的計畫書分段擬一份初稿？`)) return;
       await APIX("library-draft", {slug: SLUG, ids: [...LIBSEL]}); location.href = "pipeline.html";
     }

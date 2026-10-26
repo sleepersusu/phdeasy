@@ -149,7 +149,7 @@ def _lib_app(tmp_path):
     calls = []
     app.lib_script = lambda *a: calls.append(a) or "ADD W1 2024 Paper"
     app._rebuild_site = lambda slug: None
-    app.jobs.start = lambda kind, prompt, title, slug=None: calls.append(("job", kind, slug, prompt)) or {"ok": True}
+    app.jobs.start = lambda kind, prompt, title, slug=None, key=None, session=None: calls.append(("job", kind, slug, prompt)) or {"ok": True}
     return app, calls
 
 
@@ -351,3 +351,22 @@ def test_gcal_login_import_and_create(tmp_path, monkeypatch):
     assert made["body"]["extendedProperties"]["private"]["phdeasy_slug"] == "doe-jane"
     with pytest.raises(ValueError):
         app.post("gcal-create", {"slug": "../etc", "summary": "x", "start": "2026-11-10T09:00"})
+
+
+def test_new_professor_gets_slug_and_reply_targets_job(tmp_path):
+    import json
+    import pytest
+    from pipeline.jobs import slug_of
+    assert slug_of("Julian Hong, M.D., M.S.") == "hong-julian" and slug_of("Julian C. Hong") == "hong-julian"
+    assert slug_of("Dr. Yoshimi Fukuoka (UCSF)") == "fukuoka-yoshimi" and slug_of("José Núñez") == "nunez-jose"
+    app, calls = _lib_app(tmp_path)
+    app.post("new", {"name": "Julian Hong, M.D.", "institution": "UCSF"})
+    job = [c for c in calls if c[0] == "job"][-1]
+    assert job[1] == "new" and job[2] == "hong-julian" and "runs/hong-julian" in job[3]
+    (tmp_path / "runs" / "hong-julian").mkdir(exist_ok=True)
+    (tmp_path / "runs" / "hong-julian" / "state.json").write_text("{}")
+    with pytest.raises(ValueError, match="已經有"):
+        app.post("new", {"name": "Julian Hong", "institution": "UCSF"})
+    app.jobs.load = lambda jid: {"id": jid, "title": "建檔：Julian Hong", "session": "s-h", "slug": "hong-julian", "key": "hong-julian"} if jid == "J2" else None
+    app.post("reply", {"job": "J2", "text": "範圍選 E"})
+    assert [c for c in calls if c[0] == "job"][-1][1:3] == ("reply", "hong-julian")
