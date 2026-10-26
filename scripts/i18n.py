@@ -16,7 +16,7 @@ def check(run, ids=None):
     works = json.loads((run / "work" / "works.json").read_text())
     total, missing = 0, []
     for w in works:
-        if ids and w["id"] not in ids:
+        if (ids and w["id"] not in ids) or w.get("kind") == "title":  # 只列標題的（不在必讀）沒有解析卡
             continue
         d = run / "work" / "cards" / w["id"]
         card = json.loads((d / "card.json").read_text())

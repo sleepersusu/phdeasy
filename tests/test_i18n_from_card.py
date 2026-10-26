@@ -28,3 +28,17 @@ def test_missing_english_is_caught():
     final = card([{"text": "成本下降 20%"}])  # 閱讀者漏寫英文
     fails = check_card_i18n(final, i18n_from_card(final, KW))
     assert any(f["path"] == "findings[0]" and f["why"] == "missing" for f in fails)
+
+
+def test_i18n_check_skips_title_only_works(tmp_path, capsys):
+    import json
+    import i18n
+    import pytest
+    r = tmp_path / "runs" / "x"
+    (r / "work" / "cards" / "W1").mkdir(parents=True)
+    (r / "work" / "works.json").write_text(json.dumps([{"id": "W1", "kind": "full"}, {"id": "W2", "kind": "title"}]))
+    c = card([{"text": "成本下降 20%", "text_en": "Costs fell 20%"}])
+    (r / "work" / "cards" / "W1" / "card.json").write_text(json.dumps(c))
+    (r / "work" / "cards" / "W1" / "i18n.json").write_text(json.dumps(i18n_from_card(c, KW)))
+    i18n.check(r)  # W2 沒有卡也不會壞
+    assert "PASS" in capsys.readouterr().out
