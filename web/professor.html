@@ -690,17 +690,22 @@ const VIEWS = [
 ];
 const GSTAT = {confirmed: ["g", "她主持"], pending: ["y", "待確認"], other: ["y", "合作者主持"]};
 function grantRows(ag){
-  /* 期間內的經費：依時間最新排（迄日晚的在前，再看起日）；確定還在期間內的標綠底「進行中」，期間不明的灰色排最後 */
+  /* 期間內的經費：分「進行中」「已結束／期間不明」兩張表，各依時間最新排（迄日晚的在前，再看起日） */
   const today = new Date().toISOString().slice(0, 10);
   const parse = g => { const m = (g.period || "").match(/^(\S*)\s*–\s*(\S+)$/);
     if (m) return {start: m[1], end: m[2], known: true};
     const y = (g.period || "").match(/(\d{4})/); return {start: y ? y[1] : "", end: "", known: false}; };
-  const rows = ag.map(g => ({g, ...parse(g)}));
-  rows.sort((a, b) => (b.known - a.known) || (b.end || "").localeCompare(a.end || "") || (b.start || "").localeCompare(a.start || ""));
-  return rows.map(({g, start, end, known}) => { const live = known && end >= today;
-    return `<div style="margin:3px 0;padding:4px 8px;border-radius:6px;${live ? "background:#eff6ff;border-left:3px solid #2563eb" : known ? "" : "color:#555"}">
-      ${live ? `<span style="color:#1d4ed8;font-weight:600;font-size:.85rem;white-space:nowrap">● 進行中</span>` : `<span class="muted" style="font-size:.85rem;white-space:nowrap">○ ${known ? "已結束" : "期間不明"}</span>`} ${pill(...(GSTAT[g.status] || ["", g.status]))} ${esc(g.title || g.funder || g.key)}
-      <span class="muted">（${known ? esc(`${start || "?"} – ${end}`) : esc(g.period || "")}）</span></div>`; }).join("");
+  const rows = ag.map(g => ({g, ...parse(g)}))
+    .sort((a, b) => (b.known - a.known) || (b.end || "").localeCompare(a.end || "") || (b.start || "").localeCompare(a.start || ""));
+  const live = rows.filter(r => r.known && r.end >= today), rest = rows.filter(r => !(r.known && r.end >= today));
+  const table = (title, rs) => rs.length ? `<div class="small" style="margin:6px 0 2px;font-weight:600">${title}（${rs.length}）</div>
+    <table class="small" style="width:100%;border-collapse:collapse;margin-bottom:6px">
+      <thead><tr style="text-align:left;color:#555"><th style="padding:4px 6px;font-weight:600">計畫</th><th style="padding:4px 6px;font-weight:600;white-space:nowrap">角色</th><th style="padding:4px 6px;font-weight:600;white-space:nowrap">期間</th></tr></thead>
+      <tbody>${rs.map(({g, start, end, known}) => `<tr style="border-top:1px solid #eee;vertical-align:top">
+        <td style="padding:5px 6px">${esc(g.title || g.funder || g.key)}${g.funder && g.title ? `<div class="muted">${esc(g.funder)}</div>` : ""}</td>
+        <td style="padding:5px 6px;white-space:nowrap">${pill(...(GSTAT[g.status] || ["", g.status]))}</td>
+        <td style="padding:5px 6px;white-space:nowrap" class="muted">${known ? esc(`${start || "?"} – ${end}`) : esc(g.period || "期間不明")}</td></tr>`).join("")}</tbody></table>` : "";
+  return table("進行中", live) + table("已結束或期間不明", rest);
 }
 function basicHTML(){
   /* 教授首頁頂端：職稱、系所、學校（ORCID）、學術指標（OpenAlex）、近五年角色、領域、合作者、期間內的經費 */

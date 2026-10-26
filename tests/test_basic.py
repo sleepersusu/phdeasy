@@ -47,3 +47,17 @@ def test_openalex_metrics():
     m = parse_openalex_author(a)
     assert m == {"works_count": 171, "cited_by_count": 6133, "h_index": 35, "i10_index": 80,
                  "topics": ["Mobile Health", "Telemedicine"], "as_of": "2026-10-20"}
+
+
+def test_orcid_falls_back_to_openalex_author(tmp_path):
+    """本人建檔時沒填 ORCID（例：從教員名單勾選）：用 OpenAlex 找到的那位作者的 ORCID，學歷、經歷才讀得到。"""
+    import json
+    from basic_info import professor_orcid
+    r = tmp_path / "x"
+    (r / "work").mkdir(parents=True)
+    (r / "state.json").write_text(json.dumps({"professor": {"orcid": None}, "author_id": "A2"}))
+    (r / "work" / "author_candidates.json").write_text(json.dumps([{"id": "A1", "orcid": "https://orcid.org/0000-0000-0000-0001"},
+                                                                   {"id": "A2", "orcid": "https://orcid.org/0000-0002-1045-8459"}]))
+    assert professor_orcid(r) == "0000-0002-1045-8459"
+    (r / "state.json").write_text(json.dumps({"professor": {"orcid": "0000-0003-1020-3402"}, "author_id": "A2"}))
+    assert professor_orcid(r) == "0000-0003-1020-3402"  # 本人填的優先

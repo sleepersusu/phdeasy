@@ -12,12 +12,24 @@ from pipeline.http import get_json, openalex_params
 from pipeline.works import strip_prefix
 
 
+def professor_orcid(run):
+    """本人填的 ORCID 優先；沒填就用 OpenAlex 鎖定的那位作者的 ORCID（從教員名單勾選建檔時通常沒填）。"""
+    st = json.loads((run / "state.json").read_text())
+    orcid = strip_prefix((st.get("professor") or {}).get("orcid") or "")
+    if orcid:
+        return orcid
+    p = run / "work" / "author_candidates.json"
+    cands = json.loads(p.read_text()) if p.exists() else []
+    me = next((c for c in cands if c.get("id") == st.get("author_id")), None)
+    return strip_prefix((me or {}).get("orcid") or "") or None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
     run = Path(ap.parse_args().run)
     st = json.loads((run / "state.json").read_text())
-    orcid = strip_prefix(st["professor"].get("orcid") or "")
+    orcid = professor_orcid(run)
     out = {"fetched": datetime.now().date().isoformat(), "orcid": orcid or None, "author_id": st.get("author_id"), "sources": {}}
     if orcid:
         try:
