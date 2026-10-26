@@ -119,7 +119,7 @@ function render(d, w){
     `<a href="${prof}&v=${lib ? "library" : "papers"}">${lib ? "討論文獻" : "文章解析"}</a><span class="sep">›</span><span aria-current="page">這一篇</span>`;
   $("#t-en").textContent = w.title; $("#t-zh").textContent = w.title_zh || (lib ? "" : "（還沒有中文標題）");
   $("#meta").innerHTML = (lib ? [w.year, esc(w.venue || ""), (w.authors || []).slice(0, 3).map(a => esc(a.name)).join(", "),
-      [lib.given_by && `${esc(lib.given_by)} 給的`, lib.discussion && `${esc(lib.discussion)} 討論`].filter(Boolean).join("，"),
+      lib.discussion && `${esc(lib.discussion)} 討論`,
       w.digest ? (w.text_source === "abstract" ? "依摘要整理" : "依全文整理") : "還在處理"]
     : [w.year, esc(w.venue || "期刊來源未提及"), (ROLE[w.target_position] || "作者序不明") + (w.target_corresponding ? "＋通訊作者" : ""),
     w.card && w.card.exists ? (w.text_source === "abstract" ? "依摘要解析" : w.text_source === "none" ? "只有標題" : "依全文解析") : "還沒解析",

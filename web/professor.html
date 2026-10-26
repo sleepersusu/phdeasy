@@ -799,23 +799,20 @@ const LIBSEL = new Set();
 const libPage = id => paperPage(id) + "&lib=1";
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };  // 本地日期
 function libAddHTML(){
+  /* 在這位教授頁加的文獻就是她給的：只要填哪次討論（日期），再貼 DOI 或從 Zotero 選 */
   if (!APP) return `<p class="small muted">在應用程式裡打開才能加入文獻。</p>`;
-  const first = (D.professor.name || "").split(" ")[0];
-  return `<details class="item" open><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>＋ 加入文獻</strong></summary>
+  return `<details class="item"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>＋ 加入文獻</strong></summary>
     <div class="match-form" style="margin-top:8px">
-      <div class="row"><label>誰給的 <input id="lb-who" type="text" value="${esc(first)}" style="width:10em"></label>
-        <label>哪次討論 <input id="lb-when" type="date" value="${today()}"></label>
-        <label style="flex:1">備註 <input id="lb-note" type="text" placeholder="例：她說先看方法" style="width:100%"></label></div>
-      <div class="row" style="margin-top:10px"><label class="btn btn-green" style="cursor:pointer">上傳 PDF<input id="lb-pdf" type="file" accept="application/pdf" multiple hidden></label>
-        <span class="small muted">可以一次選好幾個</span></div>
-      <div style="margin-top:10px"><label for="lb-doi">或貼 DOI（一行一個）</label><textarea id="lb-doi" rows="2" placeholder="10.2196/12345"></textarea>
-        <button class="btn btn-green" data-lib-doi style="margin-top:6px">加入這些 DOI</button></div>
-      <div style="margin-top:10px"><button class="btn" data-lib-zotero>從 Zotero 選</button> <span class="small muted">讀這台電腦的 Zotero（只讀不改；Zotero 要開著）</span>
+      <div><label for="lb-when">哪次討論</label> <input id="lb-when" type="date" value="${today()}"></div>
+      <div><label for="lb-doi">DOI（一行一個）</label><textarea id="lb-doi" rows="2" placeholder="10.2196/12345"></textarea>
+        <button class="btn btn-green" data-lib-doi style="margin-top:6px">加入</button></div>
+      <div><button class="btn" data-lib-zotero>從 Zotero 選</button> <span class="small muted">讀這台電腦的 Zotero（只讀不改；Zotero 要開著）</span>
         <div id="lb-zot" style="margin-top:8px"></div></div>
-      <div id="lb-msg" class="small" role="status" style="margin-top:8px"></div>
+      <div class="small muted">沒有 DOI 的文獻：<label style="cursor:pointer;text-decoration:underline">上傳 PDF<input id="lb-pdf" type="file" accept="application/pdf" multiple hidden></label></div>
+      <div id="lb-msg" class="small" role="status"></div>
     </div></details>`;
 }
-function libMeta(){ return {given_by: $("#lb-who").value, discussion: $("#lb-when").value, note: $("#lb-note").value}; }
+function libMeta(){ return {given_by: D.professor.name || "", discussion: $("#lb-when").value}; }
 async function libAfterAdd(msg){ $("#lb-msg").textContent = msg + " 重新整理就會看到；按「開始處理」讓 AI 整理重點與圖表。"; }
 
 function libraryView(){
@@ -825,7 +822,7 @@ function libraryView(){
     return `<details class="item"><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="checkbox" data-libsel="${esc(w.id)}" ${LIBSEL.has(w.id) ? "checked" : ""} aria-label="勾選這篇擬初稿" onclick="event.stopPropagation()">
         <strong>${esc(w.title || w.id)}</strong> <span class="small muted">${esc(w.year || "")}</span>
-        ${l.given_by ? pill("", `${l.given_by} 給的`) : ""}${l.discussion ? pill("", `${l.discussion} 討論`) : ""}
+        ${l.discussion ? pill("", `${l.discussion} 討論`) : ""}
         ${g ? pill("g", "已整理") : pill("y", w.fulltext === "no_free_fulltext" ? "只找到摘要／待處理" : "待處理")}</summary>
       <div style="margin-top:8px">${l.note ? `<div class="small">備註：${esc(l.note)}</div>` : ""}
         ${g && (g.key_points || []).length ? `<ul>${g.key_points.map(k => `<li>${bi(k.zh, k.en, "div")}</li>`).join("")}</ul>` : `<div class="small muted">還沒整理。</div>`}
