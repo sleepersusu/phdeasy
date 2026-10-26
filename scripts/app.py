@@ -184,6 +184,7 @@ class App:
         self.jobs.engine = self.engine  # 背景工作用哪個 AI：Claude Code（預設）或 Codex（備用）
         self.codex_test = None
         self.port = 8790
+        self._prog_samples = {}  # {工作 id: {步驟: (第一次看到的時間, 當時做完幾項)}}
         self.gcal_pending = None
         self.jobs.on_done = self.after_job
         self.blocked = None
@@ -217,7 +218,28 @@ class App:
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
                 "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})},
                 "settings": self.settings(), "update": self.update_info, "version": self.version,
-                "boot": self.boot, "update_state": self.update_state}
+                "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job)}
+
+    def job_progress(self, job):
+        """執行中的流水線工作：進度條與預估時間（看批次資料夾裡已產生的檔案；速度用這次輪詢量到的）。"""
+        from pipeline.progress import estimate
+        if not job or job.get("status") != "running" or job.get("kind") not in ("new", "reply", "continue", "exception"):
+            return None
+        slug = job.get("slug")
+        if not slug:  # 新建檔時還不知道資料夾：用這個工作開始後最近有動的批次
+            cands = [p for p in self.runs.glob("*/state.json") if not p.parent.name.startswith("_") and p.stat().st_mtime >= (job.get("started") or 0) - 60]
+            if not cands:
+                return None
+            slug = max(cands, key=lambda p: p.stat().st_mtime).parent.name
+        try:
+            e = estimate(self.runs / slug, job["kind"], samples=self._prog_samples.get(job["id"]))
+        except Exception:
+            return None
+        smp = self._prog_samples.setdefault(job["id"], {})
+        cur = next((x for x in e["steps"] if x["key"] == e["current"]), None)
+        if cur and cur["key"] not in smp:
+            smp[cur["key"]] = (time.time(), cur["done"])
+        return {"slug": slug, **e}
 
     def settings(self):
         """設定頁要顯示的：雲端帳號（這台偵測到的全部）、Claude Code 測試結果、金鑰有沒有設（不顯示內容）。"""

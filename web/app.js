@@ -39,6 +39,19 @@ function appBanner(st){
   wasSyncing = st.syncing || st.need_account;
 }
 
+const dur = s => s < 90 ? "不到 2 分鐘" : s < 3600 ? `約 ${Math.round(s / 60)} 分鐘` : `約 ${Math.floor(s / 3600)} 小時 ${Math.round((s % 3600) / 60)} 分`;
+function progressHTML(p){
+  /* 進度條＋預估時間：看資料夾裡已產生的檔案算；速度是這次實際量到的，量不到用預設值，所以是「約」 */
+  const cur = p.steps.find(x => x.key === p.current);
+  return `<div style="margin:4px 0 12px">
+    <div class="row" style="justify-content:space-between"><strong>${p.percent}%</strong><span class="small">預估還要 ${dur(p.eta_s)}${p.steps.at(-1).key === "fulltext" ? "（到停 1）" : "（到停 2）"}</span></div>
+    <div role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.percent}" style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;margin-top:4px">
+      <div style="height:100%;width:${p.percent}%;background:#15803d;transition:width .3s"></div></div>
+    ${cur ? `<div class="small" style="margin-top:6px">目前：${esc(cur.label)}${cur.total > 1 ? ` ${cur.done}／${cur.total}` : ""}，這一步${dur(cur.eta_s)}</div>` : ""}
+    <ol class="small muted" style="margin:6px 0 0;padding-left:20px">${p.steps.map(x => `<li>${x.key === p.current ? "▶ " : x.total && x.done >= x.total ? "✓ " : ""}${esc(x.label)}${x.total > 1 ? `（${x.done}／${x.total}）` : ""}</li>`).join("")}</ol>
+  </div>`;
+}
+
 async function pipelinePanel(){
   let st;
   try { st = await API("status"); } catch (e) { return; }  // 不是在應用程式裡：不顯示
@@ -98,6 +111,7 @@ function renderPipeline(st){
   const tools = [st.claude, st.uv, st.drive].filter(Boolean).length;
   el.innerHTML =
     (job ? setRow("row-job", "目前的工作", `${running ? '<span class="pill y">執行中</span>' : job.status === "done" ? '<span class="pill g">跑完了</span>' : `<span class="pill r">中斷</span>`} <span class="small muted">${esc(job.title)}</span>`, `
+      ${running && st.progress ? progressHTML(st.progress) : ""}
       <div class="row">${running ? `<button class="btn btn-red" id="job-stop">停止</button>` : ""}
         ${job.cost_usd != null ? `<span class="small muted">本段用量約 US$${Number(job.cost_usd).toFixed(2)}</span>` : ""}</div>
       ${job.result && !running ? `<h3>Claude Code 的回報</h3><div class="card" style="white-space:pre-wrap">${esc(job.result)}</div>` : ""}
