@@ -172,6 +172,10 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 .lr>div{min-width:0;overflow-wrap:anywhere}
 .lr>.zh{border-left:1px solid var(--line);padding-left:20px}
 @media (max-width:760px){.lr{grid-template-columns:1fr}.lr>.zh{border-left:none;padding-left:0;margin-top:4px}}
+
+/* 比對推薦：每篇一列，下面是對到的興趣標籤 */
+.reclist{padding-left:1.4em;margin:6px 0}
+.reclist>li{margin:10px 0}
 </style>
 </head>
 <body>
@@ -260,20 +264,30 @@ const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升�
                  tags: "chatbot、physical activity、women、cardiovascular、health disparities", methods: ["pilot-rct", "quasi-experimental"]};
 
 function recommendHTML(){
-  /* prof-match：Claude 依你的興趣與 CV 項目挑出的推薦（核對過出處、推翻過） */
+  /* prof-match 的推薦（核對過出處、推翻過）：以「文章」為單位，每篇只出現一次，標上它對到你的哪些興趣／CV 項目 */
   const r = D.recommend;
   if (!r) return `<div class="item" style="margin-bottom:12px">${pill("y", "還沒比對")} 還沒依你的興趣做推薦；在「目標教授」頁按「依我的興趣比對」，或跟 Claude 說「比對這位教授」。</div>`;
   const W = Object.fromEntries(D.works.map(w => [w.id, w])), G = Object.fromEntries(D.grants.map(g => [g.key, g]));
-  const FITL = {strong: ["g", "強相關"], partial: ["y", "部分相關"], none: ["", "沒有相關"]};
-  const paper = id => W[id] ? `<a href="#paper-${esc(id)}">${bi(W[id].title_zh, W[id].title)}</a> <span class="small muted">${W[id].year}</span>` : esc(id);
-  return `${r.stale ? `<div class="item attn">${pill("y", "比對過期")} 你的研究興趣或研究計畫改過了，這份推薦是用舊的內容比的。</div>` : ""}
-    <h3>建議先看這幾篇</h3><ol>${r.read_first.map(id => `<li>${paper(id)}</li>`).join("")}</ol>
-    <h3>依你的興趣與 CV 項目</h3>
-    ${r.targets.filter(t => t.fit !== "none").map(t => `<details class="item" ${t.fit === "strong" ? "open" : ""}><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${pill(FITL[t.fit][0], FITL[t.fit][1])}<strong>${esc(t.label_zh)}</strong>${t.kind === "cv" ? `<span class="small muted">（你的 CV：會的／做過的）</span>` : ""}</summary>
-      <div class="small">${esc(t.why)}</div>
-      <ul>${t.papers.map(x => `<li>${paper(x.id)}<div class="small muted">${esc(x.why)}</div></li>`).join("")}
-      ${t.grants.map(x => `<li>${G[x.key] ? bi(G[x.key].title_zh || G[x.key].funder_zh, G[x.key].title || G[x.key].funder) : esc(x.key)}<div class="small muted">${esc(x.why)}</div></li>`).join("")}</ul></details>`).join("")}
-    ${r.targets.some(t => t.fit === "none") ? `<p class="small muted">沒有找到相關研究：${r.targets.filter(t => t.fit === "none").map(t => esc(t.label_zh)).join("、")}</p>` : ""}`;
+  const hits = r.targets.filter(t => t.fit !== "none"), miss = r.targets.filter(t => t.fit === "none");
+  const byPaper = new Map(), byGrant = new Map();
+  hits.forEach(t => {
+    t.papers.forEach(x => { const e = byPaper.get(x.id) || {id: x.id, tags: [], why: x.why}; e.tags.push(t); byPaper.set(x.id, e); });
+    t.grants.forEach(x => { const e = byGrant.get(x.key) || {key: x.key, tags: [], why: x.why}; e.tags.push(t); byGrant.set(x.key, e); });
+  });
+  const weight = e => e.tags.reduce((a, t) => a + (t.fit === "strong" ? 2 : 1), 0);
+  const tags = e => e.tags.map(t => pill(t.fit === "strong" ? "g" : "y", t.label_zh)).join(" ");
+  const title = id => W[id] ? `<a href="#paper-${esc(id)}">${bi(W[id].title_zh, W[id].title)}</a> <span class="small muted">${W[id].year}</span>` : esc(id);
+  const row = e => `<li><div>${title(e.id)}</div><div class="row small" style="margin-top:4px;gap:4px">${tags(e)}</div><div class="small muted">${esc(e.why)}</div></li>`;
+  const first = r.read_first.slice(0, 5).map(id => byPaper.get(id) || {id, tags: [], why: ""});
+  const others = [...byPaper.values()].filter(e => !r.read_first.slice(0, 5).includes(e.id)).sort((a, b) => weight(b) - weight(a));
+  const grants = [...byGrant.values()].sort((a, b) => weight(b) - weight(a));
+  const nStrong = hits.filter(t => t.fit === "strong").length;
+  return `${r.stale ? `<div class="item attn">${pill("y", "比對過期")} 你的研究興趣或 CV 改過了，這份推薦是用舊的內容比的。</div>` : ""}
+    <p class="small muted" style="margin-top:0">你的 ${r.targets.length} 個興趣與 CV 項目：強相關 ${nStrong}、部分相關 ${hits.length - nStrong}、沒有相關 ${miss.length}。每篇下面的標籤是它對到你的哪幾項（綠＝強相關、黃＝部分相關）。</p>
+    <h3>必讀前五篇</h3><ol class="reclist">${first.map(row).join("")}</ol>
+    ${others.length ? `<details class="item"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>其他推薦的文章（${others.length} 篇）</strong></summary><ol class="reclist">${others.map(row).join("")}</ol></details>` : ""}
+    ${grants.length ? `<details class="item"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>相關計畫（${grants.length} 個）</strong></summary><ul class="reclist">${grants.map(e => `<li><div>${G[e.key] ? bi(G[e.key].title_zh || G[e.key].funder_zh, G[e.key].title || G[e.key].funder) : esc(e.key)}</div><div class="row small" style="margin-top:4px;gap:4px">${tags(e)}</div><div class="small muted">${esc(e.why)}</div></li>`).join("")}</ul></details>` : ""}
+    ${miss.length ? `<p class="small muted">沒有找到相關研究：${miss.map(t => esc(t.label_zh)).join("、")}</p>` : ""}`;
 }
 
 function matchDocs(){ return buildIndex(D.match_docs); }
@@ -284,9 +298,8 @@ function match(){
   const saved = store.get("match") || D.me_query || {};
   const designs = [...new Set(D.works.map(w => (w.card.fields.find(x => x.key === "design") || {}).facts).filter(Boolean).map(f => f["設計類型"]).filter(Boolean))];
   if (!$("#mf")){
-    el.innerHTML = recommendHTML() + `<h3>${D.recommend ? "自己輸入想做的研究（用詞比對，參考用）" : ""}</h3>
-      ${D.me_query && !store.get("match") ? `<div class="item" style="margin-bottom:12px">${pill("g", "已套用")} 已自動帶入你的 CV 摘要、研究興趣與能力領域，可以直接修改後重新比對。</div>` : ""}
-      <p class="muted">輸入你想做的研究，頁面會在你的瀏覽器裡跟這位教授的文章、計畫、合作者與方法比對，列出重疊之處和證據。比對只看主題與用詞的重疊程度，<strong>不是</strong>「適不適合」的判斷；你輸入的內容只存在這台電腦的瀏覽器。</p>
+    el.innerHTML = recommendHTML() + `<details class="item" id="kw-box" ${D.recommend ? "" : "open"}><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>自己輸入關鍵字比對（用詞重疊，參考用）</strong></summary>
+      <p class="small muted">在瀏覽器裡比對主題與用詞的重疊，<strong>不是</strong>「適不適合」的判斷；輸入的內容只存在這台電腦。</p>
       <form id="mf" class="match-form">
         <div><label for="m-goal">我想做的研究 <span class="hint">（中文或英文都可以；寫族群、介入方式、想看的結果會更準）</span></label>
           <textarea id="m-goal" rows="4"></textarea></div>
@@ -299,7 +312,7 @@ function match(){
           <button type="button" class="btn btn-red" id="m-clear">清除</button>
         </div>
       </form>
-      <div id="m-out" aria-live="polite" style="margin-top:16px"></div>`;
+      <div id="m-out" aria-live="polite" style="margin-top:16px"></div></details>`;
     $("#m-goal").value = saved.goal || ""; $("#m-tags").value = saved.tags || "";
     el.querySelectorAll("fieldset input").forEach(c => c.checked = (saved.methods || []).includes(c.value.split("（")[1]?.replace("）", "") || c.value));
     $("#mf").onsubmit = ev => { ev.preventDefault(); runMatch(); };
