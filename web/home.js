@@ -10,9 +10,22 @@ const STATUS = {confirmed: ["g", "本人主持"], pending: ["y", "待確認"], a
 
 function setLang(l){
   document.body.className = "lang-" + l;
-  document.querySelectorAll("[data-lang]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === l)));
+  document.querySelectorAll("[data-lang]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.lang === l)));
   try { localStorage.setItem("phdeasy:home:lang", l); } catch (e) {}
 }
+
+function initLangMenu(onPick){
+  /* 右上角語言圖示：點開選單，選了就關；點外面或按 Esc 也會關 */
+  const btn = document.getElementById("lang-btn"), menu = document.getElementById("lang-menu");
+  if (!btn || !menu) return;
+  const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+  btn.onclick = ev => { ev.stopPropagation(); const open = menu.hidden; menu.hidden = !open; btn.setAttribute("aria-expanded", String(open));
+    if (open) (menu.querySelector('[aria-checked="true"]') || menu.querySelector("button")).focus(); };
+  menu.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => { onPick(b.dataset.lang); close(); btn.focus(); });
+  document.addEventListener("click", ev => { if (!menu.hidden && !menu.contains(ev.target)) close(); });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !menu.hidden){ close(); btn.focus(); } });
+}
+
 
 function renderMe(m){
   $("#name").textContent = m.name + (m.name_zh ? `（${m.name_zh}）` : "");
@@ -194,7 +207,7 @@ function setupHomeViews(){
 (async function init(){
   let l = "both"; try { l = localStorage.getItem("phdeasy:home:lang") || "both"; } catch (e) {}
   setLang(l);
-  document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+  initLangMenu(setLang);
   H = await loadHome();
   OFFLINE_HOME = document.getElementById("inline-data")?.textContent.trim() !== "__INLINE__";
   setupHomeViews();

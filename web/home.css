@@ -87,3 +87,16 @@ details>summary{list-style:none}details>summary::-webkit-details-marker{display:
 details.item>summary::before{content:"›";display:inline-block;width:1em;color:var(--muted);transition:transform .15s}
 details.item[open]>summary::before{transform:rotate(90deg)}
 header.top{border-bottom:1px solid var(--line)}
+
+/* 語言：右上角一個圖示，點開選中文／English／雙語對照 */
+header.top .wrap{flex-wrap:nowrap;align-items:flex-start}
+header.top .wrap>div:first-child{flex:1;min-width:0}
+.langmenu{position:relative;align-self:flex-start;flex:none}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:999px;border:1px solid #d5d8dc;background:#fff;color:var(--fg);cursor:pointer}
+.iconbtn:hover,.iconbtn[aria-expanded="true"]{background:var(--soft)}
+.langmenu .menu{position:absolute;right:0;top:46px;z-index:30;min-width:150px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.10)}
+.langmenu .menu button{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:0 10px;border:0;border-radius:6px;background:none;font:inherit;color:var(--fg);text-align:left;cursor:pointer}
+.langmenu .menu button:hover{background:var(--soft)}
+.langmenu .menu button::before{content:"";display:inline-block;width:1em}
+.langmenu .menu button[aria-checked="true"]{font-weight:600;color:#14532d}
+.langmenu .menu button[aria-checked="true"]::before{content:"✓"}

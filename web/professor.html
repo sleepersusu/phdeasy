@@ -135,15 +135,33 @@ details.item[open]>summary::before{transform:rotate(90deg)}
 header.top{border-bottom:1px solid var(--line)}
 nav.sections a{font-weight:500;color:var(--muted)}nav.sections a:hover{background:var(--soft);text-decoration:none;color:var(--fg)}
 nav.sections a[aria-current="true"]{background:#eaf5ee;color:#14532d;font-weight:600;text-decoration:none}
+
+/* 語言：右上角一個圖示，點開選中文／English／雙語對照 */
+header.top .wrap{flex-wrap:nowrap;align-items:flex-start}
+header.top .wrap>div:first-child{flex:1;min-width:0}
+.langmenu{position:relative;align-self:flex-start;flex:none}
+.iconbtn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:999px;border:1px solid #d5d8dc;background:#fff;color:var(--fg);cursor:pointer}
+.iconbtn:hover,.iconbtn[aria-expanded="true"]{background:var(--soft)}
+.langmenu .menu{position:absolute;right:0;top:46px;z-index:30;min-width:150px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.10)}
+.langmenu .menu button{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:0 10px;border:0;border-radius:6px;background:none;font:inherit;color:var(--fg);text-align:left;cursor:pointer}
+.langmenu .menu button:hover{background:var(--soft)}
+.langmenu .menu button::before{content:"";display:inline-block;width:1em}
+.langmenu .menu button[aria-checked="true"]{font-weight:600;color:#14532d}
+.langmenu .menu button[aria-checked="true"]::before{content:"✓"}
 </style>
 </head>
 <body>
 <a class="sr" href="#papers">跳到文章解析</a>
 <header class="top"><div class="wrap"><div><a class="btn btn-green" href="index.html" id="home-link" style="margin-bottom:8px">← 回我的首頁</a><h1 id="title"></h1><div class="meta" id="meta"></div></div>
-  <div class="langs" role="group" aria-label="內容語言">
-    <button class="btn btn-green" data-lang="zh" aria-pressed="false">中文</button>
-    <button class="btn btn-green" data-lang="en" aria-pressed="false">English</button>
-    <button class="btn btn-green" data-lang="both" aria-pressed="true">雙語</button>
+  <div class="langmenu">
+    <button type="button" class="iconbtn" id="lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" aria-label="切換內容語言" title="內容語言">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
+    </button>
+    <div class="menu" id="lang-menu" role="menu" aria-label="內容語言" hidden>
+      <button type="button" role="menuitemradio" data-lang="zh" aria-checked="false">中文</button>
+      <button type="button" role="menuitemradio" data-lang="en" aria-checked="false">English</button>
+      <button type="button" role="menuitemradio" data-lang="both" aria-checked="true">雙語對照</button>
+    </div>
   </div></div></header>
 <nav class="sections" aria-label="區段"><div class="wrap"><a href="#match">與我的研究比對</a><a href="#overview">總覽</a><a href="#profile">教授總覽</a><a href="#decisions">待你決定</a><a href="#coauthors">合作者</a><a href="#topics">研究領域</a><a href="#grants">研究計畫</a><a href="#papers">文章解析</a><a href="#exceptions">例外紀錄</a><a href="#files">檔案</a></div></nav>
 <main class="wrap"><section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">研究計畫書</h2><div class="body"></div></section><section id="library" aria-labelledby="h-library"><h2 id="h-library">討論文獻</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
@@ -197,9 +215,22 @@ function header(){
 function setLang(l){
   document.body.classList.remove("lang-zh", "lang-en", "lang-both");
   document.body.classList.add("lang-" + l);
-  document.querySelectorAll("[data-lang]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lang === l)));
+  document.querySelectorAll("[data-lang]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.lang === l)));
   store.set("lang", l);
 }
+
+function initLangMenu(onPick){
+  /* 右上角語言圖示：點開選單，選了就關；點外面或按 Esc 也會關 */
+  const btn = document.getElementById("lang-btn"), menu = document.getElementById("lang-menu");
+  if (!btn || !menu) return;
+  const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+  btn.onclick = ev => { ev.stopPropagation(); const open = menu.hidden; menu.hidden = !open; btn.setAttribute("aria-expanded", String(open));
+    if (open) (menu.querySelector('[aria-checked="true"]') || menu.querySelector("button")).focus(); };
+  menu.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => { onPick(b.dataset.lang); close(); btn.focus(); });
+  document.addEventListener("click", ev => { if (!menu.hidden && !menu.contains(ev.target)) close(); });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !menu.hidden){ close(); btn.focus(); } });
+}
+
 
 const EXAMPLE = {goal: "我想研究用 AI 聊天機器人或手機 app 提升中年女性的身體活動與心血管健康知識，特別是少數族群。",
                  tags: "chatbot、physical activity、women、cardiovascular、health disparities", methods: ["pilot-rct", "quasi-experimental"]};
@@ -847,7 +878,7 @@ async function loadData(){
   if (OFFLINE) document.getElementById("home-link").href = "../../../index.html";
   document.title = (D.professor.name || "") + " 研究檔案";
   setLang(store.get("lang") || "both");
-  document.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => setLang(b.dataset.lang));
+  initLangMenu(setLang);
   header(); proposalView(); libraryView(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files();
   if (OFFLINE){ navHighlight(); }   // 離線單檔版：全部放在一頁
   else { setupViews(); }            // 應用程式：教授首頁是按鈕，一個按鈕進一個區塊
