@@ -114,7 +114,10 @@ function renderProposal(){
     const drafts = (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
         return `<li><span class="pill ${c[0]}">${c[1]}</span> <strong>${esc(v.id)}</strong>｜${bi(v.direction_zh, v.direction_en)}</li>`; }).join("")}</ul>` : "";
     return `<details class="profcard" ${has ? "open" : ""}><summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc((p.owner || {}).institution || p.institution || "")}</div>
-          ${(p.owner || {}).note ? `<div class="small" style="margin-top:2px">📝 ${esc(p.owner.note)}</div>` : ""}</div>
+          ${(p.owner || {}).note ? `<div class="small" style="margin-top:2px">📝 ${esc(p.owner.note)}</div>` : ""}
+          ${(() => { const now = new Date().toISOString(), up = ((H.cal || {}).events || []).filter(e => e.slug === p.slug && (e.end || e.start) >= now).sort((a, b) => a.start < b.start ? -1 : 1)[0];
+            return up ? `<div class="small" style="margin-top:4px">📅 ${esc(up.summary)} <span class="pill g">${esc(new Date(up.start).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}))}</span>${up.meet ? ` <a href="${esc(up.meet)}" target="_blank" rel="noopener">Meet</a>` : ""}</div>` : ""; })()}
+          ${(() => { const a = ((H.apps || {}).rows || []).find(x => x.slug === p.slug); return a ? `<div class="small" style="margin-top:4px">${a.status ? `<span class="pill">${esc(a.status)}</span> ` : ""}${a.program ? esc(a.program) + " " : ""}${a.deadline ? `<span class="pill y">截止 ${esc(a.deadline)}</span> ` : ""}${a.meeting ? `<span class="pill g">會議 ${esc(a.meeting.slice(0, 16).replace("T", " "))}</span>` : ""}</div>` : ""; })()}</div>
         ${has ? `<span class="pill g">第 ${(H.docs[key].versions.slice(-1)[0] || {}).n} 版</span>` : (pr.versions || []).length ? `<span class="pill y">AI 草稿 ${pr.versions.length} 版</span>` : `<span class="pill">還沒有</span>`}</div></summary>
       <div class="pc-body" data-doc-root>${has ? "" : drafts ? `<div class="small muted">AI 依她的方向與經費擬的草稿（<a href="professor.html?p=${encodeURIComponent(p.slug)}&v=proposal">到她的頁面看全文</a>）：</div>${drafts}` : ""}<div data-doc-slot="${esc(key)}"></div></div></details>`;
   }).join("");
@@ -490,6 +493,9 @@ function renderProfs(ps){
     return `<details class="profcard">
       <summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc((p.owner || {}).institution || p.institution || "")}</div>
           ${(p.owner || {}).note ? `<div class="small" style="margin-top:2px">📝 ${esc(p.owner.note)}</div>` : ""}
+          ${(() => { const now = new Date().toISOString(), up = ((H.cal || {}).events || []).filter(e => e.slug === p.slug && (e.end || e.start) >= now).sort((a, b) => a.start < b.start ? -1 : 1)[0];
+            return up ? `<div class="small" style="margin-top:4px">📅 ${esc(up.summary)} <span class="pill g">${esc(new Date(up.start).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}))}</span>${up.meet ? ` <a href="${esc(up.meet)}" target="_blank" rel="noopener">Meet</a>` : ""}</div>` : ""; })()}
+          ${(() => { const a = ((H.apps || {}).rows || []).find(x => x.slug === p.slug); return a ? `<div class="small" style="margin-top:4px">${a.status ? `<span class="pill">${esc(a.status)}</span> ` : ""}${a.program ? esc(a.program) + " " : ""}${a.deadline ? `<span class="pill y">截止 ${esc(a.deadline)}</span> ` : ""}${a.meeting ? `<span class="pill g">會議 ${esc(a.meeting.slice(0, 16).replace("T", " "))}</span>` : ""}</div>` : ""; })()}
           <div class="small facts" style="margin-top:4px">${facts.join(" · ")}</div></div>${starsHTML(r)}</div></summary>
       <div class="pc-body">
         ${top5.length ? `<div class="small muted" style="margin-bottom:4px">${T("必讀前五篇", "Top 5 to read")}</div>
@@ -500,11 +506,29 @@ function renderProfs(ps){
             <button class="btn btn-sm" data-prof-edit="${esc(p.slug)}">${T("編輯", "Edit")}</button><button class="btn btn-sm btn-red" data-prof-remove="${esc(p.slug)}">${T("移除", "Remove")}</button>` : ""}</div>
         <form class="prof-edit" data-slug="${esc(p.slug)}" hidden style="margin-top:10px">
           <label>${T("顯示的機構", "Institution")}<input type="text" name="institution" value="${esc((p.owner || {}).institution || p.institution || "")}"></label>
+          <label>Email<input type="email" name="email" value="${esc((p.owner || {}).email || "")}" placeholder="${T("對 Google 日曆的會議用", "Matches calendar meetings")}"></label>
           <label>${T("備註", "Note")}<input type="text" name="note" value="${esc((p.owner || {}).note || "")}" placeholder="例：11/3 面談、想申請 2027 入學"></label>
           <div class="row" style="margin-top:6px"><button class="btn btn-green btn-sm" type="submit">${T("儲存", "Save")}</button><button class="btn btn-sm" type="button" data-cancel>${T("取消", "Cancel")}</button></div></form>
       </div></details>`;
-  }).join("") + removedHTML;
+  }).join("") + notionPendingHTML() + removedHTML;
 }
+function notionPendingHTML(){
+  /* Notion 裡填了、但還沒建檔的教授：按「建檔」才開始 */
+  const rows = ((H.apps || {}).rows || []).filter(r => !r.slug && r.name);
+  if (!rows.length) return "";
+  return `<details class="item" open style="margin-top:12px"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center">${T("Notion 裡還沒建檔", "In Notion, not built yet")}（${rows.length}）</summary>
+    ${rows.map(r => `<div class="row" style="justify-content:space-between;margin:6px 0"><span><strong>${esc(r.name)}</strong> <span class="small muted">${esc(r.institution || "")}${r.program ? "｜" + esc(r.program) : ""}${r.deadline ? "｜截止 " + esc(r.deadline) : ""}</span></span>
+      ${window.APP_REMATCH ? `<button class="btn btn-green btn-sm" data-notion-build="${esc(r.page_id)}">${T("建檔", "Build")}</button>` : ""}</div>`).join("")}</details>`;
+}
+document.addEventListener("click", async ev => {
+  const b = ev.target.closest("[data-notion-build]");
+  if (!b) return;
+  const r = ((H.apps || {}).rows || []).find(x => x.page_id === b.dataset.notionBuild);
+  if (!r.institution){ alert("Notion 那一列還沒填「學校」，填好再匯入。"); return; }
+  if (!confirm(`幫 ${r.name}（${r.institution}）建教授檔案？Claude Code 會在背景跑到停 1。`)) return;
+  b.disabled = true;
+  try { await API("new", {name: r.name, institution: r.institution, orcid: r.orcid || ""}); location.href = "settings.html"; } catch (e) { alert(e.message); b.disabled = false; }
+});
 document.addEventListener("click", async ev => {
   const ed = ev.target.closest("[data-prof-edit]"), rm = ev.target.closest("[data-prof-remove]"), rs = ev.target.closest("[data-prof-restore]"), cn = ev.target.closest(".prof-edit [data-cancel]");
   if (ed){ const f = document.querySelector(`.prof-edit[data-slug="${ed.dataset.profEdit}"]`); f.hidden = !f.hidden; return; }
@@ -518,7 +542,7 @@ document.addEventListener("submit", async ev => {
   const f = ev.target.closest(".prof-edit");
   if (!f) return;
   ev.preventDefault();
-  try { await API("prof-update", {slug: f.dataset.slug, institution: f.institution.value, note: f.note.value}); location.reload(); } catch (e) { alert(e.message); }
+  try { await API("prof-update", {slug: f.dataset.slug, institution: f.institution.value, email: f.email.value, note: f.note.value}); location.reload(); } catch (e) { alert(e.message); }
 });
 
 function designCode(w){
@@ -565,13 +589,15 @@ async function loadHome(){
   const me = await getJSON("../runs/_me/me.json").catch(() => null);
   const list = await getJSON("../runs/professors.json").catch(() => []);
   const docs = await getJSON("../runs/_me/docs/index.json").catch(() => ({}));
+  const apps = await getJSON("../runs/_me/applications.json").catch(() => null);
+  const cal = await getJSON("../runs/_me/calendar.json").catch(() => null);  // Google 日曆裡跟教授有關的會議  // Notion「博士申請追蹤」匯入的
   const profs = [];
   for (const p of list){
     const owner = await getJSON(`../runs/${p.slug}/owner.json`).catch(() => ({}));
     try { profs.push({...summarize(p, await getJSON("../runs/" + p.data), me), owner}); }
     catch (e) { profs.push({slug: p.slug, name: p.name, institution: p.institution, built: false, counts: {}, n_strong: 0, n_overlap_papers: 0, shared_terms: [], top_papers: [], top_grants: [], design_overlap: []}); }
   }
-  return {me, professors: profs, docs};
+  return {me, professors: profs, docs, apps, cal};
 }
 
 let OFFLINE_HOME = false;

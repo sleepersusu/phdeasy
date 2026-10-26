@@ -667,6 +667,48 @@ function basicHTML(){
   </section>`;
 }
 
+let CAL = null;
+async function meetingsCard(){
+  /* 教授首頁：Google 日曆裡跟她有關的會議（設定裡連接後才有）；應用程式裡可以新增會議 */
+  const el = document.getElementById("meetings-card");
+  if (!el || OFFLINE) return;
+  if (CAL === null) CAL = await fetch("../runs/_me/calendar.json", {cache: "no-store"}).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+  const gc = ((APP || {}).settings || {}).gcal || {};
+  const evs = (CAL.events || []).filter(e => e.slug === SLUG).sort((a, b) => a.start < b.start ? 1 : -1);
+  if (!evs.length && !(APP && gc.connected)) { el.hidden = true; return; }
+  const now = new Date().toISOString(), when = x => esc(new Date(x).toLocaleString([], {dateStyle: "medium", timeStyle: x.length > 10 ? "short" : undefined}));
+  const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  el.hidden = false;
+  el.innerHTML = `<div class="row" style="justify-content:space-between"><strong>會議</strong>${APP && gc.connected ? `<button class="btn btn-green btn-sm" id="mt-new">新增會議</button>` : ""}</div>
+    ${evs.length ? `<ul class="small" style="margin:8px 0 0;padding-left:18px">${evs.map(e => `<li style="margin:4px 0">${(e.end || e.start) >= now ? pill("g", "即將") + " " : ""}<strong>${when(e.start)}</strong>　${esc(e.summary)}
+      ${e.meet ? ` <a href="${esc(e.meet)}" target="_blank" rel="noopener">Meet</a>` : ""}${e.link ? ` <a href="${esc(e.link)}" target="_blank" rel="noopener">日曆</a>` : ""}</li>`).join("")}</ul>` : `<div class="small muted" style="margin-top:6px">日曆裡還沒有跟她的會議</div>`}
+    <form id="mt-form" class="match-form" hidden style="max-width:none;margin-top:10px">
+      <label>標題<input type="text" name="summary" required value="${esc("PhD 討論｜" + (D.professor.name || ""))}"></label>
+      <div class="row"><label>開始（${esc(tz)}）<input type="datetime-local" name="start" required></label>
+        <label>長度<select name="minutes"><option>30</option><option selected>45</option><option>60</option><option>90</option></select> 分鐘</label></div>
+      <label>與會者 email（逗號分開，可空白）<input type="text" name="attendees" placeholder="name@university.edu"></label>
+      <label>備註<input type="text" name="note"></label>
+      <label class="small"><input type="checkbox" name="meet" checked> 附 Google Meet 連結</label>
+      <label class="small"><input type="checkbox" name="notify"> 寄邀請信給與會者（不勾就只放進你的日曆）</label>
+      <div class="row"><button class="btn btn-green btn-sm" type="submit">建立</button><button class="btn btn-sm" type="button" id="mt-cancel">取消</button></div>
+    </form>`;
+  const f = el.querySelector("#mt-form");
+  el.querySelector("#mt-new")?.addEventListener("click", () => { f.hidden = false; f.start.focus(); });
+  el.querySelector("#mt-cancel")?.addEventListener("click", () => { f.hidden = true; });
+  f.addEventListener("submit", async ev => {
+    ev.preventDefault();
+    const att = f.attendees.value.split(/[,\s，；;]+/).filter(Boolean);
+    if (f.notify.checked && att.length && !confirm(`會寄 Google 日曆邀請給：${att.join("、")}。確定？`)) return;
+    const b = f.querySelector("[type=submit]"); b.disabled = true;
+    try {
+      const r = await APIX("gcal-create", {slug: SLUG, summary: f.summary.value, start: f.start.value, minutes: +f.minutes.value, tz,
+                                           attendees: att, note: f.note.value, meet: f.meet.checked, notify: f.notify.checked});
+      CAL = null; await meetingsCard();
+      if (r.meet) alert("已建立，Meet 連結：" + r.meet);
+    } catch (e) { alert(e.message); b.disabled = false; }
+  });
+}
+
 let HOME_HREF = "index.html";
 function crumbs(v){
   /* 我的首頁 › 教授 › 目前這一塊（返回都在最上面，不另外放按鈕） */
@@ -687,7 +729,7 @@ function setupViews(){
   if (!v){
     const hub = document.createElement("section");
     hub.id = "hub";
-    hub.innerHTML = basicHTML() + `<p class="muted" style="margin-top:16px">選一個想看的部分，按進去就只顯示那一塊；上方的列可以隨時切換。</p>
+    hub.innerHTML = basicHTML() + `<section class="card" id="meetings-card" aria-label="會議" style="margin-top:12px" hidden></section>` + `<p class="muted" style="margin-top:16px">選一個想看的部分，按進去就只顯示那一塊；上方的列可以隨時切換。</p>
       <div class="mgrid">${VIEWS.map(([id, label, hint, n]) => `<a class="card" href="${viewHref(id)}" style="padding:16px">
         <div class="row" style="justify-content:space-between"><strong style="font-size:1.1rem">${label}</strong><span class="pill">${esc(n(D) || "看")}</span></div>
         <div class="small muted" style="margin-top:6px">${hint}</div></a>`).join("")}</div>`;
@@ -953,7 +995,8 @@ async function loadData(){
   else { setupViews(); }            // 應用程式：教授首頁是按鈕，一個按鈕進一個區塊
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
-  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); proposalView(); libraryView(); } } catch (e) {}  // 離線單檔版沒有 /api
+  meetingsCard();
+  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); proposalView(); libraryView(); meetingsCard(); } } catch (e) {}  // 離線單檔版沒有 /api
 })();
 </script>
 </body>

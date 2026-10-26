@@ -14,9 +14,11 @@
 import argparse
 import atexit
 import functools
+import html
 import http.server
 import json
 import os
+import secrets
 import shlex
 import shutil
 import signal
@@ -181,6 +183,8 @@ class App:
         self.jobs = Jobs(self.workspace, self.runs)
         self.jobs.engine = self.engine  # 背景工作用哪個 AI：Claude Code（預設）或 Codex（備用）
         self.codex_test = None
+        self.port = 8790
+        self.gcal_pending = None
         self.jobs.on_done = self.after_job
         self.blocked = None
         self.closer = None
@@ -229,7 +233,7 @@ class App:
                 if eq and not line.lstrip().startswith("#"):
                     keys[k.strip()] = bool(v.strip().strip('"').strip("'"))
         return {"drives": drives, "account": conf.get("account") or (drives[0] if len(drives) == 1 else None),
-                "folder": str(dst) if dst else None, "claude_test": self.claude_test, "codex_test": self.codex_test,
+                "folder": str(dst) if dst else None, "claude_test": self.claude_test, "codex_test": self.codex_test, "notion": self.notion_status(), "gcal": self.gcal_status(),
                 "keys": {"S2_API_KEY": keys.get("S2_API_KEY", False) or bool(os.environ.get("S2_API_KEY"))},
                 "workspace": str(self.workspace)}
 
@@ -336,6 +340,139 @@ class App:
         else:
             raise ValueError("這個系統請自己在終端機執行 codex login")
         return {"ok": True}
+
+    def set_secret(self, name, value):
+        """寫進本人的金鑰檔（runs/_me/secrets.env，經雲端硬碟同步）；已有就改那一行。程式之後不顯示內容。"""
+        p = self.runs / "_me" / "secrets.env"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        lines = p.read_text(encoding="utf-8").splitlines() if p.exists() else []
+        lines = [l for l in lines if not l.strip().startswith(name + "=")] + [f"{name}={value}"]
+        p.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def _secret(self, name):
+        p = self.runs / "_me" / "secrets.env"
+        for line in (p.read_text(encoding="utf-8").splitlines() if p.exists() else []):
+            k, sep, v = line.partition("=")
+            if sep and k.strip() == name:
+                return v.strip() or None
+        return None
+
+    def _profs_for_notion(self):
+        out = []
+        for st_p in sorted(self.runs.glob("*/state.json")):
+            if st_p.parent.name.startswith("_"):
+                continue
+            pr = (json.loads(st_p.read_text()) or {}).get("professor") or {}
+            out.append({"slug": st_p.parent.name, "name": pr.get("name"), "institution": pr.get("institution"), "orcid": pr.get("orcid")})
+        return out
+
+    def notion_import(self):
+        """從 Notion 的「博士申請追蹤」匯入（Notion 為主）→ runs/_me/applications.json；對不到已建檔教授的是待建檔。"""
+        from pipeline import notion
+        cfg_p = self.runs / "_me" / "notion.json"
+        token = self._secret("NOTION_TOKEN")
+        if not token or not cfg_p.exists():
+            raise ValueError("還沒連接 Notion")
+        cfg = json.loads(cfg_p.read_text())
+        rows = notion.match_professors(notion.fetch_rows(token, cfg["db_id"]), self._profs_for_notion())
+        (self.runs / "_me" / "applications.json").write_text(json.dumps({"fetched": datetime.now().astimezone().isoformat(timespec="seconds"),
+                                                                         "db_url": cfg.get("db_url"), "rows": rows}, ensure_ascii=False, indent=1))
+        return {"ok": True, "rows": len(rows)}
+
+    def notion_connect(self, token, link):
+        from pipeline import notion
+        token = (token or "").strip()
+        if not token:
+            raise ValueError("先貼上 Notion 整合的金鑰")
+        cfg = notion.setup(token, link, [{**p, "status": "聯絡中"} for p in self._profs_for_notion()])
+        self.set_secret("NOTION_TOKEN", token)
+        (self.runs / "_me" / "notion.json").write_text(json.dumps(cfg, ensure_ascii=False, indent=1))
+        return self.notion_import()
+
+    def notion_status(self):
+        p = self.runs / "_me" / "notion.json"
+        a = self.runs / "_me" / "applications.json"
+        if not p.exists():
+            return None
+        cfg = json.loads(p.read_text())
+        fetched = json.loads(a.read_text()).get("fetched") if a.exists() else None
+        return {"db_url": cfg.get("db_url"), "fetched": fetched, "token": bool(self._secret("NOTION_TOKEN"))}
+
+    # ---- Google 日曆（OAuth：本人自己的「電腦版應用程式」用戶端；權杖只在本人的雲端硬碟）----
+    def _gfile(self, name):
+        return self.runs / "_me" / name
+
+    def gcal_client(self, text):
+        from pipeline import gcal
+        c = gcal.client_from(text)
+        self._gfile("").mkdir(parents=True, exist_ok=True)
+        self._gfile("google_client.json").write_text(json.dumps(c, ensure_ascii=False, indent=1))
+        return {"ok": True}
+
+    def gcal_start(self):
+        """產生登入網址並用預設瀏覽器打開；Google 回到 http://127.0.0.1:<port>/ 由 gcal_callback 接。"""
+        from pipeline import gcal
+        cp = self._gfile("google_client.json")
+        if not cp.exists():
+            raise ValueError("先上傳 Google 的用戶端 JSON")
+        v, c = gcal.pkce()
+        st = secrets.token_urlsafe(16)
+        self.gcal_pending = {"state": st, "verifier": v, "redirect": f"http://127.0.0.1:{self.port}/"}
+        url = gcal.auth_url(json.loads(cp.read_text())["client_id"], self.gcal_pending["redirect"], st, c)
+        webbrowser.open(url)
+        return {"ok": True, "url": url}
+
+    def gcal_callback(self, q):
+        from pipeline import gcal
+        pend = getattr(self, "gcal_pending", None)
+        if not pend or q.get("state") != pend["state"]:
+            raise ValueError("登入狀態對不上：回應用程式重按「登入 Google」")
+        if q.get("error"):
+            raise ValueError(f"Google 沒有給權限（{q['error']}）")
+        tok = gcal.exchange(json.loads(self._gfile("google_client.json").read_text()), q.get("code"), pend["verifier"], pend["redirect"])
+        self.gcal_pending = None
+        self._gfile("google_token.json").write_text(json.dumps(tok, ensure_ascii=False, indent=1))
+        return self.gcal_import()
+
+    def _gcal_access(self):
+        from pipeline import gcal
+        tp, cp = self._gfile("google_token.json"), self._gfile("google_client.json")
+        if not tp.exists() or not cp.exists():
+            raise ValueError("還沒連接 Google 日曆")
+        tok = json.loads(tp.read_text())
+        if gcal.expired(tok):
+            tok = gcal.refresh(json.loads(cp.read_text()), tok)
+            tp.write_text(json.dumps(tok, ensure_ascii=False, indent=1))
+        return tok["access_token"]
+
+    def _profs_for_gcal(self):
+        out = []
+        for p in self._profs_for_notion():
+            op = self.runs / p["slug"] / "owner.json"
+            out.append({**p, "email": (json.loads(op.read_text()) if op.exists() else {}).get("email")})
+        return out
+
+    def gcal_import(self):
+        """讀主日曆前 60 天到後 180 天的活動，留下對到教授的 → runs/_me/calendar.json。"""
+        from pipeline import gcal
+        events = gcal.match_events(gcal.list_events(self._gcal_access()), self._profs_for_gcal())
+        self._gfile("calendar.json").write_text(json.dumps({"fetched": datetime.now().astimezone().isoformat(timespec="seconds"),
+                                                            "events": events}, ensure_ascii=False, indent=1))
+        return {"ok": True, "events": len(events)}
+
+    def gcal_create(self, body):
+        from pipeline import gcal
+        slug = self._lib_slug(body.get("slug"))
+        b = gcal.event_body(body.get("summary"), body.get("start") or "", body.get("minutes") or 60, body.get("tz") or "UTC",
+                            body.get("attendees") or [], meet=bool(body.get("meet")), slug=slug, note=body.get("note"))
+        e = gcal.create_event(self._gcal_access(), b, notify=bool(body.get("notify")))
+        self.gcal_import()
+        return {"ok": True, "link": e.get("htmlLink"), "meet": e.get("hangoutLink")}
+
+    def gcal_status(self):
+        cal = self._gfile("calendar.json")
+        return {"client": self._gfile("google_client.json").exists(), "connected": self._gfile("google_token.json").exists(),
+                "fetched": json.loads(cal.read_text()).get("fetched") if cal.exists() else None}
 
     def test_claude(self):
         """跑一個極小的工作確認 Claude Code 裝好、也登入了（不碰任何檔案）。"""
@@ -553,6 +690,18 @@ class App:
         return {"ok": True, **o}
 
     def post(self, path, body):
+        if path == "notion-connect":
+            return self.notion_connect(body.get("token"), body.get("link"))
+        if path == "notion-import":
+            return self.notion_import()
+        if path == "gcal-client":
+            return self.gcal_client(body.get("json") or "")
+        if path == "gcal-login":
+            return self.gcal_start()
+        if path == "gcal-import":
+            return self.gcal_import()
+        if path == "gcal-create":
+            return self.gcal_create(body)
         if path == "engine":
             return self.set_engine(body.get("engine"))
         if path == "test-codex":
@@ -562,7 +711,7 @@ class App:
         if path == "doc-change":
             return self.doc_change(body)
         if path == "prof-update":
-            upd = {k: str(body[k]).strip()[:500] for k in ("note", "institution") if k in body}
+            upd = {k: str(body[k]).strip()[:500] for k in ("note", "institution", "email") if k in body}
             return self.prof_owner(body.get("slug"), **upd)
         if path in ("prof-remove", "prof-restore"):
             return self.prof_owner(body.get("slug"), archived=path == "prof-remove")
@@ -724,6 +873,21 @@ def make_handler(app):
             return str(app.web / "__missing__")
 
         def do_GET(self):
+            u = urlparse(self.path)
+            if u.path == "/" and "state=" in u.query:  # Google 日曆登入回來
+                from urllib.parse import parse_qs
+                try:
+                    r = app.gcal_callback({k: v[0] for k, v in parse_qs(u.query).items()})
+                    msg = f"已連接 Google 日曆，讀到 {r['events']} 個跟教授有關的會議。可以關掉這一頁，回到應用程式。"
+                except (ValueError, RuntimeError) as e:
+                    msg = f"沒有連接成功：{e}"
+                data = f'<!doctype html><meta charset="utf-8"><title>phdeasy</title><p style="font:16px system-ui;margin:40px">{html.escape(msg)}</p>'.encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
             if urlparse(self.path).path in ("/", "/index.html"):
                 self.send_response(302)
                 self.send_header("Location", "/web/index.html")
@@ -808,6 +972,12 @@ def startup(app, choose=True):
                  (f"拉下 {sy.get('pulled', 0)}、推上 {sy.get('pushed', 0)} 個檔案" if (sy.get("pulled") or sy.get("pushed")) else "已經是最新的") if r == 0 else "沒有同步（只用這台的資料）")
         step("rebuild", "doing")
         step("rebuild", "ok" if rebuild(app.workspace) else "skip", "" if find_uv() else "沒有 uv：用雲端同步下來的資料")
+        for name, fn in (("Notion", app.notion_import), ("Google 日曆", app.gcal_import)):  # 有連接才匯入；失敗不擋開機
+            try:
+                if (name == "Notion" and app.notion_status()) or (name != "Notion" and app.gcal_status()["connected"]):
+                    fn()
+            except Exception as e:
+                print(f"{name} 匯入失敗：{e}")
         step("tools", "doing")
         c, u = find_claude(), find_uv()
         step("tools", "ok" if c and u else "warn", "Claude Code、uv 都在" if c and u else
@@ -896,6 +1066,7 @@ def main():
     threading.Thread(target=startup, args=(app,), daemon=True).start()
 
     port = free_port(a.port)
+    app.port = port  # Google 日曆登入回呼用
     srv = http.server.ThreadingHTTPServer(("127.0.0.1", port), make_handler(app))
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     url = f"http://127.0.0.1:{port}/web/loading.html"  # 開機畫面：顯示每一步與進度，做完自動進首頁

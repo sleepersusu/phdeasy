@@ -92,6 +92,7 @@ def test_upload_saves_pdf_into_inbox_without_overwrite(tmp_path):
 
 
 def test_settings_reports_keys_without_values_and_switches_account(tmp_path, monkeypatch):
+    import pytest
     import app as appmod
     a = appmod.App(tmp_path)
     (tmp_path / "runs" / "_me").mkdir(parents=True)
@@ -298,3 +299,55 @@ def test_engine_choice_is_saved_and_used_by_jobs(tmp_path):
     with pytest.raises(ValueError):
         app.post("engine", {"engine": "gpt"})
     assert app.status()["engine"] == "codex"
+
+
+def test_notion_connect_and_import(tmp_path, monkeypatch):
+    import json
+    from pipeline import notion
+    app, calls = _lib_app(tmp_path)
+    (tmp_path / "runs" / "doe-jane" / "state.json").write_text(json.dumps({"professor": {"name": "Jane Doe", "institution": "Uni X", "orcid": "0000-1"}}))
+    seen = {}
+    monkeypatch.setattr(notion, "setup", lambda token, link, seed: seen.update(token=token, seed=seed) or {"page_id": "p", "db_id": "db1", "db_url": "https://notion.so/db1"})
+    monkeypatch.setattr(notion, "fetch_rows", lambda token, db: [{"name": "Jane Doe", "orcid": None, "status": "已面談", "deadline": "2026-12-01"},
+                                                                 {"name": "New Prof", "orcid": None, "institution": "Uni Y"}])
+    r = app.post("notion-connect", {"token": "secret_abc", "link": "https://notion.so/x-2f1c3d4e5a6b7c8d9e0f1a2b3c4d5e6f"})
+    assert r["rows"] == 2 and seen["token"] == "secret_abc" and seen["seed"][0]["name"] == "Jane Doe"
+    assert "NOTION_TOKEN=secret_abc" in (tmp_path / "runs" / "_me" / "secrets.env").read_text()
+    assert "secret_abc" not in (tmp_path / "runs" / "_me" / "notion.json").read_text()  # 金鑰只在 secrets.env
+    apps = json.loads((tmp_path / "runs" / "_me" / "applications.json").read_text())
+    assert [x["slug"] for x in apps["rows"]] == ["doe-jane", None]
+    assert app.settings()["notion"]["db_url"] == "https://notion.so/db1"
+
+
+def test_gcal_login_import_and_create(tmp_path, monkeypatch):
+    import json
+    from pipeline import gcal
+    import pytest
+    import app as appmod
+    app, _ = _lib_app(tmp_path)
+    (tmp_path / "runs" / "doe-jane" / "state.json").write_text(json.dumps({"professor": {"name": "Jane Doe", "institution": "Uni X"}}))
+    with pytest.raises(ValueError):
+        app.post("gcal-login", {})  # 還沒上傳用戶端
+    app.post("gcal-client", {"json": '{"installed": {"client_id": "cid", "client_secret": "cs"}}'})
+    opened = []
+    monkeypatch.setattr(appmod.webbrowser, "open", opened.append)
+    app.port = 8799
+    r = app.post("gcal-login", {})
+    assert opened == [r["url"]] and "redirect_uri=http%3A%2F%2F127.0.0.1%3A8799%2F" in r["url"]
+    with pytest.raises(ValueError):  # state 對不上就不換權杖
+        app.gcal_callback({"state": "forged", "code": "c"})
+    monkeypatch.setattr(gcal, "exchange", lambda client, code, v, redir: {"access_token": "at", "refresh_token": "rt", "expires_at": "2999-01-01T00:00:00+00:00"})
+    made = {}
+    monkeypatch.setattr(gcal, "list_events", lambda access: [{"id": "e1", "summary": "Chat with Jane Doe", "start": {"dateTime": "2026-11-03T10:00:00+08:00"}, "end": {}},
+                                                             {"id": "e2", "summary": "Gym", "start": {}, "end": {}}])
+    monkeypatch.setattr(gcal, "create_event", lambda access, body, notify: made.update(body=body, notify=notify) or {"htmlLink": "https://cal/e3"})
+    assert app.gcal_callback({"state": app.gcal_pending["state"], "code": "c"})["events"] == 1
+    cal = json.loads((tmp_path / "runs" / "_me" / "calendar.json").read_text())
+    assert [e["slug"] for e in cal["events"]] == ["doe-jane"]
+    assert app.settings()["gcal"]["connected"] is True
+    r = app.post("gcal-create", {"slug": "doe-jane", "summary": "PhD 討論", "start": "2026-11-10T09:00", "minutes": 30, "tz": "Asia/Taipei",
+                                 "attendees": ["jane@x.edu"], "meet": True})
+    assert r["link"] == "https://cal/e3" and made["notify"] is False
+    assert made["body"]["extendedProperties"]["private"]["phdeasy_slug"] == "doe-jane"
+    with pytest.raises(ValueError):
+        app.post("gcal-create", {"slug": "../etc", "summary": "x", "start": "2026-11-10T09:00"})

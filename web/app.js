@@ -146,7 +146,7 @@ function renderSettings(st){
   const el = document.querySelector("#settings:not([hidden]) .body");
   if (!el) return;
   const g = st.settings || {};
-  const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, codex: st.codex, engine: st.engine, ct: st.codex_test, uv: st.uv, running: st.running, v: st.version, u: st.update && st.update.latest});
+  const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, codex: st.codex, engine: st.engine, ct: g.codex_test, uv: st.uv, running: st.running, v: st.version, u: st.update && st.update.latest});
   if (shape === lastSettings) return;
   lastSettings = shape;
   const t = g.claude_test;
@@ -171,9 +171,28 @@ function renderSettings(st){
           <div class="row"><button class="btn btn-sm" id="claude-test">測試</button><button class="btn btn-sm" id="claude-login">登入／換帳號</button></div>`
         : `<p class="small">沒裝：到 <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a> 安裝後重開。</p>`}
         <h4 style="margin:12px 0 4px">Codex CLI</h4>
-        ${st.codex ? `<p class="small">${st.codex_test ? (st.codex_test.ok ? '<span class="pill g">✓ 可以用</span> ' : '<span class="pill r">✗ 不能用</span> ') + esc(st.codex_test.msg) : '<span class="muted">已安裝，還沒測試</span>'}</p>
+        ${st.codex ? `<p class="small">${g.codex_test ? (g.codex_test.ok ? '<span class="pill g">✓ 可以用</span> ' : '<span class="pill r">✗ 不能用</span> ') + esc(g.codex_test.msg) : '<span class="muted">已安裝，還沒測試</span>'}</p>
           <div class="row"><button class="btn btn-sm" id="codex-test">測試</button><button class="btn btn-sm" id="codex-login">登入（ChatGPT 帳號）</button></div>`
         : `<p class="small">沒裝：在終端機執行 <code>npm install -g @openai/codex</code>，再按「登入」。</p>`}`) +
+    setRow("row-notion", "Notion", g.notion ? `<span class="pill g">✓ 已連接</span> <span class="small muted">${g.notion.fetched ? "匯入於 " + esc(g.notion.fetched.slice(0, 16).replace("T", " ")) : ""}</span>` : '<span class="pill">沒連接</span>',
+      g.notion ? `<div class="row"><a class="btn btn-sm" href="${esc(g.notion.db_url || "#")}" target="_blank" rel="noopener">打開「博士申請追蹤」</a><button class="btn btn-green btn-sm" id="notion-import">立刻匯入</button></div>
+          <p class="small muted">在 Notion 填教授、學程、截止日、狀態、會議；按「立刻匯入」（打開程式時也會自動匯入）。還沒建檔的教授會出現在「目標教授」等你按建檔。</p>`
+        : `<ol class="small"><li>到 <a href="https://www.notion.so/profile/integrations" target="_blank" rel="noopener">notion.so/profile/integrations</a> 按「新增整合」（Internal），複製「Internal Integration Secret」</li>
+            <li>在 Notion 開一個頁面（例：「博士申請」），右上角「…」→「連線」（Connections）→ 加入剛建的整合</li>
+            <li>在那個頁面右上角「分享」→「複製連結」</li><li>把金鑰和連結貼在下面，按「連接」：程式會在那頁建「博士申請追蹤」資料庫，放進已建檔的教授</li></ol>
+          <form id="notion-form" class="match-form" style="max-width:none"><label>整合金鑰<input type="password" name="token" autocomplete="off" placeholder="ntn_…"></label>
+            <label>頁面連結<input type="text" name="link" placeholder="https://www.notion.so/…"></label><button class="btn btn-green btn-sm" type="submit">連接</button></form>
+          <p class="small muted">金鑰存在你雲端硬碟的金鑰檔（每台電腦同步），程式不會顯示它。</p>`) +
+    setRow("row-gcal", "Google 日曆", g.gcal && g.gcal.connected ? `<span class="pill g">✓ 已連接</span> <span class="small muted">${g.gcal.fetched ? "讀取於 " + esc(g.gcal.fetched.slice(0, 16).replace("T", " ")) : ""}</span>` : '<span class="pill">沒連接</span>',
+      (g.gcal && g.gcal.connected ? `<div class="row"><button class="btn btn-green btn-sm" id="gcal-import">重新讀取會議</button><button class="btn btn-sm" id="gcal-login">重新登入</button></div>
+          <p class="small muted">會議標題或說明寫了教授全名、與會者有教授的 email（教授卡片「編輯」可填），或是在教授頁建的會議，都會顯示在那位教授。</p>`
+        : `<ol class="small"><li>到 <a href="https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" target="_blank" rel="noopener">Google Cloud</a> 建一個專案，啟用「Google Calendar API」</li>
+            <li>「OAuth 同意畫面」選「外部」，把自己的 Gmail 加到「測試使用者」</li>
+            <li>「憑證」→「建立憑證」→「OAuth 用戶端 ID」→ 類型選「<strong>電腦版應用程式</strong>」→ 下載 JSON</li>
+            <li>在下面選那個 JSON，再按「登入 Google」（會打開瀏覽器，允許「日曆活動」權限）</li></ol>
+          <div class="row"><label class="btn btn-sm" style="cursor:pointer">${g.gcal && g.gcal.client ? "✓ 已上傳用戶端（換一個）" : "選用戶端 JSON"}<input type="file" id="gcal-client" accept=".json,application/json" hidden></label>
+            <button class="btn btn-green btn-sm" id="gcal-login" ${g.gcal && g.gcal.client ? "" : "disabled"}>登入 Google</button></div>
+          <p class="small muted">用戶端與登入權杖存在你雲端硬碟的 _me 資料夾（每台電腦同步），不會上傳到別處。</p>`)) +
     setRow("row-keys", "金鑰", g.keys && g.keys.S2_API_KEY ? '<span class="pill g">✓ Semantic Scholar 已設定</span>' : '<span class="pill y">沒設定</span>', `
         <p class="small">Semantic Scholar：${g.keys && g.keys.S2_API_KEY ? `<span class="pill g">✓ 已設定</span>` : `<span class="pill y">沒設定</span>（不設也能用，只是常被限流）`}</p>
         <button class="btn btn-green" id="open-secrets">打開金鑰檔</button>
@@ -210,6 +229,14 @@ function renderSettings(st){
   el.querySelector("#claude-login")?.addEventListener("click", act(() => API("login-claude", {})));
   el.querySelector("#codex-test")?.addEventListener("click", act(async () => { el.querySelector("#codex-test").textContent = "測試中…"; await API("test-codex", {}); }));
   el.querySelector("#codex-login")?.addEventListener("click", act(() => API("login-codex", {})));
+  el.querySelector("#gcal-import")?.addEventListener("click", act(async () => { const r = await API("gcal-import", {}); alert(`讀到 ${r.events} 個跟教授有關的會議`); }));
+  el.querySelector("#gcal-login")?.addEventListener("click", act(async () => { await API("gcal-login", {}); alert("已在瀏覽器打開 Google 登入頁；允許後回到這裡（設定會自動更新）"); }));
+  el.querySelector("#gcal-client")?.addEventListener("change", async ev => { const f = ev.target.files[0]; if (!f) return;
+    try { await API("gcal-client", {json: await f.text()}); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); } });
+  el.querySelector("#notion-import")?.addEventListener("click", act(async () => { const r = await API("notion-import", {}); alert(`匯入 ${r.rows} 筆`); }));
+  el.querySelector("#notion-form")?.addEventListener("submit", async ev => { ev.preventDefault(); const f = ev.target, b = f.querySelector("button"); b.disabled = true; b.textContent = "連接中…";
+    try { const r = await API("notion-connect", {token: f.token.value, link: f.link.value}); f.token.value = ""; alert(`已連接，匯入 ${r.rows} 筆`); lastSettings = ""; renderSettings(await API("status")); }
+    catch (e) { alert(e.message); b.disabled = false; b.textContent = "連接"; } });
   el.querySelectorAll('input[name="engine"]').forEach(r => r.onchange = async () => { try { await API("engine", {engine: r.value}); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); } });
   el.querySelector("#open-secrets")?.addEventListener("click", act(() => API("open-secrets", {})));
   el.querySelector("#install-uv2")?.addEventListener("click", act(async () => {
