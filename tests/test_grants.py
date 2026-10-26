@@ -324,3 +324,23 @@ def test_merge_cli_ignores_dropped_works(tmp_path):
     cli.merge(run)
     g = json.loads((gd / "grants.json").read_text())
     assert [x["works"] for x in g] == [["W1"]]
+
+
+def test_openalex_awards_batches_over_100_ids():
+    # OpenAlex 的 filter OR 最多 100 個值；128 篇一次查會回 http_400
+    from pipeline.grants import openalex_awards
+
+    calls = []
+
+    def fake_fetch(ids):
+        assert len(ids) <= 50, f"一次查 {len(ids)} 個 id"
+        calls.append(ids)
+        return {"results": [{"id": f"https://openalex.org/{i}",
+                             "awards": [{"funder_display_name": "NIH", "funder_award_id": "R01CA5"}] if i == "W5" else [],
+                             "funders": [{"display_name": "NSF"}] if i == "W7" else []} for i in ids]}
+
+    awards, pages = openalex_awards([f"W{i}" for i in range(128)], fake_fetch)
+    assert len(calls) == 3 and sum(map(len, calls)) == 128 and len(pages) == 3
+    assert {"work_id": "W5", "funder": "NIH", "award_id": "R01CA5"} in awards
+    assert {"work_id": "W7", "funder": "NSF", "award_id": None} in awards
+    assert len(awards) == 2

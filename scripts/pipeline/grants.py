@@ -174,6 +174,22 @@ def ack_snippets(text, max_chars=1500):
     return out
 
 
+def openalex_awards(work_ids, fetch, batch=50):
+    """OpenAlex 補助標註；filter OR 最多 100 個值，分批查。fetch(ids) 回一頁 API 回應。"""
+    awards, pages = [], []
+    for i in range(0, len(work_ids), batch):
+        d = fetch(work_ids[i:i + batch])
+        pages.append(d)
+        for w in d["results"]:
+            wid = w["id"].rsplit("/", 1)[-1]
+            for a in w.get("awards") or []:
+                awards.append({"work_id": wid, "funder": a.get("funder_display_name"), "award_id": a.get("funder_award_id")})
+            if not w.get("awards"):
+                for f in w.get("funders") or []:
+                    awards.append({"work_id": wid, "funder": f.get("display_name"), "award_id": None})
+    return awards, pages
+
+
 def _add(acc, key, base):
     if key not in acc:
         acc[key] = {**base, "works": [], "evidence": []}

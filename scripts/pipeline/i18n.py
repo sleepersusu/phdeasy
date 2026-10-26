@@ -107,6 +107,24 @@ def _en_at(en, path):
     return v
 
 
+def i18n_from_card(card, a):
+    """合併閱讀者（本人 2026-10-26：一篇只讀一次全文）把英文寫在每一句旁邊（text_en）；
+    組裝後從最終卡留下的說法取英文，title_zh／關鍵詞取自 a.json。漏寫的英文留空，check_card_i18n 會抓到。"""
+    f = card.get("fields") or {}
+    en = {}
+    for k in ("summary", "design", "sample"):
+        if (f.get(k) or {}).get("text_en"):
+            en[k] = f[k]["text_en"]
+    for k in ("gap", "solves", "findings"):
+        cl = (f.get(k) or {}).get("claims") or []
+        if cl:
+            en[k] = [c.get("text_en") for c in cl]
+    lim = f.get("limitations") or {}
+    en["limitations"] = {sub: [c.get("text_en") for c in lim.get(sub) or []] for sub in ("author_stated", "inferred")}
+    return {"id": card.get("id") or a.get("id"), "title_zh": a.get("title_zh"), "en": en,
+            "keywords_zh": a.get("keywords_zh") or [], "keywords_en": a.get("keywords_en") or []}
+
+
 def check_card_i18n(card, tr):
     fails = []
     if not (tr.get("title_zh") or "").strip():

@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from pipeline.exceptions import add_exception
-from pipeline.grants import ack_snippets, currency, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match
+from pipeline.grants import ack_snippets, currency, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match, openalex_awards
 from pipeline.http import get_json, openalex_params
 from pipeline.state import load_state
 
@@ -87,16 +87,10 @@ def fetch(run):
     awards = []
 
     def oa_awards():
-        ids = "|".join(w["id"] for w in works)
-        d = get_json(f"https://api.openalex.org/works?filter=openalex_id:{ids}&select=id,awards,funders&per-page=100{openalex_params()}")
-        _save(gd, "openalex_awards", d)
-        for w in d["results"]:
-            wid = w["id"].rsplit("/", 1)[-1]
-            for a in w.get("awards") or []:
-                awards.append({"work_id": wid, "funder": a.get("funder_display_name"), "award_id": a.get("funder_award_id")})
-            if not w.get("awards"):
-                for f in w.get("funders") or []:
-                    awards.append({"work_id": wid, "funder": f.get("display_name"), "award_id": None})
+        found, pages = openalex_awards([w["id"] for w in works], lambda ids: get_json(
+            f"https://api.openalex.org/works?filter=openalex_id:{'|'.join(ids)}&select=id,awards,funders&per-page=100{openalex_params()}"))
+        _save(gd, "openalex_awards", pages)
+        awards.extend(found)
         return len(awards)
 
     attempt("openalex_awards", oa_awards)

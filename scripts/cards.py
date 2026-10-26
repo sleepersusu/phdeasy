@@ -17,6 +17,7 @@ from pathlib import Path
 
 from pipeline.cards import apply_judge, apply_refute, assemble, check_card, missing_refute_paths, needs_refute, refute_paths, title_only_card, validate_card
 from pipeline.exceptions import add_exception, check_circuit
+from pipeline.i18n import i18n_from_card
 from pipeline.state import append_progress
 
 
@@ -154,6 +155,8 @@ def assemble_all(run, limit=0.3):
         card["preprint_text"] = "preprint_text" in ((ing.get(w["id"]) or {}).get("exceptions") or [])
         card["kind"], card["verified"] = w["kind"], {"judged": bool(judge), "refuted": bool(ref), "dual_track": (d / "b.json").exists()}
         (d / "card.json").write_text(json.dumps(card, ensure_ascii=False, indent=2))
+        if a.get("title_zh"):  # 合併閱讀者寫的英文與中文標題：依最終卡留下的說法產生 i18n.json
+            (d / "i18n.json").write_text(json.dumps(i18n_from_card(card, a), ensure_ascii=False, indent=2))
         stamp = d / ".rejected_logged"
         if not stamp.exists():
             for r in rej_refute:

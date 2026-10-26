@@ -16,7 +16,9 @@ uv run python scripts/digest.py todo runs/<slug>
 
 `todo` 列出還沒寫重點的文章（PDF 全文的摘要位置是 `p.1`，只有摘要的文章才用 `abs`）（有全文或摘要的才寫；只有標題的不寫）與每篇的圖表清單。
 
-## 2. 整理（重點＋圖表＋研究方法，一個 agent 一次寫完；每個 agent 4–5 篇，同時最多 5 個）
+## 2. 整理（只補 `todo` 列出還沒有重點的；每個 agent 4–5 篇，同時最多 5 個）
+
+本人 2026-10-26：教授的文章由 prof-cards 的閱讀者讀全文時一起寫好重點，這一步通常沒有要補的，直接到第 3 步。只有舊批次、閱讀者漏寫的、或討論文獻，才派整理者：
 
 > 讀 `.claude/skills/prof-digest/digester.md` 照做。slug=<slug>，id=<id 清單>
 
