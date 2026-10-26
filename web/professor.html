@@ -689,14 +689,15 @@ const VIEWS = [
   ["files", "檔案", "報告、CSV、Zotero 匯入檔", d => ""],
 ];
 const GSTAT = {confirmed: ["g", "主持人"], pending: ["y", "待確認"], other: ["y", "協同主持人"]};
+const ROLE_RANK = g => ({confirmed: 0, pending: 1, other: 2}[g.status] ?? 3);  // 主持人放最上面，再來待確認、協同主持人
 function grantRows(ag){
-  /* 期間內的經費：分「進行中」「已結束／期間不明」兩張表，各依時間最新排（迄日晚的在前，再看起日） */
+  /* 期間內的經費：分「進行中」「已結束／期間不明」兩張表；每張表主持人在上，同角色再依時間最新排 */
   const today = new Date().toISOString().slice(0, 10);
   const parse = g => { const m = (g.period || "").match(/^(\S*)\s*–\s*(\S+)$/);
     if (m) return {start: m[1], end: m[2], known: true};
     const y = (g.period || "").match(/(\d{4})/); return {start: y ? y[1] : "", end: "", known: false}; };
   const rows = ag.map(g => ({g, ...parse(g)}))
-    .sort((a, b) => (b.known - a.known) || (b.end || "").localeCompare(a.end || "") || (b.start || "").localeCompare(a.start || ""));
+    .sort((a, b) => (b.known - a.known) || (ROLE_RANK(a.g) - ROLE_RANK(b.g)) || (b.end || "").localeCompare(a.end || "") || (b.start || "").localeCompare(a.start || ""));
   const live = rows.filter(r => r.known && r.end >= today), rest = rows.filter(r => !(r.known && r.end >= today));
   const table = (title, rs) => rs.length ? `<div class="small" style="margin:6px 0 2px;font-weight:600">${title}（${rs.length}）</div>
     <table class="small" style="width:100%;border-collapse:collapse;margin-bottom:6px">
