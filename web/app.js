@@ -64,6 +64,7 @@ function jobsHTML(st, ready){
       `${running ? (job.progress ? `<span class="pill y">${job.progress.percent}%｜還要${dur(job.progress.eta_s)}</span>` : '<span class="pill y">執行中</span>') : job.status === "done" ? '<span class="pill g">跑完了</span>' : '<span class="pill r">中斷</span>'}`, `
       ${running && job.progress ? progressHTML(job.progress) : ""}
       <div class="row">${running ? `<button class="btn btn-red btn-sm" data-job-stop="${id}">停止</button>` : ""}
+        ${!running && job.status !== "done" && job.slug ? `<button class="btn btn-green btn-sm" data-continue="${esc(job.slug)}" ${!ready ? "disabled" : ""}>繼續跑</button><span class="small muted">從中斷的地方接著跑，已完成的不會重做</span>` : ""}
         ${job.cost_usd != null ? `<span class="small muted">本段用量約 US$${Number(job.cost_usd).toFixed(2)}</span>` : ""}</div>
       ${job.result && !running ? `<h3>Claude Code 的回報</h3><div class="card" style="white-space:pre-wrap">${esc(job.result)}</div>` : ""}
       <details ${running ? "open" : ""}><summary class="small" style="cursor:pointer;min-height:44px;display:flex;align-items:center">過程紀錄（${(job.log || []).length} 行）</summary>
@@ -73,13 +74,30 @@ function jobsHTML(st, ready){
         <div class="row" style="margin-top:8px"><button class="btn btn-green" data-reply-send="${id}" ${!ready ? "disabled" : ""}>送出並繼續</button>
         <span class="small muted">會接著同一個對話跑。</span></div>` : ""}`);
   };
-  /* 分兩類：未完成（跑中、排隊、中斷）在上面，已完成收起來 */
+  /* 右上角標籤切換：未完成（跑中、排隊、中斷）／已完成 */
   const todo = jobs.filter(j => j.running || j.status !== "done"), done = jobs.filter(j => !j.running && j.status === "done");
-  return `<h3 style="margin:8px 0 4px">未完成 <span class="small muted">${todo.length + queue.length}｜${nrun ? `${nrun} 個在跑（最多同時 3 個）` : "沒有在跑的工作"}</span></h3>`
+  if (JOB_TAB === "done") return done.map(row).join("") || `<div class="small muted" style="margin:8px 0">還沒有完成的工作</div>`;
+  return `<div class="small muted" style="margin:4px 0">${nrun ? `${nrun} 個在跑（最多同時 3 個）` : "沒有在跑的工作"}</div>`
     + (todo.map(row).join("") || `<div class="small muted" style="margin:4px 0 8px">沒有未完成的工作</div>`)
-    + queue.map(t => `<div class="small" style="margin:6px 0"><span class="pill">排隊中</span> ${esc(t)}</div>`).join("")
-    + `<details style="margin-top:12px" ${OPEN_ROWS.has("done-jobs") ? "open" : ""} id="done-jobs" class="setrow"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center;gap:6px"><strong>已完成</strong><span class="small muted">${done.length}</span></summary>
-      ${done.map(row).join("") || `<div class="small muted">還沒有完成的工作</div>`}</details>`;
+    + queue.map(t => `<div class="small" style="margin:6px 0"><span class="pill">排隊中</span> ${esc(t)}</div>`).join("");
+}
+let JOB_TAB = (() => { try { return localStorage.getItem("phdeasy:jobtab") || "todo"; } catch (e) { return "todo"; } })();
+let LAST_ST = null;
+function jobTabs(st){
+  /* 工作進度標題列右邊：未完成／已完成（附數量） */
+  const head = document.getElementById("h-pipe");
+  if (!head) return;
+  let bar = document.getElementById("job-tabs");
+  if (!bar){
+    const wrap = document.createElement("div"); wrap.className = "sec-head"; head.before(wrap); wrap.append(head);
+    bar = document.createElement("div"); bar.id = "job-tabs"; bar.className = "seg"; bar.setAttribute("role", "tablist"); wrap.append(bar);
+    bar.addEventListener("click", ev => { const b = ev.target.closest("[data-tab]"); if (!b) return;
+      JOB_TAB = b.dataset.tab; try { localStorage.setItem("phdeasy:jobtab", JOB_TAB); } catch (e) {}
+      lastShape = ""; if (LAST_ST) renderPipeline(LAST_ST); });
+  }
+  const jobs = st.jobs || [], nTodo = jobs.filter(j => j.running || j.status !== "done").length + (st.queue || []).length, nDone = jobs.length - jobs.filter(j => j.running || j.status !== "done").length;
+  bar.innerHTML = [["todo", "未完成", nTodo], ["done", "已完成", nDone]].map(([k, l, n]) =>
+    `<button type="button" role="tab" data-tab="${k}" aria-selected="${JOB_TAB === k}">${l}<span class="seg-n">${n}</span></button>`).join("");
 }
 
 async function pipelinePanel(){
@@ -122,9 +140,10 @@ document.addEventListener("toggle", ev => { const d = ev.target; if (d.classList
 
 function renderPipeline(st){
   const el = document.querySelector("#pipeline:not([hidden]) .body");
-  if (!el) return;  // 這一頁沒有「建新教授」區
+  if (!el) return;
+  LAST_ST = st;  // 這一頁沒有「建新教授」區
   /* 每 3 秒更新：只有紀錄變多時只換紀錄那一塊，不打斷你正在打字的欄位 */
-  const shape = JSON.stringify({...st, log: undefined, progress: undefined, job: undefined,
+  const shape = JOB_TAB + JSON.stringify({...st, log: undefined, progress: undefined, job: undefined,
     jobs: (st.jobs || (st.job ? [{...st.job, running: !!st.running, log: st.log}] : [])).map(j => ({...j, log: (j.log || []).length ? 1 : 0, progress: j.progress && [j.progress.percent, j.progress.current]}))});
   const logs = [...el.querySelectorAll("[data-job-log]")];
   if (shape === lastShape && logs.length){  // 只有紀錄或預估時間變：只換那幾塊，不打斷你正在打字的回覆
@@ -145,20 +164,9 @@ function renderPipeline(st){
   const busy = new Set((st.jobs || (st.running && st.job ? [{...st.job, running: true}] : [])).filter(j => j.running).map(j => j.slug));
   const profs = st.professors || [];
   const tools = [st.claude, st.uv, st.drive].filter(Boolean).length;
-  el.innerHTML =
-    jobsHTML(st, ready) +
-    setRow("row-profs", "各教授進度", `<span class="small muted">${profs.length} 位${profs.some(p => WAITING.has(p.stage)) ? "｜有等你確認的" : ""}</span>`,
-      profs.length ? `<ul>${profs.map(p => `<li class="row" style="margin:6px 0"><strong>${esc(p.name || p.slug)}</strong>
-        <span class="pill ${WAITING.has(p.stage) ? "y" : p.stage === "stop2" ? "g" : ""}">${esc(STAGE_ZH[p.stage] || p.stage)}</span>
-        ${p.report ? `<a class="btn btn-green btn-sm" href="../runs/${esc(p.slug)}/${esc(p.report)}" target="_blank" rel="noopener">看${p.stage === "stop1" ? "停 1" : ""}報告</a>` : ""}
-        ${p.stage !== "stop2" ? `<button class="btn btn-green btn-sm" data-continue="${esc(p.slug)}" ${!ready || busy.has(p.slug) ? "disabled" : ""}>${p.stage === "halted" ? "我看過了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
-        : `<div class="empty">還沒有教授。到「申請目標」按「＋ 新增教授」。</div>`) +
-    setRow("row-tools", "這台電腦的工具", tools === 3 ? '<span class="pill g">✓ 齊全</span>' : `<span class="pill y">${3 - tools} 項沒裝</span>`, `<ul class="checks">
-      ${check(st.claude, `Claude Code：${esc(st.claude)}`, `找不到 Claude Code。請先安裝並登入：<a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a>，裝好後重開這個程式。`)}
-      ${check(st.uv, `uv：${esc(st.uv)}`, `找不到 uv（流水線的 Python 工具）。<button class="btn btn-yellow" id="install-uv">安裝 uv</button>`)}
-      ${check(st.drive, `Google 雲端硬碟：${esc(st.drive)}`, "找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入。沒有也能跑，但結果不會同步到別台。")}
-      ${st.blocked ? `<li><span class="pill y">!</span> 另一台電腦（${esc(st.blocked)}）正在用：這台先不同步，那台關掉後重開這個程式。</li>` : ""}
-    </ul>`);
+  el.innerHTML = jobsHTML(st, ready) +
+    (st.blocked ? `<div class="small" style="margin-top:8px"><span class="pill y">!</span> 另一台電腦（${esc(st.blocked)}）正在用：這台先不同步，那台關掉後重開這個程式。</div>` : "");
+  jobTabs(st);
 
   for (const [id, v] of Object.entries(keep.replies)){ const t = el.querySelector(`[data-reply-box="${CSS.escape(id)}"]`); if (t && v) t.value = v; }
   el.querySelectorAll("[data-job-log]").forEach(lg => { lg.scrollTop = lg.scrollHeight; });
