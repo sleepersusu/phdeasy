@@ -391,3 +391,18 @@ def test_deep_route_adds_focus_and_starts_job(tmp_path, monkeypatch):
     assert job[1:3] == ("deep", "doe-jane") and "W2, W3" in job[3]
     with pytest.raises(ValueError):
         app.post("deep", {"slug": "doe-jane", "ids": ["W1"]})
+
+
+def test_applicant_status_saved_and_in_settings(tmp_path):
+    """申請身分（國際生／本地生、國籍、要哪一年入學）：設定裡選一次，查博士學程時照這個身分寫學費、條件、期限。"""
+    import json
+    import pytest
+    app, _ = _lib_app(tmp_path)
+    (tmp_path / "runs" / "_me").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "runs" / "_me" / "me.json").write_text(json.dumps({"name": "A"}))
+    app.post("me-update", {"applicant": {"status": "international", "citizenship": "Taiwan", "intake": "2027", "evil": "x"}})
+    me = json.loads((tmp_path / "runs" / "_me" / "me.json").read_text())
+    assert me["applicant"] == {"status": "international", "citizenship": "Taiwan", "intake": "2027"}
+    assert app.settings()["applicant"]["status"] == "international"
+    with pytest.raises(ValueError):
+        app.post("me-update", {"applicant": {"status": "alien"}})

@@ -109,20 +109,35 @@ def check_enrich(enr):
     return fails
 
 
+BASES = ("member", "department")
+
+
 def check_programs(progs):
-    """教授掛名的博士學程：名稱、官方教員名單（看得到他名字的那頁）出處；資助值與出處。"""
+    """博士學程兩種：member＝教授本人掛名（要有看得到他名字的官方頁 member_src）；
+    department＝查不到本人掛名時，他所在系所／學院下一年度的博士班（本人 2026-10-26；要有學程頁 src）。
+    兩種的資助、學費、繳交文件，有寫就要有出處。"""
     fails = []
     for i, p in enumerate(progs):
         w = f"programs[{i}]"
+        basis = p.get("basis") or "member"
+        if basis not in BASES:
+            fails.append({"where": w, "why": "bad_basis"})
+            continue
         if not (p.get("name") or "").strip():
             fails.append({"where": w, "why": "no_name"})
-        elif not _src_ok(p.get("member_src")):
+        elif basis == "member" and not _src_ok(p.get("member_src")):
             fails.append({"where": w, "why": "no_member_source"})
+        elif basis == "department" and not _src_ok(p.get("src")):
+            fails.append({"where": w, "why": "no_program_source"})
         f = p.get("funding") or {"value": "unknown"}
         if f.get("value") not in FUNDING:
             fails.append({"where": w, "why": "bad_funding_value"})
         elif f["value"] != "unknown" and not _src_ok(f.get("src")):
             fails.append({"where": w, "why": "no_source"})
+        if (p.get("tuition") or {}).get("text") and not _src_ok(p["tuition"].get("src")):
+            fails.append({"where": w, "why": "no_tuition_source"})
+        if p.get("requirements") and not _src_ok(p.get("requirements_src")):
+            fails.append({"where": w, "why": "no_requirements_source"})
     return fails
 
 

@@ -400,10 +400,12 @@ async function renderDiscover(){
       <div class="pc-body">
         <ol class="top5">${c.papers.slice(0, 6).map(p => `<li>${p.doi ? `<a href="${esc(p.doi)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)} <span class="small muted">${p.year}</span></li>`).join("")}</ol>
         ${(c.funders || []).length ? `<div class="small"><strong>經費：</strong>${c.funders.slice(0, 6).map(esc).join("、")}</div>` : ""}
-        ${(c.programs || []).length ? `<div class="small"><strong>他掛名的博士學程：</strong>${c.programs.map(p => { const f = p.funding || {}, [k, t] = FUND[f.value] || FUND.unknown;
-            return `<div style="margin:2px 0 4px 8px"><a href="${esc(p.url || p.member_src)}" target="_blank" rel="noopener">${esc(p.name)}</a> <span class="pill ${k}">${t}${f.years ? `・${f.years} 年` : ""}</span>${f.stipend ? ` ${esc(f.stipend)}` : ""}
-              <span class="muted">${f.note ? esc(f.note) + "｜" : ""}<a href="${esc(p.member_src)}" target="_blank" rel="noopener">教員名單</a>${f.src ? `・<a href="${esc(f.src)}" target="_blank" rel="noopener">資助出處</a>` : ""}</span></div>`; }).join("")}</div>`
-          : c.programs ? `<div class="small muted">查過：官方名單上找不到他掛名的博士學程</div>` : ""}
+        ${(c.programs || []).length ? `<div class="small"><strong>博士學程：</strong>${c.programs.map(p => { const f = p.funding || {}, [k, t] = FUND[f.value] || FUND.unknown;
+            const dept = p.basis === "department", facts = [p.intake && `${esc(p.intake)} 入學`, p.duration && esc(p.duration), p.tuition && p.tuition.text && `學費 ${esc(p.tuition.text)}`].filter(Boolean).join("｜");
+            return `<div style="margin:2px 0 4px 8px"><a href="${esc(p.url || p.src || p.member_src)}" target="_blank" rel="noopener">${esc(p.name)}</a> ${dept ? '<span class="pill y">系所的博士班</span> ' : ""}<span class="pill ${k}">${t}${f.years ? `・${f.years} 年` : ""}</span>${f.stipend ? ` ${esc(f.stipend)}` : ""}
+              ${facts ? `<div class="muted">${facts}</div>` : ""}${(p.requirements || []).length ? `<div class="muted">要繳：${p.requirements.map(esc).join("、")}</div>` : ""}
+              <span class="muted">${f.note ? esc(f.note) + "｜" : ""}<a href="${esc(dept ? p.src : p.member_src)}" target="_blank" rel="noopener">${dept ? "學程頁" : "教員名單"}</a>${f.src ? `・<a href="${esc(f.src)}" target="_blank" rel="noopener">資助出處</a>` : ""}</span></div>`; }).join("")}</div>`
+          : c.programs ? `<div class="small muted">查過：他本人沒掛名、系所的博士班也查不到</div>` : ""}
         ${!(c.programs || []).length && c.funding_note ? `<div class="small"><strong>學校博士班資助（備用）：</strong>${esc(c.funding_note)} ${c.funding_src ? `<a href="${esc(c.funding_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}
         ${c.qs_rank || c.usnews_rank ? `<div class="small"><strong>排名：</strong>${c.qs_rank ? `QS #${c.qs_rank} <a href="${esc(c.qs_src)}" target="_blank" rel="noopener">出處</a>` : ""} ${c.usnews_rank ? `US News #${c.usnews_rank} <a href="${esc(c.usnews_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}
         <div class="row" style="margin-top:10px">${c.lab_url ? `<a class="btn btn-sm" href="${esc(c.lab_url)}" target="_blank" rel="noopener">🔬 實驗室網站</a>` : ""}<a class="btn btn-sm" href="https://openalex.org/${esc(c.id)}" target="_blank" rel="noopener">OpenAlex</a>

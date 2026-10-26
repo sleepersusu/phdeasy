@@ -207,6 +207,15 @@ function renderSettings(st){
         ${st.codex ? `<p class="small">${g.codex_test ? (g.codex_test.ok ? '<span class="pill g">✓ 可以用</span> ' : '<span class="pill r">✗ 不能用</span> ') + esc(g.codex_test.msg) : '<span class="muted">已安裝，還沒測試</span>'}</p>
           <div class="row"><button class="btn btn-sm" id="codex-test">測試</button><button class="btn btn-sm" id="codex-login">登入（ChatGPT 帳號）</button></div>`
         : `<p class="small">沒裝：在終端機執行 <code>npm install -g @openai/codex</code>，再按「登入」。</p>`}`) +
+    setRow("row-applicant", "申請身分", g.applicant ? `<span class="pill g">${g.applicant.status === "international" ? "國際生" : "本地生"}</span> <span class="small muted">${esc([g.applicant.citizenship, g.applicant.intake && g.applicant.intake + " 入學"].filter(Boolean).join("｜"))}</span>` : '<span class="pill y">還沒設定</span>',
+      `<form id="applicant-form" class="match-form" style="max-width:none">
+         <div class="row" role="radiogroup" aria-label="申請身分">
+           <label><input type="radio" name="status" value="international" ${!g.applicant || g.applicant.status === "international" ? "checked" : ""}> 國際生</label>
+           <label><input type="radio" name="status" value="domestic" ${g.applicant && g.applicant.status === "domestic" ? "checked" : ""}> 本地生</label></div>
+         <label>國籍<input type="text" name="citizenship" value="${esc((g.applicant || {}).citizenship || "Taiwan")}"></label>
+         <label>想哪一年入學<input type="text" name="intake" value="${esc((g.applicant || {}).intake || String(new Date().getFullYear() + 1))}" placeholder="例：2027"></label>
+         <button class="btn btn-green btn-sm" type="submit">儲存</button></form>
+       <p class="small muted">查博士學程時，學費、獎學金、申請條件、截止日都照這個身分寫（國際生和本地生常常不同）。</p>`) +
     setRow("row-notion", "Notion", g.notion ? `<span class="pill g">✓ 已連接</span> <span class="small muted">${g.notion.fetched ? "匯入於 " + esc(g.notion.fetched.slice(0, 16).replace("T", " ")) : ""}</span>` : '<span class="pill">沒連接</span>',
       g.notion ? `<div class="row"><a class="btn btn-sm" href="${esc(g.notion.db_url || "#")}" target="_blank" rel="noopener">打開「博士申請追蹤」</a><button class="btn btn-green btn-sm" id="notion-import">立刻匯入</button></div>
           <p class="small muted">在 Notion 填教授、學程、截止日、狀態、會議；按「立刻匯入」（打開程式時也會自動匯入）。還沒建檔的教授會出現在「目標教授」等你按建檔。</p>`
@@ -266,6 +275,9 @@ function renderSettings(st){
   el.querySelector("#gcal-login")?.addEventListener("click", act(async () => { await API("gcal-login", {}); alert("已在瀏覽器打開 Google 登入頁；允許後回到這裡（設定會自動更新）"); }));
   el.querySelector("#gcal-client")?.addEventListener("change", async ev => { const f = ev.target.files[0]; if (!f) return;
     try { await API("gcal-client", {json: await f.text()}); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); } });
+  el.querySelector("#applicant-form")?.addEventListener("submit", async ev => { ev.preventDefault(); const f = ev.target;
+    try { await API("me-update", {applicant: {status: f.status.value, citizenship: f.citizenship.value, intake: f.intake.value}}); lastSettings = ""; renderSettings(await API("status")); }
+    catch (e) { alert(e.message); } });
   el.querySelector("#notion-import")?.addEventListener("click", act(async () => { const r = await API("notion-import", {}); alert(`匯入 ${r.rows} 筆`); }));
   el.querySelector("#notion-form")?.addEventListener("submit", async ev => { ev.preventDefault(); const f = ev.target, b = f.querySelector("button"); b.disabled = true; b.textContent = "連接中…";
     try { const r = await API("notion-connect", {token: f.token.value, link: f.link.value}); f.token.value = ""; alert(`已連接，匯入 ${r.rows} 筆`); lastSettings = ""; renderSettings(await API("status")); }

@@ -145,6 +145,7 @@ def prompt_deep(slug, ids):
 
 def prompt_programs(slug, name, institution, orcid=None):
     return (f"查 {name}（{institution}{'，ORCID ' + orcid if orcid else ''}）本人掛名、可以收博士生的博士學程與各學程的資助："
+            f"學費、獎學金、申請條件、截止日照 runs/_me/me.json 的 applicant（本人是國際生或本地生、想哪一年入學）寫；"
             f"照 .claude/skills/prof-discover/SKILL.md 的 B，寫 runs/{slug}/work/programs.json，再跑 scripts/programs.py runs/{slug}，"
             "完成後回報 DONE 那一行。" + UNATTENDED)
 

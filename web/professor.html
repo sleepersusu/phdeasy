@@ -747,15 +747,24 @@ async function meetingsCard(){
 }
 
 const FUND = {full: ["g", "全額資助"], partial: ["y", "部分資助"], none: ["r", "自費"], unknown: ["", "資助查不到"]};
+function programRows(progs){
+  /* 每個學程：本人掛名（教員名單為證）或系所的博士班（本人沒掛名時，供參考）；年度、年限、學費、資助、要繳的文件，各附出處 */
+  const a = (u, t) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${t}</a>` : "";
+  return progs.map(p => { const f = p.funding || {}, [c, t] = FUND[f.value] || FUND.unknown, dept = p.basis === "department";
+    const facts = [p.intake ? `${esc(p.intake)} 入學` : "", p.duration ? esc(p.duration) : "", p.tuition && p.tuition.text ? `學費：${esc(p.tuition.text)} ${a(p.tuition.src, "出處")}` : ""].filter(Boolean).join("｜");
+    return `<div style="margin-bottom:10px"><a href="${esc(p.url || p.src || p.member_src)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a>
+      ${dept ? pill("y", "系所的博士班（她本人沒掛名）") : pill("g", "她本人掛名")} ${pill(c, t + (f.years ? `・${f.years} 年` : ""))}${f.stipend ? ` <span class="small">${esc(f.stipend)}</span>` : ""}
+      ${facts ? `<div class="small" style="margin-top:2px">${facts}</div>` : ""}
+      ${f.note ? `<div class="small">資助：${esc(f.note)} ${a(f.src, "出處")}</div>` : ""}
+      ${(p.requirements || []).length ? `<div class="small">要繳：${p.requirements.map(esc).join("、")} ${a(p.requirements_src, "出處")}</div>` : ""}
+      <div class="small muted">${dept ? a(p.src, "學程頁") : a(p.member_src, "教員名單")}</div></div>`; }).join("");
+}
 function programsHTML(pg){
   /* 她本人掛名、可以收博士生的學程（官方教員名單為證）與各學程的資助；能不能收你、有沒有錢看的是學程，不是全校 */
   const btn = APP ? ` <button class="btn btn-sm" data-programs>${pg ? "重新查" : "查博士學程"}</button>` : "";
   if (!pg) return `<span class="muted">還沒查</span>${btn}`;
-  if (!(pg.programs || []).length) return `<span class="muted">查過，官方名單上找不到她掛名的博士學程${pg.checked ? `（${esc(pg.checked)}）` : ""}</span>${btn}`;
-  return pg.programs.map(p => { const f = p.funding || {}, [c, t] = FUND[f.value] || FUND.unknown;
-    return `<div style="margin-bottom:6px"><a href="${esc(p.url || p.member_src)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a>
-      ${pill(c, t + (f.years ? `・${f.years} 年` : ""))}${f.stipend ? ` <span class="small">${esc(f.stipend)}</span>` : ""}
-      <div class="small muted">${f.note ? esc(f.note) + "｜" : ""}<a href="${esc(p.member_src)}" target="_blank" rel="noopener">教員名單</a>${f.src ? `・<a href="${esc(f.src)}" target="_blank" rel="noopener">資助出處</a>` : ""}</div></div>`; }).join("")
+  if (!(pg.programs || []).length) return `<span class="muted">查過，她本人沒掛名的學程，所屬系所的博士班也查不到${pg.checked ? `（${esc(pg.checked)}）` : ""}</span>${btn}`;
+  return programRows(pg.programs)
     + `<div class="small muted">${pg.from === "discover" ? "來自查詢教授的結果" : pg.checked ? "查於 " + esc(pg.checked) : ""}${btn}</div>`;
 }
 document.addEventListener("click", async ev => {

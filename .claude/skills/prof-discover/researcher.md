@@ -4,6 +4,8 @@
 
 ## 查什麼
 
+**本人的申請身分**：先讀 `runs/_me/me.json` 的 `applicant`（`status` 是 `international` 國際生或 `domestic` 本地生、`citizenship` 國籍、`intake` 想入學的年度；沒有就當國際生、入學年度用明年）。學費、獎學金、申請條件（例：英文成績、學歷認證）、截止日都寫**這個身分**適用的；國際生與本地生不同時只寫本人的，`note` 註明「國際生」。國籍有特別的獎學金（例：台灣教育部留學獎學金不算，只寫學校或學程提供的）時也寫。`intake` 寫本人想入學的那一次招生。
+
 每所學校：
 - `qs`：QS World University Rankings 最新一年的整體名次（`rank` 整數；「601-650」這種區間寫下限 601）、`year`、`src`（topuniversities.com 的學校頁或排名頁）。
 - `usnews`：U.S. News Best Global Universities 最新的整體名次、`src`（usnews.com）。
@@ -20,7 +22,17 @@
   - `member_src`：**看得到他名字的那一頁**（學程教員名單或學校個人頁寫明的那頁）；只在新聞或第三方網站看到的不算
   - `funding`：這個學程的資助（同上面四種 `value`），加 `years`（資助幾年，查不到寫 null）、`stipend`（生活津貼一句原文數字與年份，例 "est. $43,800 (2024-25)"）、`note`（一句中文，各校區寫法不同也照實寫）、`src`（學程官方的 financial support 頁）
   - `deadline`：最近一次申請截止日（查得到才寫，附在 `note`）
-  - 只列查得到官方名單的學程；一個都查不到就寫 `"programs": []`（代表查過了）
+  - 本人掛名的學程 `basis` 寫 `"member"`；也照下面 department 的欄位補上 `intake`、`duration`、`tuition`、`requirements`（查得到才寫）。
+  - **查不到本人掛名的學程時，不要停在空的**（本人 2026-10-26）：改查他所在系所／學院（或學校）**下一年度招生**的博士班，`basis` 寫 `"department"`，`member_src` 不用寫，改寫 `src`（學程官方頁）。去學程頁、申請頁、學費頁、獎學金頁逐頁打開看（不要只看搜尋結果摘要），寫：
+    - `intake`：招生年度（例 `"2027"`；寫明是哪一次入學）
+    - `duration`：修業年限（例 `"3–4 年全職"`）
+    - `tuition`：`{"text": "國際生每年約 AUD 50,000（照原文幣別與年度）", "src": "…"}`
+    - `funding`：同上四種值，`note` 寫有哪些獎學金或補助、怎麼申請、要不要競爭，`src` 用獎學金頁
+    - `requirements`：要繳交的文件與資格清單（例：研究計畫書、CV、成績單、推薦信、英文成績門檻、要先找到指導教授），`requirements_src`：申請頁
+    - `deadline`：最近一次申請截止日（國際生與本地生不同就分開寫，放在 `note`）
+    - 系所有多個相關博士班（例：醫學與健康博士、公共衛生博士）就各寫一筆，最多 3 筆，挑跟這位教授研究最接近的
+  - 真的連系所的博士班都查不到才寫 `"programs": []`
+- 這個工作在背景跑，**不能用終端機指令**；要查 OpenAlex、ORCID 等 API 就用 WebFetch 直接開網址（例 `https://api.openalex.org/authors?search=<姓名>`）。
 - `lab_url`（實驗室或個人學術頁）、`src`（你在哪裡看到這個網址，例：學校人員頁）。已經有網址的人不用再查網址。
 
 學校層級的 `funding` 只是備用：教授有查到學程時，篩選與畫面都看學程的資助。
@@ -33,7 +45,7 @@
    "usnews": {"rank": 30, "src": "https://www.usnews.com/…"},
    "funding": {"value": "full", "note": "…", "src": "https://www.sydney.edu.au/…"}}},
  "people": {"A5004159814": {"lab_url": "https://…", "src": "https://…",
-   "programs": [{"name": "Computational Precision Health (UCSF–UC Berkeley joint PhD)", "url": "https://computationalhealth.ucsf.edu/",
+   "programs": [{"basis": "member", "name": "Computational Precision Health (UCSF–UC Berkeley joint PhD)", "url": "https://computationalhealth.ucsf.edu/",
                  "member_src": "https://computationalhealth.ucsf.edu/faculty/page/3",
                  "funding": {"value": "full", "years": 5, "stipend": "est. $43,800 (2024-25)", "note": "學費、雜費＋生活津貼 5 年；Berkeley 頁寫第一學期津貼後改 GSR／GSI", "src": "https://computationalhealth.ucsf.edu/?p=181"}}]}}}
 ```

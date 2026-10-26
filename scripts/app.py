@@ -268,9 +268,16 @@ class App:
                 if eq and not line.lstrip().startswith("#"):
                     keys[k.strip()] = bool(v.strip().strip('"').strip("'"))
         return {"drives": drives, "account": conf.get("account") or (drives[0] if len(drives) == 1 else None),
-                "folder": str(dst) if dst else None, "claude_test": self.claude_test, "codex_test": self.codex_test, "notion": self.notion_status(), "gcal": self.gcal_status(),
+                "folder": str(dst) if dst else None, "claude_test": self.claude_test, "codex_test": self.codex_test, "notion": self.notion_status(), "applicant": self._applicant(), "gcal": self.gcal_status(),
                 "keys": {"S2_API_KEY": keys.get("S2_API_KEY", False) or bool(os.environ.get("S2_API_KEY"))},
                 "workspace": str(self.workspace)}
+
+    def _applicant(self):
+        mep = self.runs / "_me" / "me.json"
+        try:
+            return json.loads(mep.read_text()).get("applicant") if mep.exists() else None
+        except ValueError:
+            return None
 
     def check_update(self):
         from pipeline.updater import check
@@ -690,6 +697,12 @@ class App:
                     raise ValueError("學歷要有學位或學校")
                 eds.append({k: str(e.get(k) or "").strip()[:300] for k in ("degree", "school", "years", "note")})
             new["education"] = eds
+        if "applicant" in body:  # 申請身分：查博士學程時照這個身分寫學費、條件、期限
+            ap = body["applicant"] or {}
+            if ap.get("status") not in ("international", "domestic"):
+                raise ValueError("申請身分只能是國際生或本地生")
+            new["applicant"] = {"status": ap["status"], "citizenship": str(ap.get("citizenship") or "").strip()[:80],
+                                "intake": str(ap.get("intake") or "").strip()[:20]}
         if not new:
             raise ValueError("沒有要改的內容")
         hist = mep.parent / "history"

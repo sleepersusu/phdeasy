@@ -114,3 +114,22 @@ def test_combine_enrich_accumulates():
     old = {"institutions": {"UCSF": {"qs": {"rank": 20, "src": "https://q"}}}, "people": {"A1": {"lab_url": "https://l", "src": "https://s"}}}
     got = combine_enrich(old, {"institutions": {"Uni Z": {}}, "people": {"A1": {"programs": [CPH]}}})
     assert set(got["institutions"]) == {"UCSF", "Uni Z"} and got["people"]["A1"]["lab_url"] == "https://l" and got["people"]["A1"]["programs"]
+
+
+DEPT = {"name": "Doctor of Philosophy (Medicine and Health)", "basis": "department", "url": "https://www.sydney.edu.au/courses/phd-medicine",
+        "src": "https://www.sydney.edu.au/courses/phd-medicine", "intake": "2027", "duration": "3–4 年全職",
+        "tuition": {"text": "國際生每年約 AUD 50,000（獎學金可免）", "src": "https://www.sydney.edu.au/fees"},
+        "requirements": ["研究計畫書", "CV", "指導教授同意", "英文成績 IELTS 6.5"], "requirements_src": "https://www.sydney.edu.au/apply",
+        "funding": {"value": "partial", "note": "RTP 獎學金需競爭", "src": "https://www.sydney.edu.au/scholarships"}}
+
+
+def test_department_program_fallback_checked():
+    """教授本人沒掛名學程時，改查她系所／學院下一年度的博士班：不需要教員名單，但學程頁、學費、繳交文件都要有出處。"""
+    from pipeline.discover import check_programs
+    assert check_programs([DEPT]) == []
+    whys = lambda p: [f["why"] for f in check_programs([p])]
+    assert whys({**DEPT, "src": None}) == ["no_program_source"]
+    assert whys({**DEPT, "tuition": {"text": "AUD 50,000"}}) == ["no_tuition_source"]
+    assert whys({**DEPT, "requirements_src": None}) == ["no_requirements_source"]
+    assert whys({**DEPT, "basis": "guess"}) == ["bad_basis"]
+    assert whys({**CPH, "member_src": None}) == ["no_member_source"]  # 本人掛名的仍要教員名單
