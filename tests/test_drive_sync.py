@@ -129,3 +129,44 @@ def test_sync_reports_progress(tmp_path):
     seen = []
     sync(a, drive, my_id="pcA", progress=lambda i, total, rel, n: seen.append((i, total)))
     assert seen[0] == (0, 3) and seen[-1] == (3, 3)
+
+
+def test_unreadable_remote_folder_aborts_instead_of_deleting(tmp_path, monkeypatch):
+    # 2026-10-26 事故：macOS 不讓程式列出雲端硬碟某些資料夾，os.walk 默默略過，看起來像「雲端刪了」→ 這台跟著刪
+    import pytest
+    from pipeline import drive_sync as ds
+    a, drive = tmp_path / "pcA", tmp_path / "drive"
+    _w(a / "_me" / "me.json", "{}")
+    _w(a / "prof" / "x.txt", "x")
+    sync(a, drive)
+    real = os.walk
+
+    def flaky(top, onerror=None, **kw):
+        for dp, dns, fns in real(top, onerror=onerror, **kw):
+            if str(dp).startswith(str(drive)) and dp != str(drive) and onerror:
+                onerror(PermissionError(1, "Operation not permitted", dp))
+                dns[:] = []
+                continue
+            yield dp, dns, fns
+    monkeypatch.setattr(ds.os, "walk", flaky)
+    with pytest.raises(ds.ScanError):
+        sync(a, drive)
+    assert (a / "_me" / "me.json").exists() and (a / "prof" / "x.txt").exists()
+
+
+def test_mass_delete_and_personal_files_are_refused(tmp_path):
+    a, drive = tmp_path / "pcA", tmp_path / "drive"
+    for i in range(30):
+        _w(a / "prof" / f"f{i}.txt", "x")
+    _w(a / "_me" / "me.json", "{}")
+    sync(a, drive)
+    for i in range(30):
+        (drive / "prof" / f"f{i}.txt").unlink()
+    r = sync(a, drive)
+    assert r.get("refused") and len(list((a / "prof").glob("*.txt"))) == 30  # 一次要刪很多：停下來，不刪
+    (drive / "_me" / "me.json").unlink()
+    for i in range(30):
+        (a / "prof" / f"f{i}.txt").unlink()  # 這台也刪掉，讓下一輪只剩 me.json 的刪除
+    sync(a, drive)
+    assert (a / "_me" / "me.json").exists()  # 本人資料（_me/）同步不刪；雲端少了就從這台推回去
+    assert (drive / "_me" / "me.json").exists()

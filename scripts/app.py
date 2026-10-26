@@ -682,7 +682,9 @@ def startup(app, choose=True):
             b["sync"] = {"done": i, "total": total, "cur": rel, "pulled": n.get("pull", 0) + n.get("conflict_pull", 0),
                          "pushed": n.get("push", 0) + n.get("conflict_push", 0) + n.get("shrunk", 0)}
         r = drive_sync(app.runs, hold=True, wait=60, progress=prog) if dst and dst.parent.exists() else 1
-        if r == 2:
+        if r == 3:  # 有資料夾讀不到、或一次要刪太多：不同步，用這台的資料
+            step("sync", "warn", "同步先停下：有雲端資料夾讀不到，或一次要刪太多檔案；先用這台的資料，沒有刪任何東西（終端機有詳細原因）")
+        elif r == 2:
             app.blocked = (busy_elsewhere(target(app.runs), device_id()) or {}).get("device") or "另一台電腦"
             step("sync", "warn", f"另一台電腦（{app.blocked}）正在用：已拉下雲端的資料給你看，這台先不推上去")
         else:

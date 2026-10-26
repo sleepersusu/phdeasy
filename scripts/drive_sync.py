@@ -15,7 +15,7 @@ import sys
 import time
 from pathlib import Path
 
-from pipeline.drive_sync import FOLDER, find_drive, find_drives, release, sync
+from pipeline.drive_sync import ScanError, FOLDER, find_drive, find_drives, release, sync
 
 
 def _cfg(runs):
@@ -45,7 +45,16 @@ def run(runs, account=None, given=None, force=False, do_release=False, hold=Fals
     if not dst or not dst.parent.exists():
         print("SKIP 找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入，再跑 --setup")
         return 1
-    n = sync(runs, dst, force=force, progress=progress)
+    try:
+        n = sync(runs, dst, force=force, progress=progress)
+    except ScanError as e:
+        print(f"STOP 雲端同步停下：{e}。有資料夾讀不到時不同步，避免把讀不到的當成刪掉。"
+              "Mac：系統設定 → 隱私權與安全性 → 檔案與資料夾／完整磁碟取用權，讓終端機（或本程式）可以存取 Google 雲端硬碟，再重開。")
+        return 3
+    if "refused" in n:
+        print(f"STOP 雲端同步停下：這次要刪 {n['refused']} 個檔（例：{'、'.join(n['examples'])}），一次刪太多，先不動。"
+              "確認真的要刪，再跟 Claude 說。")
+        return 3
     waited = 0
     while "blocked" in n and waited < wait:  # 別台剛關掉時，「已釋放」要等雲端硬碟同步過來（常延遲 1–2 分鐘）
         time.sleep(15)

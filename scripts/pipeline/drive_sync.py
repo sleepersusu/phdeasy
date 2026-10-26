@@ -71,13 +71,25 @@ def find_drive(home=None, prefer=None):
     return drives[0][1] if drives else None
 
 
+class ScanError(RuntimeError):
+    """有資料夾讀不到（例：macOS 不讓程式列出雲端硬碟的資料夾）。這時不能同步，否則讀不到的會被當成「刪掉了」。"""
+
+
+def _raise(e):
+    raise ScanError(f"讀不到資料夾：{getattr(e, 'filename', '') or e}（{e.strerror if hasattr(e, 'strerror') else e}）")
+
+
+PROTECT = ("_me/",)  # 本人資料：同步只會補，不會刪（2026-10-26 事故後加）
+MAX_DELETE = 10  # 一次要刪超過這麼多（且超過 5%），就停下來不刪，等本人確認
+
+
 def scan(root):
-    """{相對路徑: (大小, 修改時間)}；略過同步自己的資料夾與暫存檔。"""
+    """{相對路徑: (大小, 修改時間)}；略過同步自己的資料夾與暫存檔。任何資料夾讀不到就丟 ScanError（不當成空的）。"""
     root = Path(root)
     out = {}
     if not root.exists():
         return out
-    for dp, dns, fns in os.walk(root):
+    for dp, dns, fns in os.walk(root, onerror=_raise):
         dns[:] = [d for d in dns if d not in SKIP_DIRS and not d.startswith(".")]
         for f in fns:
             if f in SKIP_FILES or f.startswith("~$") or f.endswith(".tmp"):
@@ -114,9 +126,11 @@ def plan(local, remote, base):
             else:
                 acts.append(("conflict_push" if l[1] >= r[1] else "conflict_pull", rel))
         elif l and not r:
-            acts.append(("push", rel) if first or lchg or not b.get("r") else ("del_local", rel))
+            keep = first or lchg or not b.get("r") or rel.startswith(PROTECT)
+            acts.append(("push", rel) if keep else ("del_local", rel))
         elif r and not l:
-            acts.append(("pull", rel) if first or rchg or not b.get("l") else ("del_remote", rel))
+            keep = first or rchg or not b.get("l") or rel.startswith(PROTECT)
+            acts.append(("pull", rel) if keep else ("del_remote", rel))
     return acts
 
 
@@ -180,7 +194,11 @@ def sync(local_root, remote_root, my_id=None, device=DEVICE, force=False, pull_o
     base = saved.get("files", {}) if saved.get("remote") == str(remote_root) else {}  # 換了雲端資料夾：當第一次，只合併不刪
     who_r = (read_lock(remote_root).get("device") or read_lock(remote_root).get("closed") or "另一台")
     n = {}
-    acts = [a for a in plan(scan(local_root), scan(remote_root), base)]
+    loc, rem = scan(local_root), scan(remote_root)
+    acts = [a for a in plan(loc, rem, base)]
+    dels = [rel for act, rel in acts if act in ("del_local", "del_remote")]
+    if len(dels) > MAX_DELETE and len(dels) > 0.05 * max(len(loc), len(rem), 1):
+        return {"refused": len(dels), "examples": dels[:5]}  # 一次要刪很多：多半是讀不到或搬家，先不動，等本人確認
     if progress:
         progress(0, len(acts), "", n)
     for i, (act, rel) in enumerate(acts, 1):
