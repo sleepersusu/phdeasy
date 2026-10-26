@@ -364,6 +364,27 @@ const FUND = {full: ["g", "全額資助"], partial: ["y", "部分資助"], none:
 /* 全額資助看教授本人掛名的學程；沒查到學程才看學校層級（同 pipeline/discover.py best_funding） */
 const bestFunding = c => (c.programs || []).length ? ["full", "partial", "none", "unknown"].find(v => c.programs.some(p => (p.funding || {}).value === v)) : c.phd_funding;
 let DISC = null;
+function progDialog(p){
+  /* 查詢教授的博士學程：點學程名稱跳出詳細資訊（學費、資助、要繳文件、截止日，各附出處） */
+  const a = (u, t) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${t}</a>` : "";
+  const f = p.funding || {}, [k, t] = FUND[f.value] || FUND.unknown, dept = p.basis === "department";
+  const row = (n, v) => v ? `<dt><strong>${n}</strong></dt><dd style="margin:0 0 6px">${v}</dd>` : "";
+  let d = document.getElementById("dprog-dialog");
+  if (!d){ d = document.createElement("dialog"); d.id = "dprog-dialog"; d.style.cssText = "max-width:640px;width:calc(100% - 32px);border:1px solid #ddd;border-radius:12px;padding:20px";
+    d.addEventListener("click", ev => { if (ev.target === d) d.close(); }); document.body.appendChild(d); }
+  d.innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px"><h3 style="margin:0">${esc(p.name)}</h3>
+      <button type="button" class="btn btn-sm" aria-label="關閉" onclick="this.closest('dialog').close()">✕</button></div>
+    <div style="margin:8px 0"><span class="pill ${dept ? "y" : "g"}">${dept ? "系所的博士班（教授本人沒掛名）" : "教授本人掛名"}</span> <span class="pill ${k}">${t}${f.years ? `・${f.years} 年` : ""}</span></div>
+    <dl class="small" style="margin:0">${row("透過", p.via && esc(p.via))}${row("入學", p.intake && esc(p.intake))}${row("修業年限", p.duration && esc(p.duration))}
+      ${row("學費", p.tuition && p.tuition.text && `${esc(p.tuition.text)} ${a(p.tuition.src, "出處")}`)}
+      ${row("資助", [f.stipend && esc(f.stipend), f.note && esc(f.note), a(f.src, "出處")].filter(Boolean).join(" "))}
+      ${row("要繳的文件與資格", (p.requirements || []).length && `<ul style="margin:0;padding-left:18px">${p.requirements.map(x => `<li>${esc(x)}</li>`).join("")}</ul>${a(p.requirements_src, "出處")}`)}
+      ${row("截止日", p.deadline && esc(p.deadline))}</dl>
+    <div class="row small" style="margin-top:10px">${a(p.url || p.src, "學程頁")}${!dept ? a(p.member_src, "教員名單") : ""}</div>`;
+  d.showModal();
+}
+document.addEventListener("click", ev => { const b = ev.target.closest("[data-dprog]"); if (!b) return;
+  const [cid, pi] = b.dataset.dprog.split(":"); const c = ((DISC || {}).candidates || []).find(x => x.id === cid); if (c) progDialog(c.programs[+pi]); });
 async function loadDiscover(){ try { DISC = await getJSON("../runs/_discover/latest.json"); } catch (e) { DISC = null; } return DISC; }
 function discFilter(cs){
   const y = new Date().getFullYear() - 1;
@@ -403,11 +424,9 @@ async function renderDiscover(){
       <div class="pc-body">
         <ol class="top5">${c.papers.slice(0, 6).map(p => `<li>${p.doi ? `<a href="${esc(p.doi)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)} <span class="small muted">${p.year}</span></li>`).join("")}</ol>
         ${(c.funders || []).length ? `<div class="small"><strong>經費：</strong>${c.funders.slice(0, 6).map(esc).join("、")}</div>` : ""}
-        ${(c.programs || []).length ? `<div class="small"><strong>博士學程：</strong>${c.programs.map(p => { const f = p.funding || {}, [k, t] = FUND[f.value] || FUND.unknown;
-            const dept = p.basis === "department", facts = [p.intake && `${esc(p.intake)} 入學`, p.duration && esc(p.duration), p.tuition && p.tuition.text && `學費 ${esc(p.tuition.text)}`].filter(Boolean).join("｜");
-            return `<div style="margin:2px 0 4px 8px"><a href="${esc(p.url || p.src || p.member_src)}" target="_blank" rel="noopener">${esc(p.name)}</a> ${dept ? '<span class="pill y">系所的博士班</span> ' : ""}<span class="pill ${k}">${t}${f.years ? `・${f.years} 年` : ""}</span>${f.stipend ? ` ${esc(f.stipend)}` : ""}
-              ${p.via ? `<div class="muted">透過：${esc(p.via)}</div>` : ""}${facts ? `<div class="muted">${facts}</div>` : ""}${(p.requirements || []).length ? `<div class="muted">要繳：${p.requirements.map(esc).join("、")}</div>` : ""}
-              <span class="muted">${f.note ? esc(f.note) + "｜" : ""}<a href="${esc(dept ? p.src : p.member_src)}" target="_blank" rel="noopener">${dept ? "學程頁" : "教員名單"}</a>${f.src ? `・<a href="${esc(f.src)}" target="_blank" rel="noopener">資助出處</a>` : ""}</span></div>`; }).join("")}</div>`
+        ${(c.programs || []).length ? `<div class="small"><strong>博士學程：</strong>${c.programs.map((p, pi) => { const f = p.funding || {}, [k, t] = FUND[f.value] || FUND.unknown;
+            return `<div style="margin:2px 0 4px 8px"><button type="button" data-dprog="${esc(c.id)}:${pi}" style="all:unset;cursor:pointer;text-decoration:underline;font-weight:600">${esc(p.name)}</button>
+              <span class="muted">｜${esc((p.via || (p.basis === "department" ? "所屬系所的博士班" : "本人掛名")).split(/[（(；;]/)[0].trim())}</span> <span class="pill ${k}">${t}</span></div>`; }).join("")}</div>`
           : c.programs ? `<div class="small muted">查過：他本人沒掛名、系所的博士班也查不到</div>` : ""}
         ${!(c.programs || []).length && c.funding_note ? `<div class="small"><strong>學校博士班資助（備用）：</strong>${esc(c.funding_note)} ${c.funding_src ? `<a href="${esc(c.funding_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}
         ${c.qs_rank || c.usnews_rank ? `<div class="small"><strong>排名：</strong>${c.qs_rank ? `QS #${c.qs_rank} <a href="${esc(c.qs_src)}" target="_blank" rel="noopener">出處</a>` : ""} ${c.usnews_rank ? `US News #${c.usnews_rank} <a href="${esc(c.usnews_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}

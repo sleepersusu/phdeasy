@@ -747,19 +747,38 @@ async function meetingsCard(){
 }
 
 const FUND = {full: ["g", "全額資助"], partial: ["y", "部分資助"], none: ["r", "自費"], unknown: ["", "資助查不到"]};
+let PROGS = [];
 function programRows(progs){
-  /* 每個學程：本人掛名（教員名單為證）或系所的博士班（本人沒掛名時，供參考）；年度、年限、學費、資助、要繳的文件，各附出處 */
-  const a = (u, t) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${t}</a>` : "";
-  return progs.map(p => { const f = p.funding || {}, [c, t] = FUND[f.value] || FUND.unknown, dept = p.basis === "department";
-    const facts = [p.intake ? `${esc(p.intake)} 入學` : "", p.duration ? esc(p.duration) : "", p.tuition && p.tuition.text ? `學費：${esc(p.tuition.text)} ${a(p.tuition.src, "出處")}` : ""].filter(Boolean).join("｜");
-    return `<div style="margin-bottom:10px"><a href="${esc(p.url || p.src || p.member_src)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a>
-      ${dept ? pill("y", "系所的博士班（她本人沒掛名）") : pill("g", "她本人掛名")} ${pill(c, t + (f.years ? `・${f.years} 年` : ""))}${f.stipend ? ` <span class="small">${esc(f.stipend)}</span>` : ""}
-      ${p.via ? `<div class="small muted">透過：${esc(p.via)}</div>` : ""}
-      ${facts ? `<div class="small" style="margin-top:2px">${facts}</div>` : ""}
-      ${f.note ? `<div class="small">資助：${esc(f.note)} ${a(f.src, "出處")}</div>` : ""}
-      ${(p.requirements || []).length ? `<div class="small">要繳：${p.requirements.map(esc).join("、")} ${a(p.requirements_src, "出處")}</div>` : ""}
-      <div class="small muted">${dept ? a(p.src, "學程頁") : a(p.member_src, "教員名單")}</div></div>`; }).join("");
+  /* 一行一個學程：學程名稱＋系所（透過哪個身分）；學費、資助、要繳文件等點了才跳出視窗 */
+  PROGS = progs;
+  return progs.map((p, i) => { const f = p.funding || {}, [c, t] = FUND[f.value] || FUND.unknown, dept = p.basis === "department";
+    return `<div style="margin-bottom:6px"><button type="button" class="linkbtn" data-prog="${i}" style="all:unset;cursor:pointer;color:var(--link,#1d4ed8);font-weight:600;text-decoration:underline">${esc(p.name)}</button>
+      <span class="small muted">｜${esc((p.via || (dept ? "所屬系所的博士班" : "本人掛名")).split(/[（(；;]/)[0].trim())}</span> ${pill(c, t)}</div>`; }).join("")
+    + `<div class="small muted">點學程名稱看學費、資助、申請條件與截止日</div>`;
 }
+function programDialog(p){
+  const a = (u, t) => u ? `<a href="${esc(u)}" target="_blank" rel="noopener">${t}</a>` : "";
+  const f = p.funding || {}, [c, t] = FUND[f.value] || FUND.unknown, dept = p.basis === "department";
+  const row = (k, v) => v ? `<dt><strong>${k}</strong></dt><dd style="margin:0 0 6px">${v}</dd>` : "";
+  let d = document.getElementById("prog-dialog");
+  if (!d){ d = document.createElement("dialog"); d.id = "prog-dialog"; d.style.cssText = "max-width:640px;width:calc(100% - 32px);border:1px solid #ddd;border-radius:12px;padding:20px";
+    d.addEventListener("click", ev => { if (ev.target === d) d.close(); }); document.body.appendChild(d); }
+  d.innerHTML = `<div class="row" style="justify-content:space-between;align-items:flex-start;flex-wrap:nowrap;gap:12px">
+      <h3 style="margin:0">${esc(p.name)}</h3><button type="button" class="btn btn-sm" aria-label="關閉" onclick="this.closest('dialog').close()">✕</button></div>
+    <div style="margin:8px 0">${dept ? pill("y", "系所的博士班（教授本人沒掛名）") : pill("g", "教授本人掛名")} ${pill(c, t + (f.years ? `・${f.years} 年` : ""))}</div>
+    <dl class="small" style="margin:0">
+      ${row("透過", p.via ? esc(p.via) : "")}
+      ${row("入學", p.intake ? esc(p.intake) : "")}
+      ${row("修業年限", p.duration ? esc(p.duration) : "")}
+      ${row("學費", p.tuition && p.tuition.text ? `${esc(p.tuition.text)} ${a(p.tuition.src, "出處")}` : "")}
+      ${row("資助", [f.stipend ? esc(f.stipend) : "", f.note ? esc(f.note) : "", a(f.src, "出處")].filter(Boolean).join(" "))}
+      ${row("要繳的文件與資格", (p.requirements || []).length ? `<ul style="margin:0;padding-left:18px">${p.requirements.map(x => `<li>${esc(x)}</li>`).join("")}</ul>${a(p.requirements_src, "出處")}` : "")}
+      ${row("截止日", p.deadline ? esc(p.deadline) : "")}
+    </dl>
+    <div class="row small" style="margin-top:10px">${a(p.url || p.src, "學程頁")}${!dept ? a(p.member_src, "教員名單") : ""}</div>`;
+  d.showModal();
+}
+document.addEventListener("click", ev => { const b = ev.target.closest("[data-prog]"); if (b) programDialog(PROGS[+b.dataset.prog]); });
 function programsHTML(pg){
   /* 她本人掛名、可以收博士生的學程（官方教員名單為證）與各學程的資助；能不能收你、有沒有錢看的是學程，不是全校 */
   const btn = APP ? ` <button class="btn btn-sm" data-programs>${pg ? "重新查" : "查博士學程"}</button>` : "";
