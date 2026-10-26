@@ -642,7 +642,8 @@ function targetsHTML(list, card){
   const t = H.targets || {schools: []}, by = Object.fromEntries(list.map(p => [p.slug, p])), used = new Set();
   const built = new Set((H.professors || []).map(p => p.slug));
   const dept = d => {
-    const ps = (d.members || []).map(x => by[x]).filter(Boolean); ps.forEach(p => used.add(p.slug));
+    const mem = new Set(d.members || []);
+    const ps = list.filter(p => mem.has(p.slug)); ps.forEach(p => used.add(p.slug));  // 照右上角的排序（list 已排好），不是加入系所的順序
     const f = d.faculty, people = (f && f.people) || [];
     const fac = !window.APP_REMATCH ? "" : people.length
       ? `<div class="row small" style="margin:6px 0 10px;gap:8px"><button type="button" class="btn btn-sm" data-fac-open="${esc(d.id)}">${icon("users", 16)} ${T("教員名單", "Faculty")}（${people.length}）</button>
