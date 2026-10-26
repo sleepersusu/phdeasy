@@ -151,3 +151,24 @@ footer.wrap{color:var(--muted);font-size:.85rem;padding-bottom:32px}
   .pcard{position:static}
   .lr{grid-template-columns:1fr}.lr>.zh{border-left:0;padding-left:0;margin-top:4px}
 }
+
+/* 右上角：工作進度、設定、語言 */
+.topicons{display:flex;align-items:center;gap:8px}
+.topicons a.iconbtn{text-decoration:none}
+.topicons a.iconbtn[aria-current="page"]{background:#eaf5ee;border-color:#9fd3b0;color:#14532d}
+/* 版面加寬：左邊個人卡窄一點，右邊內容寬一點 */
+header.topbar .wrap,nav.tabs .wrap,main.layout,footer.wrap{max-width:1360px}
+main.layout{grid-template-columns:250px minmax(0,1fr)}
+.pcard .pedu{margin-top:16px;padding-top:14px;border-top:1px dashed var(--line);text-align:left;display:grid;gap:8px}
+/* 目標教授：收合卡 */
+.profcard{background:#fff;border:1px solid var(--line);border-radius:12px;margin:0 0 10px}
+.profcard>summary{list-style:none;cursor:pointer;padding:14px 16px}
+.profcard>summary::-webkit-details-marker{display:none}
+.profcard .pc-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.profcard .pc-name{font-size:1.1rem}
+.profcard .pc-name::before{content:"›";display:inline-block;width:1em;color:var(--muted);transition:transform .15s}
+.profcard[open] .pc-name::before{transform:rotate(90deg)}
+.profcard .pc-body{padding:0 16px 16px;border-top:1px solid var(--line);padding-top:12px}
+.profcard:hover{border-color:#c3c7cc}
+.top5{margin:0;padding-left:1.4em}.top5 li{margin:6px 0}
+.profcard .stars{font-size:1.2rem}

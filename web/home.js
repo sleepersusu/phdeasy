@@ -43,6 +43,8 @@ function renderCard(m){
     ${(() => { const rest = (t, sep) => (t || "").split(sep).slice(1).map(x => x.trim()).filter(Boolean).join(" · ");  // 第一段已經是上面的職稱
       const en = rest(m.headline, "·"), zh = rest(m.headline_zh, "｜");
       return en || zh ? `<div class="small" style="margin-top:8px">${bi(zh, en, "div")}</div>` : ""; })()}
+    ${(m.education || []).length ? `<div class="pedu"><div class="role" style="margin-bottom:6px">學歷｜Education</div>${m.education.map(e =>
+        `<div class="small"><strong>${esc(e.degree)}</strong><div class="muted">${esc(e.school)}（${esc(e.years)}）</div></div>`).join("")}</div>` : ""}
     <ul class="plinks">
       ${row("⌖", c.location && esc(c.location))}
       ${row("✉", c.email && `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`)}
@@ -55,9 +57,8 @@ function renderMe(m){
     <div class="card">${bi(m.summary_zh, m.summary, "div")}<div class="src">出處：${esc(m.summary_src || "CV")}</div></div>
     <h3 class="label">研究興趣｜Research interests</h3><div class="chips">${(m.interests || []).map(i => `<span class="pill">${bi(i.zh, i.en)}</span>`).join("")}</div>
     <div class="grid" style="margin-top:16px">
-      <div class="card"><h3 class="label" style="margin-top:0">學歷｜Education</h3><ul>${(m.education || []).map(e => `<li><strong>${esc(e.degree)}</strong>，${esc(e.school)}（${esc(e.years)}）${e.note ? `<div class="small muted">${esc(e.note)}</div>` : ""}</li>`).join("")}</ul></div>
-      <div class="card"><h3 class="label" style="margin-top:0">發表｜Publications</h3><ul>${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul>
-        <h3 class="label">專案｜Projects</h3><ul>${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul></div>
+      <div class="card"><h3 class="label" style="margin-top:0">發表｜Publications</h3><ul>${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul></div>
+      <div class="card"><h3 class="label" style="margin-top:0">專案｜Projects</h3><ul>${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul></div>
     </div>`;
 }
 
@@ -141,24 +142,40 @@ function starsHTML(r){
   const n = r.targets.length, st = r.targets.filter(t => t.fit === "strong").length, pa = r.targets.filter(t => t.fit === "partial").length;
   return `<span class="stars" role="img" aria-label="匹配程度 ${s.n} 顆星（共 5 顆）" title="你的 ${n} 個興趣與 CV 項目：強相關 ${st}、部分相關 ${pa}">${"★".repeat(s.n)}<span class="off">${"★".repeat(5 - s.n)}</span></span>`;
 }
+let PROF_SORT = "stars";
 function renderProfs(ps){
+  /* 目標教授：每位一張收合卡，只放重要資訊與「必讀前五篇」（跟你最相關的），其他點進教授頁看；右上角可依星星排序 */
   const el = body("professors");
   const head = document.querySelector("#professors h2");
-  if (head && !document.getElementById("add-prof")){
-    head.style.display = "flex"; head.style.justifyContent = "space-between"; head.style.alignItems = "center"; head.style.gap = "8px";
-    head.insertAdjacentHTML("beforeend", window.APP_REMATCH ? `<a class="btn btn-green" id="add-prof" href="pipeline.html#new">＋ 新增教授</a>` : "");
+  if (head && !document.getElementById("prof-tools")){
+    head.insertAdjacentHTML("afterend", `<div class="row" id="prof-tools" style="justify-content:space-between;margin:-4px 0 12px">
+      <span class="small muted">星星＝你的興趣與 CV 項目裡，她有多少強相關、部分相關的研究。</span>
+      <span class="row"><label class="small" for="prof-sort">排序</label><select id="prof-sort">
+        <option value="stars">星星多→少</option><option value="stars-asc">星星少→多</option><option value="name">姓名</option></select>
+        ${window.APP_REMATCH ? `<a class="btn btn-green" href="pipeline.html#new">＋ 新增教授</a>` : ""}</span></div>`);
+    document.getElementById("prof-sort").onchange = ev => { PROF_SORT = ev.target.value; renderProfs(ps); };
   }
   if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按右上角「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
-  el.innerHTML = `<p class="muted">星星是匹配程度：依你的每個研究興趣與 CV 項目，看她有多少強相關、部分相關的研究。點文章標題會跳到那篇的完整解析。</p>` +
-    ps.map(p => {
-      const c = p.counts || {};
-      return `<article class="prof">
-        <div class="row" style="justify-content:space-between;align-items:flex-start"><div><h3>${esc(p.name)}</h3></div>
-          <div style="text-align:right">${starsHTML(p.recommend)}<div style="margin-top:6px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">查看教授詳細資料 →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}</div></div></div>
-        <div class="muted small">${esc(p.institution || "")}</div>
-        ${p.recommend ? recommendBlock(p) : keywordBlock(p)}
-      </article>`;
-    }).join("");
+  const score = p => (matchStars(p.recommend) || {score: -1}).score;
+  const list = [...ps].sort(PROF_SORT === "name" ? (a, b) => (a.name || "").localeCompare(b.name || "")
+    : PROF_SORT === "stars-asc" ? (a, b) => score(a) - score(b) : (a, b) => score(b) - score(a));
+  el.innerHTML = list.map(p => {
+    const c = p.counts || {}, r = p.recommend;
+    const strong = r ? r.targets.filter(t => t.fit === "strong").length : null, partial = r ? r.targets.filter(t => t.fit === "partial").length : null;
+    const top5 = r ? (r.read_first || []).slice(0, 5) : (p.top_papers || []).slice(0, 5);
+    const facts = [c.works != null && `${c.works} 篇（2022–2026）`, c.grants_pi != null && `本人主持計畫 ${c.grants_pi}`, c.coauthors != null && `合作者 ${c.coauthors} 位`,
+                   r && `強相關 ${strong}／部分相關 ${partial}`].filter(Boolean);
+    return `<details class="profcard">
+      <summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc(p.institution || "")}</div>
+          <div class="small" style="margin-top:4px">${facts.map(esc).join("｜")}</div></div>${starsHTML(r)}</div></summary>
+      <div class="pc-body">
+        ${top5.length ? `<div class="small muted" style="margin-bottom:4px">必讀前五篇（跟你最相關）</div>
+          <ol class="top5">${top5.map(w => `<li><a href="${esc(paperLink(p, w.id))}">${bi(w.title_zh, w.title)}</a> <span class="small muted">${esc(w.year || "")}</span></li>`).join("")}</ol>`
+          : `<div class="small muted">還沒比對，沒有推薦的必讀文章。</div>`}
+        <div class="row" style="margin-top:10px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">進入教授頁 →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}
+          ${window.APP_REMATCH ? `<button class="btn" data-rematch="${esc(p.slug)}">${r ? "重新比對" : "依我的興趣比對"}</button>` : ""}</div>
+      </div></details>`;
+  }).join("");
 }
 
 function designCode(w){
@@ -218,7 +235,7 @@ const MORE = [["pipeline.html", "工作進度"], ["settings.html", "設定"]];
 const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "proposals.html": ["proposal"],
                        "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline"], "settings.html": ["settings"]};
 function setupHomeViews(){
-  /* 頁籤（參考 USyd 教授個人頁）：簡介｜目標教授｜計畫書｜Personal Statement｜SOP｜更多（工作進度、設定）。
+  /* 頁籤（參考 USyd 教授個人頁）：簡介｜目標教授｜計畫書｜Personal Statement｜SOP；工作進度與設定在右上角。
      離線單檔版全部在一頁，頁籤變成頁內連結 */
   const tabs = document.getElementById("tabs");
   const here = location.pathname.split("/").pop() || "index.html";
@@ -227,10 +244,8 @@ function setupHomeViews(){
     return;
   }
   const cur = here === "me.html" ? "index.html" : here;
-  const inMore = MORE.some(([f]) => f === cur);
-  tabs.innerHTML = PAGES.map(([f, label]) => `<a href="${f}" ${f === cur ? 'aria-current="page"' : ""}>${label}</a>`).join("") +
-    `<details class="more"><summary ${inMore ? 'aria-current="page"' : ""}>更多</summary><div class="menu">${MORE.map(([f, l]) => `<a href="${f}" ${f === cur ? 'aria-current="page"' : ""}>${l}</a>`).join("")}</div></details>`;
-  document.addEventListener("click", ev => { const d = tabs.querySelector("details.more"); if (d && d.open && !d.contains(ev.target)) d.open = false; });
+  tabs.innerHTML = PAGES.map(([f, label]) => `<a href="${f}" ${f === cur ? 'aria-current="page"' : ""}>${label}</a>`).join("");
+  MORE.forEach(([f]) => { const a = document.querySelector(`.topicons a[href="${f}"]`); if (a && f === cur) a.setAttribute("aria-current", "page"); });
   const show = PAGE_SECTIONS[here] || PAGE_SECTIONS["index.html"];
   document.querySelectorAll(".pmain > section").forEach(sec => { sec.hidden = !show.includes(sec.id); });
 }
