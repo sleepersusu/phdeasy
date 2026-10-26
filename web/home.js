@@ -27,43 +27,71 @@ function initLangMenu(onPick){
 }
 
 
-function renderMe(m){
+function renderCard(m){
+  /* 左邊固定的個人卡（參考 USyd 教授個人頁）：職稱、姓名、地點、聯絡方式 */
+  const el = document.getElementById("pcard");
+  if (!el) return;
+  if (!m){ el.innerHTML = `<div class="small muted">還沒有個人資料</div>`; return; }
   const c = m.contact || {};
-  if ($("#name")){  // 只有首頁的頁首放個人資料；子頁是「← 我的首頁 › 這一頁」
-    $("#name").textContent = m.name + (m.name_zh ? `（${m.name_zh}）` : "");
-    $("#headline").innerHTML = bi(m.headline_zh, m.headline);
-    $("#contact").innerHTML = [c.location && esc(c.location), c.email && esc(c.email), c.github && `<a href="https://${esc(c.github)}" target="_blank" rel="noopener">${esc(c.github)}</a>`].filter(Boolean).join("｜");
-  }
+  const initials = (m.name || "").replace(/\(.*?\)/g, "").trim().split(/[\s-]+/).filter(Boolean).map(x => x[0]).slice(0, 2).join("").toUpperCase();
+  const role = (m.headline || "").split("·")[0].trim();
+  const row = (icon, html) => html ? `<li><span class="ic" aria-hidden="true">${icon}</span><span>${html}</span></li>` : "";
+  el.innerHTML = `<div class="avatar" aria-hidden="true">${esc(initials)}</div>
+    ${role ? `<div class="role">${esc(role)}</div>` : ""}
+    <h1 class="pname">${esc((m.name || "").replace(/\s*\(.*?\)\s*/g, " ").trim())}</h1>
+    ${/\(.*?\)/.test(m.name || "") || m.name_zh ? `<div class="small muted">${esc([(m.name.match(/\((.*?)\)/) || [])[1], m.name_zh].filter(Boolean).join("・"))}</div>` : ""}
+    ${(() => { const rest = (t, sep) => (t || "").split(sep).slice(1).map(x => x.trim()).filter(Boolean).join(" · ");  // 第一段已經是上面的職稱
+      const en = rest(m.headline, "·"), zh = rest(m.headline_zh, "｜");
+      return en || zh ? `<div class="small" style="margin-top:8px">${bi(zh, en, "div")}</div>` : ""; })()}
+    <ul class="plinks">
+      ${row("⌖", c.location && esc(c.location))}
+      ${row("✉", c.email && `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`)}
+      ${row("⌥", c.github && `<a href="https://${esc(c.github)}" target="_blank" rel="noopener">${esc(c.github)}</a>`)}
+    </ul>`;
+}
+
+function renderMe(m){
   body("me").innerHTML = `
     <div class="card">${bi(m.summary_zh, m.summary, "div")}<div class="src">出處：${esc(m.summary_src || "CV")}</div></div>
-    <h3>研究興趣</h3><div class="chips">${(m.interests || []).map(i => `<span class="pill">${bi(i.zh, i.en)}</span>`).join("")}</div>
+    <h3 class="label">研究興趣｜Research interests</h3><div class="chips">${(m.interests || []).map(i => `<span class="pill">${bi(i.zh, i.en)}</span>`).join("")}</div>
     <div class="grid" style="margin-top:16px">
-      <div class="card"><h3 style="margin-top:0">學歷</h3><ul>${(m.education || []).map(e => `<li><strong>${esc(e.degree)}</strong>，${esc(e.school)}（${esc(e.years)}）${e.note ? `<div class="small muted">${esc(e.note)}</div>` : ""}</li>`).join("")}</ul></div>
-      <div class="card"><h3 style="margin-top:0">發表</h3><ul>${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul>
-        <h3>專案</h3><ul>${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul></div>
+      <div class="card"><h3 class="label" style="margin-top:0">學歷｜Education</h3><ul>${(m.education || []).map(e => `<li><strong>${esc(e.degree)}</strong>，${esc(e.school)}（${esc(e.years)}）${e.note ? `<div class="small muted">${esc(e.note)}</div>` : ""}</li>`).join("")}</ul></div>
+      <div class="card"><h3 class="label" style="margin-top:0">發表｜Publications</h3><ul>${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul>
+        <h3 class="label">專案｜Projects</h3><ul>${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul></div>
     </div>`;
 }
 
-function renderProposal(p){
-  if (!p){ body("proposal").innerHTML = `<div class="empty">還沒有研究計畫資料。</div>`; return; }
-  if (H.me && H.me.proposal_with){  // 跟教授一起討論出來的計畫：放在那位教授的頁面（我們的進展），不算本人獨立的計畫
-    const prof = (H.professors || []).find(x => x.slug === H.me.proposal_with);
-    const name = prof ? prof.name : H.me.proposal_with;
-    body("proposal").innerHTML = `<div class="card">「${bi(p.title_zh, p.title)}」是你跟 <strong>${esc(name)}</strong> 一起討論出來的，放在她的教授頁「研究計畫書」。
-      <div class="row" style="margin-top:8px"><a class="btn btn-green" href="professor.html?p=${encodeURIComponent(H.me.proposal_with)}&v=proposal">看研究計畫書 →</a></div>
-      <p class="small muted" style="margin-top:8px">每位目標教授的頁面也有「研究計畫書」：依她的方向與經費、你做得到的事擬的幾個版本，附信心程度。</p></div>`;
-    return;
-  }
-  body("proposal").innerHTML = `
-    <div class="card">
-      <h3 style="margin-top:0">${bi(p.title_zh, p.title, "div")}</h3>
-      <div class="small muted">${esc(p.subtitle || "")}</div>
-      <div class="small" style="margin-top:6px">${esc(p.supervisor || "")}</div>
-      <div style="margin-top:10px">${bi(p.synopsis_zh, p.synopsis, "div")}</div>
-      <div class="src">出處：${esc(p.src || "研究計畫書")}</div>
-    </div>
-    <h3>研究缺口</h3><ol>${(p.gaps || []).map(g => `<li>${bi(g.zh, g.en, "div")}</li>`).join("")}</ol>
-    <h3>三個研究</h3><div class="grid">${(p.studies || []).map(s => `<div class="card"><strong>${bi(s.name_zh, s.name, "div")}</strong><div class="small" style="margin-top:6px">${bi(s.detail_zh, s.detail, "div")}</div></div>`).join("")}</div>`;
+const CONF = {high: ["g", "信心 高"], medium: ["y", "信心 中"], low: ["r", "信心 低"]};
+function renderProposal(){
+  /* 計畫書：每位目標教授一列。跟她定案的放定案版；其他教授是 AI 依她的方向與經費擬的幾個版本 */
+  const el = body("proposal");
+  if (!el) return;
+  const ps = H.professors || [];
+  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。</div>`; return; }
+  const href = p => OFFLINE_HOME ? p.href : `professor.html?p=${encodeURIComponent(p.slug)}&v=proposal`;
+  el.innerHTML = ps.map(p => {
+    const pr = p.proposal || {};
+    const body = pr.joint ? `<div class="row">${'<span class="pill g">已定案</span>'}<strong>${bi(pr.joint_title_zh, pr.joint_title)}</strong></div>`
+      : (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
+          return `<li><span class="pill ${c[0]}">${c[1]}</span> <strong>${esc(v.id)}</strong>｜${bi(v.direction_zh, v.direction_en)}</li>`; }).join("")}</ul>${pr.stale ? `<div class="small muted">你的 CV 或她的資料改過，這幾版可能過期。</div>` : ""}`
+      : `<div class="small muted">還沒有計畫書。到她的頁面可以產生 AI 草稿。</div>`;
+    return `<article class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;align-items:flex-start">
+        <div><h3 style="margin:0">${esc(p.name)}</h3><div class="small muted">${esc(p.institution || "")}</div></div>
+        <a class="btn btn-green" href="${esc(href(p))}">${pr.joint ? "看定案版" : (pr.versions || []).length ? "看草稿" : "到她的頁面"} →</a></div>
+      <div style="margin-top:10px">${body}</div></article>`;
+  }).join("");
+}
+
+function renderStatement(kind){
+  /* Personal Statement／SOP：左英右中逐段對照；[方括號] 的待填段落標黃 */
+  const el = body(kind);
+  if (!el) return;
+  const st = ((H.me || {}).statements || {})[kind];
+  if (!st){ el.innerHTML = `<div class="empty">還沒有${kind === "sop" ? " SOP" : " Personal Statement"}。把 Word 檔給 Claude，它會用 <code>me_proposal.py statement ${kind} &lt;檔案&gt;</code> 匯入並翻成中文。</div>`; return; }
+  const lr = (zh, en) => `<div class="lr"><div class="en" lang="en">${esc(en || "")}</div><div class="zh">${zh ? esc(zh) : '<span class="muted">（尚無中文）</span>'}</div></div>`;
+  el.innerHTML = `<div class="card"><div class="small muted">出處：${esc(st.src || "")}</div>
+      <h3 style="margin:8px 0 0">${lr(st.title_zh, st.title)}</h3></div>
+    ${st.blocks.map(b => `<div class="${b.type === "note" ? "item attn" : "stmt-p"}">${b.type === "note" ? '<span class="pill y">待填</span> ' : ""}${lr(b.zh, b.en)}</div>`).join("")}`;
 }
 
 function renderCaps(cs){
@@ -154,7 +182,13 @@ function summarize(p, d, me){
     top_papers: papers.slice(0, 3).map(r => ({id: r.id, title: W[r.id].title, title_zh: W[r.id].title_zh, year: W[r.id].year, terms: (r.terms || []).slice(0, 6), pct: Math.round(r.score / top * 100)})),
     top_grants: grants.slice(0, 2).map(r => ({key: r.id, title: G[r.id].title || G[r.id].funder, title_zh: G[r.id].title_zh || G[r.id].funder_zh, status: G[r.id].status, award_id: G[r.id].award_id, end: G[r.id].end})),
     design_overlap: (m.methods || []).map(mth => ({method: mth, n: designs[mth] || 0})), designs,
-    recommend: enrichRecommend(d.recommend, W, G)};
+    recommend: enrichRecommend(d.recommend, W, G), proposal: proposalSummary(d)};
+}
+function proposalSummary(d){
+  /* 計畫書頁籤用：定案版或 AI 草稿各版的方向與信心（與 pipeline/home.py 同一套） */
+  const j = d.joint_proposal, pd = d.proposal_draft;
+  return {joint: !!j, joint_title: j && j.title, joint_title_zh: j && j.title_zh, stale: !!(pd && pd.stale),
+    versions: ((pd && pd.versions) || []).map(v => ({id: v.id, level: (v.confidence || {}).level, direction_zh: (v.direction || {}).zh, direction_en: (v.direction || {}).en}))};
 }
 function enrichRecommend(r, W, G){
   /* prof-match 的推薦只存 id；這裡帶入標題、年份、計畫狀態給卡片顯示 */
@@ -179,25 +213,26 @@ async function loadHome(){
 }
 
 let OFFLINE_HOME = false;
-const PAGES = [["index.html", "我的資料"], ["professors.html", "目標教授"], ["pipeline.html", "工作進度"], ["settings.html", "設定"]];
+const PAGES = [["index.html", "簡介"], ["professors.html", "目標教授"], ["proposals.html", "計畫書"], ["ps.html", "Personal Statement"], ["sop.html", "SOP"]];
+const MORE = [["pipeline.html", "工作進度"], ["settings.html", "設定"]];
+const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "proposals.html": ["proposal"],
+                       "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline"], "settings.html": ["settings"]};
 function setupHomeViews(){
-  /* 應用程式：首頁是本人的個人資料，其他每一塊一個頁面（professors.html…）；離線單檔版：全部在一頁 */
-  const nav = document.querySelector("nav.sections .wrap");
+  /* 頁籤（參考 USyd 教授個人頁）：簡介｜目標教授｜計畫書｜Personal Statement｜SOP｜更多（工作進度、設定）。
+     離線單檔版全部在一頁，頁籤變成頁內連結 */
+  const tabs = document.getElementById("tabs");
   const here = location.pathname.split("/").pop() || "index.html";
-  if (OFFLINE_HOME){ document.getElementById("hub")?.remove(); return; }
-  nav.innerHTML = PAGES.map(([f, label]) => `<a href="${f}" ${f === here || (f === "index.html" && here === "me.html") ? 'aria-current="true"' : ""}>${label}</a>`).join("");
-  if (here === "index.html" || here === "me.html"){
-    /* 首頁就是本人的個人資料（本人 2026-10-26）；其他頁從上方的列進去 */
-    document.getElementById("hub")?.remove();
-    document.querySelectorAll("main > section").forEach(s => s.hidden = !["me", "proposal", "capabilities"].includes(s.id));
-  } else {
-    document.getElementById("hub")?.remove();
-    /* 返回放在最上面：← 我的首頁 › 這一頁；個人資料只在首頁顯示，子頁不重複 */
-    const head = document.querySelector("header.top .wrap > div");
-    const label = (PAGES.find(([f]) => f === here) || [])[1] || "";
-    head.innerHTML = `<nav class="crumbs" aria-label="目前位置"><a href="index.html">← 我的首頁</a><span class="sep">›</span><span aria-current="page">${esc(label)}</span></nav><h1>${esc(label)}</h1>`;
-    document.querySelectorAll("main > section > h2").forEach(h => { if (h.textContent.trim() === label) h.hidden = true; });  // 頁首已經有，不重複
+  if (OFFLINE_HOME){
+    tabs.innerHTML = [["me", "簡介"], ["professors", "目標教授"], ["proposal", "計畫書"], ["ps", "Personal Statement"], ["sop", "SOP"]].map(([id, l]) => `<a href="#${id}">${l}</a>`).join("");
+    return;
   }
+  const cur = here === "me.html" ? "index.html" : here;
+  const inMore = MORE.some(([f]) => f === cur);
+  tabs.innerHTML = PAGES.map(([f, label]) => `<a href="${f}" ${f === cur ? 'aria-current="page"' : ""}>${label}</a>`).join("") +
+    `<details class="more"><summary ${inMore ? 'aria-current="page"' : ""}>更多</summary><div class="menu">${MORE.map(([f, l]) => `<a href="${f}" ${f === cur ? 'aria-current="page"' : ""}>${l}</a>`).join("")}</div></details>`;
+  document.addEventListener("click", ev => { const d = tabs.querySelector("details.more"); if (d && d.open && !d.contains(ev.target)) d.open = false; });
+  const show = PAGE_SECTIONS[here] || PAGE_SECTIONS["index.html"];
+  document.querySelectorAll(".pmain > section").forEach(sec => { sec.hidden = !show.includes(sec.id); });
 }
 
 (async function init(){
@@ -207,13 +242,14 @@ function setupHomeViews(){
   H = await loadHome();
   OFFLINE_HOME = document.getElementById("inline-data")?.textContent.trim() !== "__INLINE__";
   setupHomeViews();
+  renderCard(H.me);
   if (!H.me){
-    if ($("#name")) $("#name").textContent = "我的博士申請首頁";
     body("me").innerHTML = `<div class="empty">還沒有你的個人資料。請把 CV 與研究計畫交給 Claude，它會整理成 runs/_me/me.json。</div>`;
-    renderProposal(null); renderCaps([]);
+    renderCaps([]);
   } else {
-    renderMe(H.me); renderProposal(H.me.proposal); renderCaps(H.me.capabilities);
+    renderMe(H.me); renderCaps(H.me.capabilities);
   }
+  renderProposal(); renderStatement("ps"); renderStatement("sop");
   renderProfs(H.professors);
   if (typeof pipelinePanel === "function") pipelinePanel();
 })();

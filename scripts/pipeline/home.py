@@ -74,7 +74,16 @@ def professor_summary(run, me, use_node=True):
         "design_overlap": [{"method": mth, "n": designs.get(mth, 0)} for mth in (m.get("methods") or [])],
         "designs": designs,
         "recommend": _enrich(d.get("recommend"), W, G),
+        "proposal": _proposal_summary(d),
     }
+
+
+def _proposal_summary(d):
+    """首頁「計畫書」頁籤：定案版或 AI 草稿各版的方向與信心（與 web/home.js 的 proposalSummary 相同）。"""
+    j, pd = d.get("joint_proposal"), d.get("proposal_draft")
+    return {"joint": bool(j), "joint_title": (j or {}).get("title"), "joint_title_zh": (j or {}).get("title_zh"), "stale": bool((pd or {}).get("stale")),
+            "versions": [{"id": v.get("id"), "level": (v.get("confidence") or {}).get("level"), "direction_zh": (v.get("direction") or {}).get("zh"),
+                          "direction_en": (v.get("direction") or {}).get("en")} for v in (pd or {}).get("versions") or []]}
 
 
 def _enrich(r, W, G):

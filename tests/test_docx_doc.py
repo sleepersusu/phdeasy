@@ -50,3 +50,16 @@ def test_parse_keeps_order_figures_tables_and_captions(tmp_path):
     assert prog[2]["caption_en"] == "Table 2. Controlled comparison" and prog[2]["rows"] == [["Condition", "Action"], ["Agentic", "Ask one item"]]
     assert d["sections"][3]["blocks"] == [{"type": "ref", "en": "1. Someone. A paper."}]
     assert d["media"] == {"image1.png": b"\x89PNG fake"}
+
+
+def test_statement_paragraphs_with_title_and_placeholder(tmp_path):
+    # Personal Statement 沒有標題樣式：前兩行是姓名與標題，其餘每段一個區塊；[方括號] 的是本人留的待填說明
+    from pipeline.docx_doc import parse_statement
+    f = tmp_path / "ps.docx"
+    body = p("YU-HSIANG SU") + p("Personal Statement / Statement of Purpose") + p("First paragraph.") + p("[FIT: adapt per programme]") + p("Last.")
+    with zipfile.ZipFile(f, "w") as z:
+        z.writestr("word/document.xml", f'<w:document {W}><w:body>{body}</w:body></w:document>')
+        z.writestr("word/_rels/document.xml.rels", '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')
+    d = parse_statement(f)
+    assert d["author"] == "YU-HSIANG SU" and d["title"] == "Personal Statement / Statement of Purpose"
+    assert d["blocks"] == [{"type": "p", "en": "First paragraph."}, {"type": "note", "en": "[FIT: adapt per programme]"}, {"type": "p", "en": "Last."}]

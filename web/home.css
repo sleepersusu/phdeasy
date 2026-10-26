@@ -107,3 +107,47 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 .crumbs a:hover{color:var(--fg);text-decoration:underline}
 .crumbs .sep{color:#b8bcc2}
 .crumbs [aria-current]{color:var(--fg);font-weight:600}
+
+/* ===== 個人頁版型（參考 USyd 教授個人頁）：上方頁籤、左邊個人卡、右邊內容 ===== */
+body{background:#f6f7f8}
+header.topbar{background:#fff;border-bottom:1px solid var(--line)}
+header.topbar .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px}
+.brand{font-weight:700;font-size:1.05rem;text-decoration:none;color:var(--fg)}
+nav.tabs{background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+nav.tabs .wrap{display:flex;gap:4px;align-items:stretch;flex-wrap:wrap}
+nav.tabs a,nav.tabs summary{display:inline-flex;align-items:center;min-height:48px;padding:0 14px;text-decoration:none;color:var(--muted);
+  font-size:.86rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap;border-bottom:3px solid transparent;cursor:pointer}
+nav.tabs a:hover,nav.tabs summary:hover{color:var(--fg)}
+nav.tabs [aria-current="page"]{color:var(--fg);border-bottom-color:var(--green)}
+nav.tabs details.more{position:relative}
+nav.tabs details.more>summary{list-style:none}
+nav.tabs details.more>summary::after{content:"▾";margin-left:6px;font-size:.8em}
+nav.tabs details.more .menu{position:absolute;right:0;top:100%;min-width:140px;background:#fff;border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 8px 24px rgba(0,0,0,.10);padding:6px;z-index:30}
+nav.tabs details.more .menu a{display:flex;min-height:40px;border:0;border-radius:6px;text-transform:none;letter-spacing:0;font-size:.95rem;color:var(--fg)}
+nav.tabs details.more .menu a:hover{background:var(--soft)}
+main.layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;align-items:start;padding-top:24px;padding-bottom:24px}
+.pcard{position:sticky;top:72px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:24px 20px;text-align:center}
+.pcard .avatar{width:112px;height:112px;margin:0 auto 14px;border-radius:50%;background:#e7f3eb;color:#14532d;display:flex;align-items:center;justify-content:center;font-size:2.2rem;font-weight:700;letter-spacing:.04em}
+.pcard .role{font-size:.74rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.pcard .pname{font-size:1.4rem;line-height:1.25;margin:4px 0 0}
+.pcard .plinks{list-style:none;padding:0;margin:16px 0 0;text-align:left;border-top:1px dashed var(--line)}
+.pcard .plinks li{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px dashed var(--line);font-size:.9rem;overflow-wrap:anywhere}
+.pcard .plinks .ic{width:1.2em;flex:none;text-align:center;color:var(--green)}
+.pmain>section{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:0 0 16px}
+.pmain>section[hidden]{display:none}
+h2.label,h3.label{font-size:.8rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--green);margin:0 0 12px}
+h3.label{margin-top:18px}
+.pmain .card{background:#fff}
+.lr{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}
+.lr>div{min-width:0;overflow-wrap:anywhere}
+.lr>.zh{border-left:1px solid var(--line);padding-left:20px}
+.stmt-p{padding:12px 0;border-bottom:1px solid var(--line)}
+.stmt-p:last-child{border-bottom:0}
+.vlist{margin:0;padding-left:1.1em}.vlist li{margin:6px 0}
+footer.wrap{color:var(--muted);font-size:.85rem;padding-bottom:32px}
+@media (max-width:860px){
+  main.layout{grid-template-columns:1fr}
+  .pcard{position:static}
+  .lr{grid-template-columns:1fr}.lr>.zh{border-left:0;padding-left:0;margin-top:4px}
+}

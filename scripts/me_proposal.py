@@ -2,6 +2,7 @@
 依原檔順序保留標題、段落、圖（原始圖檔）、表（真的表格），教授頁「研究計畫書」照這個排版顯示。
 
   uv run python scripts/me_proposal.py import <計畫書.docx>
+  uv run python scripts/me_proposal.py statement ps|sop <檔案.docx>   # Personal Statement／SOP（首頁頁籤）
 
 圖檔寫到 runs/_me/proposal/figures/；結構寫進 runs/_me/me.json 的 proposal.document（每個區塊的中文由翻譯者另外補 zh）。
 """
@@ -9,7 +10,7 @@ import argparse
 import json
 from pathlib import Path
 
-from pipeline.docx_doc import parse_docx
+from pipeline.docx_doc import parse_docx, parse_statement
 
 ME = Path(__file__).resolve().parent.parent / "runs" / "_me"
 HEADING_ZH = {"synopsis": "摘要", "rationale": "1. 研究背景與缺口", "aims": "2. 整體目的與目標", "programme": "3. 研究規劃與方法",
@@ -19,9 +20,21 @@ HEADING_ZH = {"synopsis": "摘要", "rationale": "1. 研究背景與缺口", "ai
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["import"])
-    ap.add_argument("docx")
+    ap.add_argument("cmd", choices=["import", "statement"])
+    ap.add_argument("args", nargs="+", help="import：<docx>；statement：ps|sop <docx>")
     a = ap.parse_args()
+    if a.cmd == "statement":
+        kind, path = a.args
+        if kind not in ("ps", "sop"):
+            raise SystemExit("種類只能是 ps 或 sop")
+        st = parse_statement(path)
+        mep = ME / "me.json"
+        me = json.loads(mep.read_text())
+        me.setdefault("statements", {})[kind] = {**st, "src": Path(path).name}
+        mep.write_text(json.dumps(me, ensure_ascii=False, indent=2))
+        print(f"DONE {kind}：{st['title']}；{len(st['blocks'])} 段（待填說明 {sum(b['type'] == 'note' for b in st['blocks'])}）")
+        return
+    a.docx = a.args[0]
     d = parse_docx(a.docx)
     figdir = ME / "proposal" / "figures"
     figdir.mkdir(parents=True, exist_ok=True)

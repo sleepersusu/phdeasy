@@ -102,3 +102,12 @@ def test_finalized_joint_proposal_hides_drafts(tmp_path):
     (runs / "demo" / "out" / "proposal.json").write_text(json.dumps({"versions": [{"id": "v1"}], "fingerprint": "x"}))
     d = build_site_data(runs / "demo")
     assert d["joint_proposal"]["title"] == "When to Ask" and d["proposal_draft"] is None
+
+
+def test_home_summary_has_proposal_status(tmp_path):
+    # 首頁「計畫書」頁籤：每位教授是定案版或 AI 草稿各版（方向＋信心）
+    runs = runs_with_prof(tmp_path)
+    (runs / "demo" / "out" / "proposal.json").write_text(json.dumps({"versions": [{"id": "v1", "confidence": {"level": "medium"},
+                                                                                  "direction": {"zh": "方向", "en": "Dir"}}], "fingerprint": "x"}))
+    pr = build_home_data(runs, use_node=False)["professors"][0]["proposal"]
+    assert pr["joint"] is False and pr["versions"] == [{"id": "v1", "level": "medium", "direction_zh": "方向", "direction_en": "Dir"}]

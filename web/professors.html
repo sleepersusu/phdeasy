@@ -7,8 +7,8 @@
 <link rel="stylesheet" href="home.css">
 </head>
 <body class="lang-both">
-<header class="top"><div class="wrap">
-  <div><h1 id="name"></h1><div class="meta" id="headline"></div><div class="meta small" id="contact"></div></div>
+<header class="topbar"><div class="wrap">
+  <a class="brand" href="index.html">我的博士申請</a>
   <div class="langmenu">
     <button type="button" class="iconbtn" id="lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" aria-label="切換內容語言" title="內容語言">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
@@ -20,13 +20,14 @@
     </div>
   </div>
 </div></header>
-<nav class="sections" aria-label="區段"><div class="wrap">
-  <a href="#me">我是誰</a><a href="#proposal">我的研究計畫</a><a href="#capabilities">我能做到的事</a><a href="#professors">目標教授</a><a href="#pipeline" id="nav-pipeline" hidden>建新教授</a><a href="#settings" id="nav-settings" hidden>設定</a>
-</div></nav>
-<main class="wrap">
-  <section id="professors" aria-labelledby="h-prof"><h2 id="h-prof">目標教授</h2><div class="body"></div></section>
+<nav class="tabs" aria-label="頁籤"><div class="wrap" id="tabs"></div></nav>
+<main class="wrap layout">
+  <aside class="pcard" id="pcard" aria-label="我的基本資料"></aside>
+  <div class="pmain">
+    <section id="professors" aria-labelledby="h-prof"><h2 class="label" id="h-prof">目標教授｜Target professors</h2><div class="body"></div></section>
+  </div>
 </main>
-<footer class="wrap">這一頁只存在你的電腦（runs/ 不進版本控制）。內容摘自你的 CV 與研究計畫書，每段標了出處；比對只呈現主題重疊與證據，不是「適不適合」的判斷。</footer>
+<footer class="wrap">這些頁面只存在你的電腦與你的雲端硬碟（runs/ 不進版本控制）。內容摘自你的 CV、計畫書與 Personal Statement，每段標了出處；比對只呈現主題重疊與證據，不是「適不適合」的判斷。</footer>
 <script id="inline-data" type="application/json">__INLINE__</script>
 <script src="site_match.js"></script>
 <script src="home.js"></script>

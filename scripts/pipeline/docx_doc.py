@@ -95,3 +95,15 @@ def parse_docx(path):
         else:
             add({"type": "p", "en": text})
     return out
+
+
+def parse_statement(path):
+    """Personal Statement／SOP：沒有標題樣式的短文。前兩行是姓名與標題，其餘每段一個區塊；
+    整段包在 [方括號] 裡的是本人留的待填說明（例：依學校改寫的段落），標 note。"""
+    z = zipfile.ZipFile(path)
+    body = ET.fromstring(z.read("word/document.xml")).find(W + "body")
+    paras = [_text(el) for el in body if el.tag == W + "p"]
+    paras = [t for t in paras if t]
+    author, title = (paras[:2] + [None, None])[:2]
+    blocks = [{"type": "note" if t.startswith("[") and t.endswith("]") else "p", "en": t} for t in paras[2:]]
+    return {"author": author, "title": title, "blocks": blocks}
