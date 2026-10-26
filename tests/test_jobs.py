@@ -82,3 +82,45 @@ def test_prompt_match_uses_interests_and_cv_only():
     from pipeline.jobs import prompt_match
     p = prompt_match("doe-jane")
     assert "CV" in p and "研究興趣與研究計畫" not in p
+
+
+def test_codex_cmd_runs_in_workspace_with_network_and_resumes():
+    from pipeline.jobs import codex_cmd
+    c = codex_cmd("/bin/codex", "做事")
+    assert c[:2] == ["/bin/codex", "exec"] and "--json" in c and "workspace-write" in c and c[-1].endswith("做事")
+    assert "sandbox_workspace_write.network_access=true" in c
+    assert "danger-full-access" not in c
+    r = codex_cmd("/bin/codex", "繼續", session="abc-123")
+    assert r[r.index("resume") + 1] == "abc-123"
+
+
+def test_describe_codex_events():
+    from pipeline.jobs import describe_codex
+    assert describe_codex({"type": "thread.started", "thread_id": "t"}) == "Codex 已啟動"
+    assert describe_codex({"type": "item.completed", "item": {"type": "agent_message", "text": "好了"}}) == "好了"
+    assert "uv run" in describe_codex({"type": "item.completed", "item": {"type": "command_execution", "command": "uv run python scripts/x.py"}})
+    assert describe_codex({"type": "turn.completed"}).startswith("✓")
+    assert describe_codex({"type": "turn.failed", "error": {"message": "quota"}}).startswith("✗")
+
+
+def test_jobs_use_codex_when_chosen(tmp_path):
+    import io, json
+    from pipeline.jobs import Jobs
+
+    class P:
+        def __init__(self, cmd, **kw):
+            self.cmd = cmd
+            self.stdout = io.StringIO("\n".join(json.dumps(e) for e in [
+                {"type": "thread.started", "thread_id": "th-1"},
+                {"type": "item.completed", "item": {"type": "agent_message", "text": "DONE 完成"}},
+                {"type": "turn.completed"}]) + "\n")
+        def wait(self): return 0
+        def poll(self): return 0
+    seen = []
+    j = Jobs(tmp_path, tmp_path / "runs", claude="/bin/claude", popen=lambda cmd, **kw: seen.append(cmd) or P(cmd, **kw))
+    j.codex, j.engine = "/bin/codex", lambda: "codex"
+    job = j.start("x", "做事", "標題")
+    import time; time.sleep(0.2)
+    done = j.load(job["id"])
+    assert seen[0][0] == "/bin/codex" and done["session"] == "th-1" and done["result"] == "DONE 完成" and done["engine"] == "codex"
+    assert "CLAUDE.md" in seen[0][-1]  # Codex 不會自己讀 skills：開頭告訴它規則在哪

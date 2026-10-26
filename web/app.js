@@ -146,7 +146,7 @@ function renderSettings(st){
   const el = document.querySelector("#settings:not([hidden]) .body");
   if (!el) return;
   const g = st.settings || {};
-  const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, uv: st.uv, running: st.running, v: st.version, u: st.update && st.update.latest});
+  const shape = JSON.stringify({g, syncing: st.syncing, blocked: st.blocked, claude: st.claude, codex: st.codex, engine: st.engine, ct: st.codex_test, uv: st.uv, running: st.running, v: st.version, u: st.update && st.update.latest});
   if (shape === lastSettings) return;
   lastSettings = shape;
   const t = g.claude_test;
@@ -161,13 +161,19 @@ function renderSettings(st){
           ${st.blocked ? `<span class="pill y">另一台（${esc(st.blocked)}）正在用：只拉不推</span>` : ""}</div>`
         : `<p><span class="pill r">✗</span> 這台電腦找不到 Google 雲端硬碟。</p>
           <ol class="small"><li>安裝 <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive 電腦版</a></li><li>用你的 Google 帳號登入</li><li>重開這個程式</li></ol>`}`) +
-    setRow("row-ai", "AI（Claude Code）", st.claude ? (t ? (t.ok ? '<span class="pill g">✓ 可以用</span>' : '<span class="pill r">✗ 不能用</span>') : '<span class="pill">已安裝，還沒測試</span>') : '<span class="pill r">沒裝</span>', `
-        ${st.claude ? `<p class="small"><span class="pill g">✓</span> 已安裝：<span class="muted">${esc(st.claude)}</span></p>
-          ${t ? `<p class="small">${t.ok ? `<span class="pill g">✓ 可以用</span>` : `<span class="pill r">✗ 不能用</span>`} ${esc(t.msg)}</p>` : `<p class="small muted">還沒測試過能不能用。</p>`}
-          <div class="row"><button class="btn btn-green" id="claude-test">測試能不能用</button><button class="btn btn-yellow" id="claude-login">登入／換帳號</button></div>
-          <p class="small muted">「登入／換帳號」會開一個終端機視窗跑 Claude Code：照畫面登入（瀏覽器會跳出 Claude 的登入頁）；要換帳號就在裡面輸入 <code>/logout</code> 再登入。完成後關掉那個視窗，回來按「測試能不能用」。</p>`
-        : `<p><span class="pill r">✗</span> 這台還沒裝 Claude Code（只看資料不需要；要建新教授、處理例外才需要）。</p>
-          <ol class="small"><li>到 <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a> 照說明安裝</li><li>重開這個程式，再回來按「登入」</li></ol>`}`) +
+    setRow("row-ai", "AI 引擎", `<span class="small muted">背景工作用 ${st.engine === "codex" ? "Codex" : "Claude Code"}</span>`, `
+        <div class="row" role="radiogroup" aria-label="背景工作用哪個 AI">
+          <label><input type="radio" name="engine" value="claude" ${st.engine !== "codex" ? "checked" : ""}> Claude Code（預設）</label>
+          <label><input type="radio" name="engine" value="codex" ${st.engine === "codex" ? "checked" : ""}> Codex（ChatGPT，備用）</label></div>
+        <p class="small muted">建檔、AI 編修、翻譯、補資訊這些背景工作用哪一個。Claude 額度用完時可以切到 Codex；這個選擇只存在這台電腦。</p>
+        <h4 style="margin:12px 0 4px">Claude Code</h4>
+        ${st.claude ? `<p class="small">${t ? (t.ok ? '<span class="pill g">✓ 可以用</span> ' : '<span class="pill r">✗ 不能用</span> ') + esc(t.msg) : '<span class="muted">已安裝，還沒測試</span>'}</p>
+          <div class="row"><button class="btn btn-sm" id="claude-test">測試</button><button class="btn btn-sm" id="claude-login">登入／換帳號</button></div>`
+        : `<p class="small">沒裝：到 <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a> 安裝後重開。</p>`}
+        <h4 style="margin:12px 0 4px">Codex CLI</h4>
+        ${st.codex ? `<p class="small">${st.codex_test ? (st.codex_test.ok ? '<span class="pill g">✓ 可以用</span> ' : '<span class="pill r">✗ 不能用</span> ') + esc(st.codex_test.msg) : '<span class="muted">已安裝，還沒測試</span>'}</p>
+          <div class="row"><button class="btn btn-sm" id="codex-test">測試</button><button class="btn btn-sm" id="codex-login">登入（ChatGPT 帳號）</button></div>`
+        : `<p class="small">沒裝：在終端機執行 <code>npm install -g @openai/codex</code>，再按「登入」。</p>`}`) +
     setRow("row-keys", "金鑰", g.keys && g.keys.S2_API_KEY ? '<span class="pill g">✓ Semantic Scholar 已設定</span>' : '<span class="pill y">沒設定</span>', `
         <p class="small">Semantic Scholar：${g.keys && g.keys.S2_API_KEY ? `<span class="pill g">✓ 已設定</span>` : `<span class="pill y">沒設定</span>（不設也能用，只是常被限流）`}</p>
         <button class="btn btn-green" id="open-secrets">打開金鑰檔</button>
@@ -202,6 +208,9 @@ function renderSettings(st){
   });
   el.querySelector("#claude-test")?.addEventListener("click", act(async () => { el.querySelector("#claude-test").textContent = "測試中（最多 3 分鐘）…"; await API("test-claude", {}); }));
   el.querySelector("#claude-login")?.addEventListener("click", act(() => API("login-claude", {})));
+  el.querySelector("#codex-test")?.addEventListener("click", act(async () => { el.querySelector("#codex-test").textContent = "測試中…"; await API("test-codex", {}); }));
+  el.querySelector("#codex-login")?.addEventListener("click", act(() => API("login-codex", {})));
+  el.querySelectorAll('input[name="engine"]').forEach(r => r.onchange = async () => { try { await API("engine", {engine: r.value}); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); } });
   el.querySelector("#open-secrets")?.addEventListener("click", act(() => API("open-secrets", {})));
   el.querySelector("#install-uv2")?.addEventListener("click", act(async () => {
     if (!confirm("從 uv 官方網站（astral.sh）下載並安裝 uv 到你的使用者資料夾，不需要管理員權限。要安裝嗎？")) throw new Error("已取消");

@@ -25,6 +25,47 @@ def find_claude():
     return shutil.which("claude") or shutil.which("claude.cmd") or shutil.which("claude.exe")
 
 
+def find_codex():
+    """Codex CLI（OpenAI）：Claude 額度用完時的備用引擎。npm 裝在使用者資料夾時 PATH 可能沒有，多找幾個地方。"""
+    import os
+    for c in (shutil.which("codex"), shutil.which("codex.cmd"), os.path.expanduser("~/.npm-global/bin/codex"),
+              os.path.join(os.environ.get("APPDATA", ""), "npm", "codex.cmd")):
+        if c and os.path.exists(c):
+            return c
+    return None
+
+
+CODEX_PREFIX = ("（你在 phdeasy 專案根目錄。專案規則在 CLAUDE.md；各階段的做法在 .claude/skills/<名稱>/SKILL.md，需要時自己讀。"
+                "說明裡寫「派 subagent／派 agent」的地方，你沒有 subagent，就自己照那份工作說明一步一步做。"
+                "指令一律在專案根目錄用 uv run python scripts/… 跑。）\n")
+
+
+def codex_cmd(codex, prompt, session=None):
+    """Codex 在工作區裡可以寫檔、可以連網（流水線要查 OpenAlex 等）；不給整台電腦的權限。"""
+    base = [codex, "exec", "--json", "--skip-git-repo-check", "-s", "workspace-write", "-c", "sandbox_workspace_write.network_access=true"]
+    return base + (["resume", session, prompt] if session else [CODEX_PREFIX + prompt])
+
+
+def describe_codex(ev):
+    """Codex 的 --json 事件 → 給本人看的一行。"""
+    t, item = ev.get("type"), ev.get("item") or {}
+    if t == "thread.started":
+        return "Codex 已啟動"
+    if t == "item.completed":
+        if item.get("type") == "agent_message":
+            return (item.get("text") or "").strip() or None
+        if item.get("type") == "command_execution":
+            return f"▸ 指令：{str(item.get('command') or '')[:160]}"
+        if item.get("type") == "file_change":
+            return "▸ 改檔：" + "、".join(c.get("path", "") for c in item.get("changes") or [])[:160]
+        return None
+    if t == "turn.completed":
+        return "✓ 這一段跑完了"
+    if t in ("turn.failed", "error"):
+        return f"✗ 結束：{((ev.get('error') or {}).get('message') or ev.get('message') or '')[:200]}"
+    return None
+
+
 def claude_cmd(claude, prompt, session=None):
     cmd = [claude, "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--permission-mode", "dontAsk", "--allowedTools", ",".join(ALLOWED_TOOLS)]
@@ -73,6 +114,11 @@ def prompt_doc_edit(key, version, block, instruction):
     req = (instruction or "").strip() or "整體潤飾"
     return (f"AI 編修本人的文件 {key}：第 {version} 版、第 {block + 1} 段（--block {block}），本人的要求：「{req}」。"
             "照 .claude/skills/my-docs/SKILL.md 的 B 段（編修者 → apply-edit 存成新版本 → index → drive_sync），只改這一段，完成後回報 DONE 那一行。" + UNATTENDED)
+
+
+def prompt_discover_enrich():
+    return ("幫查詢教授的結果補資訊：照 .claude/skills/prof-discover/SKILL.md（--enrich-todo → 查詢者上網查 QS／US News 排名、"
+            "博士班全額資助、實驗室網址，每個值附出處 → 合成 enrich.json → --merge），完成後回報 DONE 那一行。" + UNATTENDED)
 
 
 def prompt_propose(slug):
@@ -145,6 +191,8 @@ class Jobs:
         self.workspace, self.dir = Path(workspace), Path(runs) / "_app" / "jobs"
         self.dir.mkdir(parents=True, exist_ok=True)
         self.claude, self.popen = claude, popen
+        self.codex = None
+        self.engine = lambda: "claude"  # 應用程式設定裡可以改成 "codex"（Claude 額度用完時的備用）
         self.proc, self.lock = None, threading.Lock()
         self.on_done = None  # 工作結束後要做的事（例：重建資料、同步雲端）
 
@@ -166,18 +214,25 @@ class Jobs:
         return self.proc is not None and self.proc.poll() is None
 
     def start(self, kind, prompt, title, session=None, slug=None):
-        claude = self.claude or find_claude()
-        if not claude:
-            raise RuntimeError("找不到 Claude Code：請先安裝並登入（https://claude.com/claude-code）")
+        engine = self.engine()
+        if engine == "codex":
+            exe = self.codex or find_codex()
+            if not exe:
+                raise RuntimeError("找不到 Codex CLI：請先安裝（npm install -g @openai/codex）並登入，或在設定把 AI 引擎改回 Claude Code")
+        else:
+            exe = self.claude or find_claude()
+            if not exe:
+                raise RuntimeError("找不到 Claude Code：請先安裝並登入（https://claude.com/claude-code）")
         with self.lock:
             if self.running():
                 raise RuntimeError("已經有一個工作在跑，等它到停點或跑完再開新的")
             job = {"id": time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4], "kind": kind, "title": title,
                    "slug": slug, "prompt": prompt, "session": session, "status": "running",
-                   "started": int(time.time()), "ended": None, "result": None, "cost_usd": None}
+                   "started": int(time.time()), "ended": None, "result": None, "cost_usd": None, "engine": engine}
             self._save(job)
             log = open(self.dir / f"{job['id']}.log", "a", encoding="utf-8")
-            self.proc = self.popen(claude_cmd(claude, prompt, session), cwd=str(self.workspace),
+            cmd = codex_cmd(exe, prompt, session) if engine == "codex" else claude_cmd(exe, prompt, session)
+            self.proc = self.popen(cmd, cwd=str(self.workspace),
                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
             threading.Thread(target=self._pump, args=(job, self.proc, log), daemon=True).start()
             return job
@@ -192,12 +247,20 @@ class Jobs:
             except ValueError:
                 text = line
             else:
-                if ev.get("session_id"):
-                    job["session"] = ev["session_id"]
-                if ev.get("type") == "result":
-                    job["result"] = ev.get("result")
-                    job["cost_usd"] = ev.get("total_cost_usd")
-                text = describe(ev)
+                if job.get("engine") == "codex":
+                    if ev.get("type") == "thread.started":
+                        job["session"] = ev.get("thread_id")
+                    item = ev.get("item") or {}
+                    if ev.get("type") == "item.completed" and item.get("type") == "agent_message":
+                        job["result"] = item.get("text")  # 最後一則訊息就是回報
+                    text = describe_codex(ev)
+                else:
+                    if ev.get("session_id"):
+                        job["session"] = ev["session_id"]
+                    if ev.get("type") == "result":
+                        job["result"] = ev.get("result")
+                        job["cost_usd"] = ev.get("total_cost_usd")
+                    text = describe(ev)
             if text:
                 log.write(f"[{time.strftime('%H:%M:%S')}] {text}\n")
                 log.flush()

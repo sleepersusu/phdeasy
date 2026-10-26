@@ -33,8 +33,8 @@ from urllib.parse import unquote, urlparse
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
-from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, prompt_continue,
-                           prompt_doc_edit, prompt_doc_translate, prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
+from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue,
+                           prompt_discover_enrich, prompt_doc_edit, prompt_doc_translate, prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
 FROZEN = getattr(sys, "frozen", False)  # Windows 安裝版（PyInstaller）
@@ -179,6 +179,8 @@ class App:
         self.runs = self.workspace / "runs"
         self.web = self.workspace / "web"
         self.jobs = Jobs(self.workspace, self.runs)
+        self.jobs.engine = self.engine  # 背景工作用哪個 AI：Claude Code（預設）或 Codex（備用）
+        self.codex_test = None
         self.jobs.on_done = self.after_job
         self.blocked = None
         self.closer = None
@@ -205,7 +207,8 @@ class App:
         other = busy_elsewhere(dst, device_id()) if dst and dst.exists() else None
         return {"syncing": self.syncing, "need_account": self.need_account.is_set() and not self.account_chosen.is_set(),
                 "drive_choices": self.drive_choices,
-                "claude": find_claude(), "uv": find_uv(), "drive": str(dst) if dst and dst.parent.exists() else None,
+                "claude": find_claude(), "codex": find_codex(), "engine": self.engine(),
+                "uv": find_uv(), "drive": str(dst) if dst and dst.parent.exists() else None,
                 "blocked": self.blocked or (other or {}).get("device"), "running": self.jobs.running(), "job": job,
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
                 "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})},
@@ -226,7 +229,7 @@ class App:
                 if eq and not line.lstrip().startswith("#"):
                     keys[k.strip()] = bool(v.strip().strip('"').strip("'"))
         return {"drives": drives, "account": conf.get("account") or (drives[0] if len(drives) == 1 else None),
-                "folder": str(dst) if dst else None, "claude_test": self.claude_test,
+                "folder": str(dst) if dst else None, "claude_test": self.claude_test, "codex_test": self.codex_test,
                 "keys": {"S2_API_KEY": keys.get("S2_API_KEY", False) or bool(os.environ.get("S2_API_KEY"))},
                 "workspace": str(self.workspace)}
 
@@ -282,6 +285,56 @@ class App:
             return {"ok": True, "already": True}
         self.syncing, self.blocked = True, None
         threading.Thread(target=startup, args=(self, False), daemon=True).start()
+        return {"ok": True}
+
+    def _engine_file(self):
+        return self.runs / "_app" / "engine.json"  # 只存在這台（_app 不同步）：每台可以各自選
+
+    def engine(self):
+        try:
+            return json.loads(self._engine_file().read_text()).get("engine") or "claude"
+        except (OSError, ValueError):
+            return "claude"
+
+    def set_engine(self, engine):
+        if engine not in ("claude", "codex"):
+            raise ValueError("AI 引擎只能是 Claude Code 或 Codex")
+        self._engine_file().parent.mkdir(parents=True, exist_ok=True)
+        self._engine_file().write_text(json.dumps({"engine": engine}))
+        return {"ok": True, "engine": engine}
+
+    def test_codex(self):
+        """確認 Codex CLI 裝好、也登入了：先看 codex login status，再跑一個極小的工作（唯讀、不碰檔案）。"""
+        codex = find_codex()
+        if not codex:
+            self.codex_test = {"ok": False, "msg": "找不到 Codex CLI（npm install -g @openai/codex）"}
+            return self.codex_test
+        try:
+            st = subprocess.run([codex, "login", "status"], capture_output=True, text=True, timeout=30)
+            if st.returncode != 0:
+                self.codex_test = {"ok": False, "msg": "還沒登入：按「登入 Codex」"}
+                return self.codex_test
+            r = subprocess.run([codex, "exec", "--json", "--skip-git-repo-check", "-s", "read-only", "只回覆兩個字：可以"],
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=180, cwd=str(self.workspace))
+            msgs = [json.loads(l).get("item", {}).get("text") for l in r.stdout.splitlines() if '"agent_message"' in l]
+            ok = r.returncode == 0 and bool(msgs)
+            msg = (msgs[-1] if msgs else (r.stderr or "沒有回應"))[:300]
+        except (subprocess.TimeoutExpired, OSError, ValueError) as e:
+            ok, msg = False, str(e)[:300]
+        self.codex_test = {"ok": ok, "msg": msg, "t": int(time.time())}
+        return self.codex_test
+
+    def login_codex(self):
+        """開終端機跑 codex login（瀏覽器會跳出 ChatGPT 登入頁）；登入完關掉那個視窗即可。"""
+        codex = find_codex()
+        if not codex:
+            raise ValueError("找不到 Codex CLI：請先安裝（npm install -g @openai/codex）")
+        if os.name == "nt":
+            subprocess.Popen(["cmd", "/c", "start", "Codex 登入", "cmd", "/k", codex, "login"], cwd=str(self.workspace))
+        elif sys.platform == "darwin":
+            subprocess.Popen(["osascript", "-e", f'tell application "Terminal" to do script "{shlex.quote(codex)} login"', "-e", 'tell application "Terminal" to activate'])
+        else:
+            raise ValueError("這個系統請自己在終端機執行 codex login")
         return {"ok": True}
 
     def test_claude(self):
@@ -500,6 +553,12 @@ class App:
         return {"ok": True, **o}
 
     def post(self, path, body):
+        if path == "engine":
+            return self.set_engine(body.get("engine"))
+        if path == "test-codex":
+            return self.test_codex()
+        if path == "login-codex":
+            return self.login_codex()
         if path == "doc-change":
             return self.doc_change(body)
         if path == "prof-update":
@@ -507,6 +566,12 @@ class App:
             return self.prof_owner(body.get("slug"), **upd)
         if path in ("prof-remove", "prof-restore"):
             return self.prof_owner(body.get("slug"), archived=path == "prof-remove")
+        if path == "discover-enrich":
+            if self.blocked:
+                raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑")
+            if not (self.runs / "_discover" / "latest.json").exists():
+                raise ValueError("先按「開始查詢」")
+            return self.jobs.start("discover-enrich", prompt_discover_enrich(), "查詢教授：補排名、獎學金、實驗室網址")
         if path == "discover":
             q = str(body.get("query") or "").strip()[:200]
             since = body.get("since") or datetime.now().year - 4

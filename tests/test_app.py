@@ -278,3 +278,23 @@ def test_me_update_experience_and_education(tmp_path):
     assert d["experience"][0]["role"] == "Engineer" and d["education"][0]["school"] == "NTUNHS"
     with pytest.raises(ValueError):
         app.post("me-update", {"experience": [{"role": "", "org": ""}]})
+
+
+def test_discover_enrich_starts_job(tmp_path):
+    app, calls = _lib_app(tmp_path)
+    (tmp_path / "runs" / "_discover").mkdir(parents=True)
+    (tmp_path / "runs" / "_discover" / "latest.json").write_text('{"candidates": []}')
+    app.post("discover-enrich", {})
+    assert calls[-1][1] == "discover-enrich" and "prof-discover" in calls[-1][3]
+
+
+def test_engine_choice_is_saved_and_used_by_jobs(tmp_path):
+    import pytest
+    from app import App
+    app = App(tmp_path)
+    assert app.jobs.engine() == "claude"
+    app.post("engine", {"engine": "codex"})
+    assert app.jobs.engine() == "codex" and App(tmp_path).jobs.engine() == "codex"  # 重開程式還記得（只存在這台）
+    with pytest.raises(ValueError):
+        app.post("engine", {"engine": "gpt"})
+    assert app.status()["engine"] == "codex"

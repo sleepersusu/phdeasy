@@ -353,13 +353,16 @@ function starsHTML(r){
 }
 let PROF_SORT = "stars";
 /* 查詢教授：依你的研究興趣找近幾年主導相關研究的人（scripts/discover.py），可以篩選、點開看論文，滿意才加入 */
-const DF = {funded: false, min_led: 2, min_h: 10, recent: true, country: ""};
+const DF = {funded: false, min_led: 2, min_h: 10, recent: true, country: "", qs: 0, us: 0, full: false, lab: false};
+const FUND = {full: ["g", "全額獎學金"], partial: ["y", "部分資助"], none: ["r", "自費"], unknown: ["", "資助不明"]};
 let DISC = null;
 async function loadDiscover(){ try { DISC = await getJSON("../runs/_discover/latest.json"); } catch (e) { DISC = null; } return DISC; }
 function discFilter(cs){
   const y = new Date().getFullYear() - 1;
+  const within = (r, mx) => !mx || (r != null && r <= mx);  // 跟 scripts/pipeline/discover.py 的 apply_filters 同一套
   return cs.filter(c => (!DF.funded || (c.funders || []).length) && (c.n_led || 0) >= DF.min_led && (c.h_index || 0) >= DF.min_h
-    && (!DF.recent || (c.last_year || 0) >= y) && (!DF.country || c.country === DF.country));
+    && (!DF.recent || (c.last_year || 0) >= y) && (!DF.country || c.country === DF.country)
+    && within(c.qs_rank, DF.qs) && within(c.usnews_rank, DF.us) && (!DF.full || c.phd_funding === "full") && (!DF.lab || c.lab_url));
 }
 async function renderDiscover(){
   const el = document.getElementById("disc-panel");
@@ -368,24 +371,33 @@ async function renderDiscover(){
   const list = discFilter(cs);
   el.innerHTML = `<div class="row" style="justify-content:space-between">
       <div class="small muted">${DISC ? `${esc((DISC.created || "").slice(0, 10))} 查的｜${DISC.since} 年起｜依你的 ${DISC.interests.length} 個研究興趣` : "還沒查過"}</div>
-      <div class="row"><input type="text" id="disc-q" placeholder="另外加關鍵字（選填）" style="width:14em"><button class="btn btn-green btn-sm" id="disc-run">${DISC ? "重新查詢" : "開始查詢"}</button></div></div>
+      <div class="row"><input type="text" id="disc-q" placeholder="另外加關鍵字（選填）" style="width:14em"><button class="btn btn-green btn-sm" id="disc-run">${DISC ? "重新查詢" : "開始查詢"}</button>
+        ${DISC ? `<button class="btn btn-sm" id="disc-enrich" title="AI 上網查每所學校的 QS／US News 排名、博士班是否全額資助，以及實驗室網址；每個值附出處">${DISC.enriched ? "重新補排名與獎學金" : "補排名與獎學金"}</button>` : ""}</div></div>
+    ${DISC && !DISC.enriched ? `<div class="small muted">排名、獎學金還沒補：按「補排名與獎學金」（AI 上網查，每個值附出處，約 5–15 分鐘）。</div>` : ""}
     <div class="row small" style="margin:10px 0">
       <label><input type="checkbox" id="df-funded" ${DF.funded ? "checked" : ""}> 有經費</label>
       <label>主導至少 <select id="df-led">${[1, 2, 3, 5].map(n => `<option ${n === DF.min_led ? "selected" : ""}>${n}</option>`).join("")}</select> 篇</label>
       <label>h-index ≥ <select id="df-h">${[0, 10, 20, 30].map(n => `<option ${n === DF.min_h ? "selected" : ""}>${n}</option>`).join("")}</select></label>
       <label><input type="checkbox" id="df-recent" ${DF.recent ? "checked" : ""}> 去年後還有發表</label>
       <label>國家 <select id="df-country"><option value="">全部</option>${countries.map(c => `<option ${c === DF.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
+      <label>QS <select id="df-qs">${[[0, "不限"], [50, "前 50"], [100, "前 100"], [200, "前 200"]].map(([v, l]) => `<option value="${v}" ${v === DF.qs ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label>US News <select id="df-us">${[[0, "不限"], [50, "前 50"], [100, "前 100"], [200, "前 200"]].map(([v, l]) => `<option value="${v}" ${v === DF.us ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+      <label><input type="checkbox" id="df-full" ${DF.full ? "checked" : ""}> 全額獎學金</label>
+      <label><input type="checkbox" id="df-lab" ${DF.lab ? "checked" : ""}> 有實驗室網址</label>
       <span class="muted">${list.length}／${cs.length} 位</span></div>
     <div class="small muted" style="margin-bottom:6px">「主導」＝最後作者或通訊作者，而且那篇的標題或摘要真的寫到你的興趣（不是只有主題標籤）。</div>
     <div id="disc-msg" class="small"></div>
     ${list.map(c => `<details class="profcard"><summary><div class="pc-head"><div><strong class="pc-name">${esc(c.name)}</strong>
         <div class="small muted">${esc(c.institution || "")}${c.country ? "｜" + esc(c.country) : ""}</div>
-        <div class="small" style="margin-top:4px">主導 ${c.n_led} 篇 · h-index ${c.h_index ?? "–"} · 最近 ${c.last_year || "–"} ${(c.funders || []).length ? '<span class="pill g">有經費</span>' : '<span class="pill">沒列經費</span>'}</div></div>
+        <div class="small" style="margin-top:4px">主導 ${c.n_led} 篇 · h-index ${c.h_index ?? "–"} · 最近 ${c.last_year || "–"} ${(c.funders || []).length ? '<span class="pill g">有經費</span>' : '<span class="pill">沒列經費</span>'}</div>
+        <div class="small" style="margin-top:4px">${c.qs_rank ? `<span class="pill">QS #${c.qs_rank}</span> ` : ""}${c.usnews_rank ? `<span class="pill">US News #${c.usnews_rank}</span> ` : ""}${c.phd_funding ? `<span class="pill ${FUND[c.phd_funding][0]}">${FUND[c.phd_funding][1]}</span> ` : ""}${c.lab_url ? '<span class="pill">🔬 實驗室</span>' : ""}</div></div>
         <div class="row" style="gap:4px;justify-content:flex-end;max-width:45%">${c.interests.map(i => `<span class="pill">${esc(i)}</span>`).join("")}</div></div></summary>
       <div class="pc-body">
         <ol class="top5">${c.papers.slice(0, 6).map(p => `<li>${p.doi ? `<a href="${esc(p.doi)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)} <span class="small muted">${p.year}</span></li>`).join("")}</ol>
         ${(c.funders || []).length ? `<div class="small"><strong>經費：</strong>${c.funders.slice(0, 6).map(esc).join("、")}</div>` : ""}
-        <div class="row" style="margin-top:10px"><a class="btn btn-sm" href="https://openalex.org/${esc(c.id)}" target="_blank" rel="noopener">OpenAlex</a>
+        ${c.funding_note ? `<div class="small"><strong>博士班資助：</strong>${esc(c.funding_note)} ${c.funding_src ? `<a href="${esc(c.funding_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}
+        ${c.qs_rank || c.usnews_rank ? `<div class="small"><strong>排名：</strong>${c.qs_rank ? `QS #${c.qs_rank} <a href="${esc(c.qs_src)}" target="_blank" rel="noopener">出處</a>` : ""} ${c.usnews_rank ? `US News #${c.usnews_rank} <a href="${esc(c.usnews_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}
+        <div class="row" style="margin-top:10px">${c.lab_url ? `<a class="btn btn-sm" href="${esc(c.lab_url)}" target="_blank" rel="noopener">🔬 實驗室網站</a>` : ""}<a class="btn btn-sm" href="https://openalex.org/${esc(c.id)}" target="_blank" rel="noopener">OpenAlex</a>
           ${c.orcid ? `<a class="btn btn-sm" href="https://orcid.org/${esc(c.orcid)}" target="_blank" rel="noopener">ORCID</a>` : ""}
           <button class="btn btn-green btn-sm" data-disc-add="${esc(c.id)}">＋ 加入目標教授</button></div>
       </div></details>`).join("") || `<div class="empty">${cs.length ? "沒有符合篩選的，放寬條件看看。" : "按「開始查詢」。"}</div>`}`;
@@ -395,6 +407,15 @@ async function renderDiscover(){
   el.querySelector("#df-h").onchange = e => { DF.min_h = +e.target.value; re(); };
   el.querySelector("#df-recent").onchange = e => { DF.recent = e.target.checked; re(); };
   el.querySelector("#df-country").onchange = e => { DF.country = e.target.value; re(); };
+  el.querySelector("#df-qs").onchange = e => { DF.qs = +e.target.value; re(); };
+  el.querySelector("#df-us").onchange = e => { DF.us = +e.target.value; re(); };
+  el.querySelector("#df-full").onchange = e => { DF.full = e.target.checked; re(); };
+  el.querySelector("#df-lab").onchange = e => { DF.lab = e.target.checked; re(); };
+  el.querySelector("#disc-enrich")?.addEventListener("click", async ev => {
+    ev.target.disabled = true;
+    try { await API("discover-enrich", {}); el.querySelector("#disc-msg").textContent = "已交給 AI 補資訊（右上角齒輪看進度），完成後重新整理。"; }
+    catch (e) { alert(e.message); ev.target.disabled = false; }
+  });
   el.querySelector("#disc-run").onclick = async ev => {
     ev.target.disabled = true;
     const before = (DISC || {}).created, msg = el.querySelector("#disc-msg");

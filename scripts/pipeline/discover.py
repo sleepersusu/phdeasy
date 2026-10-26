@@ -58,6 +58,56 @@ def aggregate(results, exclude):
     return sorted(out, key=lambda c: (-c["n_led"], -len(c["interests"]), -(c["last_year"] or 0), c["name"] or ""))
 
 
-def apply_filters(cands, funded=False, min_led=1, active_since=None, country=None, min_h=0):
+def apply_filters(cands, funded=False, min_led=1, active_since=None, country=None, min_h=0, qs_max=None, usnews_max=None,
+                  full_funding=False, has_lab=False):
+    def within(rank, mx):
+        return not mx or (rank is not None and rank <= mx)
     return [c for c in cands if (not funded or c.get("funders")) and c.get("n_led", 0) >= min_led and (c.get("h_index") or 0) >= min_h
-            and (not active_since or (c.get("last_year") or 0) >= active_since) and (not country or c.get("country") == country)]
+            and (not active_since or (c.get("last_year") or 0) >= active_since) and (not country or c.get("country") == country)
+            and within(c.get("qs_rank"), qs_max) and within(c.get("usnews_rank"), usnews_max)
+            and (not full_funding or c.get("phd_funding") == "full") and (not has_lab or c.get("lab_url"))]
+
+
+FUNDING = ("full", "partial", "none", "unknown")
+
+
+def _src_ok(x):
+    return isinstance(x, str) and x.startswith(("https://", "http://"))
+
+
+def check_enrich(enr):
+    """補資訊（AI 上網查的）：每個值都要有出處網址；排名是正整數；獎學金只能是 full／partial／none／unknown。"""
+    fails = []
+    for inst, d in (enr.get("institutions") or {}).items():
+        for k in ("qs", "usnews"):
+            v = d.get(k)
+            if v is None:
+                continue
+            if v.get("rank") is not None and not (isinstance(v["rank"], int) and v["rank"] > 0):
+                fails.append({"where": f"{inst}.{k}", "why": "bad_rank"})
+            if v.get("rank") is not None and not _src_ok(v.get("src")):
+                fails.append({"where": f"{inst}.{k}", "why": "no_source"})
+        f = d.get("funding")
+        if f:
+            if f.get("value") not in FUNDING:
+                fails.append({"where": f"{inst}.funding", "why": "bad_funding_value"})
+            elif f["value"] != "unknown" and not _src_ok(f.get("src")):
+                fails.append({"where": f"{inst}.funding", "why": "no_source"})
+    for aid, d in (enr.get("people") or {}).items():
+        if d.get("lab_url") and (not _src_ok(d["lab_url"]) or not _src_ok(d.get("src"))):
+            fails.append({"where": f"{aid}.lab_url", "why": "no_source"})
+    return fails
+
+
+def merge_enrich(cands, enr):
+    """把補到的排名、獎學金、實驗室網址併進候選人（沒查到的留空，篩選時當不符合）。"""
+    insts, people = enr.get("institutions") or {}, enr.get("people") or {}
+    out = []
+    for c in cands:
+        i, pz = insts.get(c.get("institution")) or {}, people.get(c["id"]) or {}
+        out.append({**c, "qs_rank": (i.get("qs") or {}).get("rank"), "qs_src": (i.get("qs") or {}).get("src"),
+                    "usnews_rank": (i.get("usnews") or {}).get("rank"), "usnews_src": (i.get("usnews") or {}).get("src"),
+                    "phd_funding": (i.get("funding") or {}).get("value"), "funding_note": (i.get("funding") or {}).get("note"),
+                    "funding_src": (i.get("funding") or {}).get("src"),
+                    "lab_url": c.get("lab_url") or pz.get("lab_url"), "lab_src": c.get("lab_src") or pz.get("src")})
+    return out

@@ -51,3 +51,23 @@ def test_group_and_journal_bylines_are_not_people():
 def test_min_h_index_filter():
     cs = [{"id": "A1", "n_led": 3, "funders": [], "last_year": 2025, "h_index": 30}, {"id": "A2", "n_led": 3, "funders": [], "last_year": 2025, "h_index": 2}]
     assert [c["id"] for c in apply_filters(cs, min_h=10)] == ["A1"]
+
+
+def test_enrichment_checked_merged_and_filtered():
+    from pipeline.discover import check_enrich, merge_enrich, apply_filters
+    enr = {"institutions": {"Uni A": {"qs": {"rank": 42, "year": 2026, "src": "https://www.topuniversities.com/x"},
+                                      "usnews": {"rank": 88, "src": "https://www.usnews.com/x"},
+                                      "funding": {"value": "full", "note": "PhD 全額", "src": "https://unia.edu/phd"}},
+                            "Uni B": {"qs": {"rank": 150, "src": ""}, "funding": {"value": "maybe"}}},
+           "people": {"A1": {"lab_url": "https://lab.unia.edu", "src": "https://unia.edu/staff/lee"}}}
+    whys = {f["why"] for f in check_enrich(enr)}
+    assert {"no_source", "bad_funding_value"} <= whys  # 沒附出處、亂填的值都會被抓
+    good = {"institutions": {"Uni A": enr["institutions"]["Uni A"]}, "people": enr["people"]}
+    assert check_enrich(good) == []
+    cs = merge_enrich([{"id": "A1", "institution": "Uni A", "n_led": 3, "funders": [], "last_year": 2025},
+                       {"id": "A2", "institution": "Uni C", "n_led": 3, "funders": [], "last_year": 2025}], good)
+    assert cs[0]["qs_rank"] == 42 and cs[0]["phd_funding"] == "full" and cs[0]["lab_url"] == "https://lab.unia.edu"
+    assert [c["id"] for c in apply_filters(cs, qs_max=50)] == ["A1"]
+    assert [c["id"] for c in apply_filters(cs, usnews_max=50)] == []
+    assert [c["id"] for c in apply_filters(cs, full_funding=True)] == ["A1"]
+    assert [c["id"] for c in apply_filters(cs, has_lab=True)] == ["A1"]
