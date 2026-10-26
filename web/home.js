@@ -112,7 +112,9 @@ function renderProposal(){
   if (!el) return;
   const ps = H.professors || [];
   if (!ps.length){ el.innerHTML = `<div class="empty">還沒有申請目標。</div>`; return; }
-  el.innerHTML = ps.map(p => {
+  /* 定案的（有你上傳的計畫書）放最上面，再來是有 AI 草稿的，最後是還沒有的 */
+  const rank = p => (H.docs || {})[`proposal--${p.slug}`] ? 0 : ((p.proposal || {}).versions || []).length ? 1 : 2;
+  el.innerHTML = [...ps].sort((a, b) => rank(a) - rank(b)).map(p => {
     const key = `proposal--${p.slug}`, has = !!(H.docs || {})[key], pr = p.proposal || {};
     const drafts = (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
         return `<li><span class="pill ${c[0]}">${c[1]}</span> <strong>${esc(v.id)}</strong>｜${bi(v.direction_zh, v.direction_en)}</li>`; }).join("")}</ul>` : "";
@@ -121,7 +123,7 @@ function renderProposal(){
           ${(() => { const now = new Date().toISOString(), up = ((H.cal || {}).events || []).filter(e => e.slug === p.slug && (e.end || e.start) >= now).sort((a, b) => a.start < b.start ? -1 : 1)[0];
             return up ? `<div class="small" style="margin-top:4px">📅 ${esc(up.summary)} <span class="pill g">${esc(new Date(up.start).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}))}</span>${up.meet ? ` <a href="${esc(up.meet)}" target="_blank" rel="noopener">Meet</a>` : ""}</div>` : ""; })()}
           ${(() => { const a = ((H.apps || {}).rows || []).find(x => x.slug === p.slug); return a ? `<div class="small" style="margin-top:4px">${a.status ? `<span class="pill">${esc(a.status)}</span> ` : ""}${a.program ? esc(a.program) + " " : ""}${a.deadline ? `<span class="pill y">截止 ${esc(a.deadline)}</span> ` : ""}${a.meeting ? `<span class="pill g">會議 ${esc(a.meeting.slice(0, 16).replace("T", " "))}</span>` : ""}</div>` : ""; })()}</div>
-        ${has ? `<span class="pill g">第 ${(H.docs[key].versions.slice(-1)[0] || {}).n} 版</span>` : (pr.versions || []).length ? `<span class="pill y">AI 草稿 ${pr.versions.length} 版</span>` : `<span class="pill">還沒有</span>`}</div></summary>
+        ${has ? `<span class="pill g">已定案｜第 ${(H.docs[key].versions.slice(-1)[0] || {}).n} 版</span>` : (pr.versions || []).length ? `<span class="pill y">AI 草稿 ${pr.versions.length} 版</span>` : `<span class="pill">還沒有</span>`}</div></summary>
       <div class="pc-body" data-doc-root>${has ? "" : drafts ? `<div class="small muted">AI 依她的方向與經費擬的草稿（<a href="professor.html?p=${encodeURIComponent(p.slug)}&v=proposal">到她的頁面看全文</a>）：</div>${drafts}` : ""}<div data-doc-slot="${esc(key)}"></div></div></details>`;
   }).join("");
   el.querySelectorAll("[data-doc-slot]").forEach(slot => renderDoc(slot.dataset.docSlot, slot));
