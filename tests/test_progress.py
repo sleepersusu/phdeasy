@@ -45,7 +45,7 @@ def test_estimate_new_job_runs_to_the_end(tmp_path):
 
 
 def test_estimate_uses_measured_rate(tmp_path):
-    r = mk(tmp_path, "cards", n=10, fulltext=10, texts=10, cards=4, extra=["work/network.json", "out/data/grants.csv"])
+    r = mk(tmp_path, "cards", n=10, fulltext=10, texts=10, cards=4, extra=["work/network.json", "out/data/grants.csv", "out/programs.json"])
     # 這一步從 1000 秒時 2 篇，到 1100 秒時 4 篇：每篇 50 秒，剩 6 篇 → 這一步還要 300 秒
     e = estimate(r, "continue", samples={"cards": (1000, 2)}, now=1100)
     cur = next(x for x in e["steps"] if x["key"] == "cards")
@@ -55,7 +55,7 @@ def test_estimate_uses_measured_rate(tmp_path):
 
 def test_done_pipeline_is_100(tmp_path):
     r = mk(tmp_path, "stop2", n=2, fulltext=2, texts=2, cards=2,
-           extra=["work/network.json", "out/data/grants.csv", "work/digest/W0.json", "out/profile.md", "out/match.json"])
+           extra=["work/network.json", "out/data/grants.csv", "work/digest/W0.json", "out/profile.md", "out/match.json", "out/programs.json"])
     e = estimate(r, "continue")
     assert e["percent"] == 100 and e["eta_s"] == 0
 
@@ -64,3 +64,13 @@ def test_deep_job_span(tmp_path):
     r = mk(tmp_path, "stop2", n=4, fulltext=4, texts=4, cards=3)
     e = estimate(r, "deep")
     assert [x["key"] for x in e["steps"]] == ["fulltext", "ingest", "cards", "digest"] and e["current"] == "cards"
+
+
+def test_programs_step_counts(tmp_path):
+    r = mk(tmp_path, "ingest", n=2, fulltext=2)
+    keys = [x["key"] for x in steps_of(r)]
+    assert keys.index("programs") == keys.index("fulltext") + 1
+    assert {x["key"]: x for x in steps_of(r)}["programs"]["done"] == 0
+    (r / "out").mkdir()
+    (r / "out" / "programs.json").write_text("{}")
+    assert {x["key"]: x for x in steps_of(r)}["programs"]["done"] == 1

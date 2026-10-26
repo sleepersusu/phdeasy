@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 # (key, 名稱, 每項預設秒數；固定步驟 total=1 就是整步的秒數)
-STEPS = [("list", "列文章與比對", 180), ("fulltext", "找全文", 15), ("ingest", "轉成文字", 3), ("network", "合作與領域", 60),
+STEPS = [("list", "列文章與比對", 180), ("fulltext", "找全文", 15), ("programs", "查博士學程", 300), ("ingest", "轉成文字", 3), ("network", "合作與領域", 60),
          ("grants", "研究計畫", 900), ("cards", "文章解析卡", 45), ("digest", "重點、圖表與研究方法", 60),
          ("profile", "總覽撰寫", 900), ("match", "與你的研究比對", 600), ("verify", "獨立驗收", 900)]
 DONE_STAGES = {"stop2"}
@@ -55,6 +55,7 @@ def steps_of(run):
     counts = {
         "list": one(works is not None),
         "fulltext": (min(len(tried), n), n),
+        "programs": one((run / "out" / "programs.json").exists()),
         "ingest": (len([t for t in (w / "text").glob("*.txt") if t.stem in ids]), n),
         "network": one((w / "network.json").exists()),
         "grants": one((run / "out" / "data" / "grants.csv").exists()),
