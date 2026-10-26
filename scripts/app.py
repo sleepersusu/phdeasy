@@ -449,7 +449,22 @@ class App:
         mep.write_text(json.dumps({**me, **new}, ensure_ascii=False, indent=2))
         return {"ok": True, "changed": sorted(new)}
 
+    def _run_discover(self, args):
+        """查詢教授：在背景跑 scripts/discover.py（只查 OpenAlex 公開資料，不開始建檔），結果寫 runs/_discover/latest.json。"""
+        def go():
+            uv = find_uv()
+            if uv:
+                subprocess.run([uv, "run", "python", "scripts/discover.py", *args], cwd=str(self.workspace), capture_output=True, timeout=900)
+        threading.Thread(target=go, daemon=True).start()
+
     def post(self, path, body):
+        if path == "discover":
+            q = str(body.get("query") or "").strip()[:200]
+            since = body.get("since") or datetime.now().year - 4
+            if not isinstance(since, int) or not 2000 <= since <= datetime.now().year:
+                raise ValueError("起始年份不對")
+            self._run_discover((["--query", q] if q else []) + ["--from", str(since)])
+            return {"started": True}
         if path == "me-update":
             return self.me_update(body)
         if path in ("doc-edit", "doc-translate"):
@@ -702,13 +717,34 @@ def startup(app, choose=True):
         b["done"] = True
 
 
+def open_mac_window(url, app):
+    """Mac：跟 ieltsgod 一樣用 pywebview 開自己的視窗（不經過 Chrome）；沒有 pywebview 就回 False 走舊的方式。
+    視窗關掉才回來；自動更新要重開時（app.quitting）由這裡把視窗關掉。"""
+    try:
+        import webview
+    except Exception as e:
+        print(f"沒有 pywebview（{e}），改用瀏覽器視窗")
+        return False
+    win = webview.create_window("我的博士申請", url, width=1360, height=900, min_size=(900, 600))
+
+    def watch_quit():
+        app.quitting.wait()
+        try:
+            win.destroy()
+        except Exception:
+            pass
+    threading.Thread(target=watch_quit, daemon=True).start()
+    webview.start()  # 主執行緒在這裡等到視窗關掉
+    return True
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--workspace", default=str(default_workspace()))
     ap.add_argument("--port", type=int, default=8790)
     ap.add_argument("--no-browser", action="store_true")
     ap.add_argument("--browser", action="store_true", help="用一般瀏覽器開，不開成獨立視窗")
-    ap.add_argument("--window", action="store_true", help="Mac 也開成獨立視窗（用 Chrome）")
+    ap.add_argument("--window", action="store_true", help="沒有 pywebview 時，Mac 也用 Chrome 開成獨立視窗")
     a = ap.parse_args()
     ws = Path(a.workspace)
     ws.mkdir(parents=True, exist_ok=True)
@@ -766,6 +802,11 @@ def main():
                 print(f"同步失敗：{e}")
     threading.Thread(target=periodic, daemon=True).start()
 
+    if sys.platform == "darwin" and not (a.browser or a.no_browser) and open_mac_window(url, app):
+        stop.set()  # 關掉視窗＝結束：最後同步、釋放使用中、停掉正在跑的流水線
+        close_all()
+        srv.shutdown()
+        return
     exe = None if (a.browser or a.no_browser) else find_app_browser()
     if exe and (FROZEN or os.name == "nt" or a.window):
         win = AppWindow(exe, url, ws / ".window")

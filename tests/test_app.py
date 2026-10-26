@@ -221,3 +221,14 @@ def test_me_update_saves_allowed_fields_and_keeps_backup(tmp_path):
     assert len(backups) == 1 and json.loads(backups[0].read_text())["summary"] == "old"
     with pytest.raises(ValueError):
         app.post("me-update", {"interests": [{"en": ""}]})
+
+
+def test_discover_runs_search_in_background_with_safe_args(tmp_path):
+    import pytest
+    app, calls = _lib_app(tmp_path)
+    ran = []
+    app._run_discover = lambda args: ran.append(args)
+    r = app.post("discover", {"query": "digital twin", "since": 2023})
+    assert r["started"] and ran == [["--query", "digital twin", "--from", "2023"]]
+    with pytest.raises(ValueError):
+        app.post("discover", {"since": "abc"})

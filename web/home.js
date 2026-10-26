@@ -278,6 +278,68 @@ function starsHTML(r){
   return `<span class="stars" role="img" aria-label="匹配程度 ${s.n} 顆星（共 5 顆）" title="你的 ${n} 個興趣與 CV 項目：強相關 ${st}、部分相關 ${pa}">${"★".repeat(s.n)}<span class="off">${"★".repeat(5 - s.n)}</span></span>`;
 }
 let PROF_SORT = "stars";
+/* 查詢教授：依你的研究興趣找近幾年主導相關研究的人（scripts/discover.py），可以篩選、點開看論文，滿意才加入 */
+const DF = {funded: false, min_led: 2, min_h: 10, recent: true, country: ""};
+let DISC = null;
+async function loadDiscover(){ try { DISC = await getJSON("../runs/_discover/latest.json"); } catch (e) { DISC = null; } return DISC; }
+function discFilter(cs){
+  const y = new Date().getFullYear() - 1;
+  return cs.filter(c => (!DF.funded || (c.funders || []).length) && (c.n_led || 0) >= DF.min_led && (c.h_index || 0) >= DF.min_h
+    && (!DF.recent || (c.last_year || 0) >= y) && (!DF.country || c.country === DF.country));
+}
+async function renderDiscover(){
+  const el = document.getElementById("disc-panel");
+  if (!DISC) await loadDiscover();
+  const cs = (DISC || {}).candidates || [], countries = [...new Set(cs.map(c => c.country).filter(Boolean))].sort();
+  const list = discFilter(cs);
+  el.innerHTML = `<div class="row" style="justify-content:space-between">
+      <div class="small muted">${DISC ? `${esc((DISC.created || "").slice(0, 10))} 查的｜${DISC.since} 年起｜依你的 ${DISC.interests.length} 個研究興趣` : "還沒查過"}</div>
+      <div class="row"><input type="text" id="disc-q" placeholder="另外加關鍵字（選填）" style="width:14em"><button class="btn btn-green btn-sm" id="disc-run">${DISC ? "重新查詢" : "開始查詢"}</button></div></div>
+    <div class="row small" style="margin:10px 0">
+      <label><input type="checkbox" id="df-funded" ${DF.funded ? "checked" : ""}> 有經費</label>
+      <label>主導至少 <select id="df-led">${[1, 2, 3, 5].map(n => `<option ${n === DF.min_led ? "selected" : ""}>${n}</option>`).join("")}</select> 篇</label>
+      <label>h-index ≥ <select id="df-h">${[0, 10, 20, 30].map(n => `<option ${n === DF.min_h ? "selected" : ""}>${n}</option>`).join("")}</select></label>
+      <label><input type="checkbox" id="df-recent" ${DF.recent ? "checked" : ""}> 去年後還有發表</label>
+      <label>國家 <select id="df-country"><option value="">全部</option>${countries.map(c => `<option ${c === DF.country ? "selected" : ""}>${esc(c)}</option>`).join("")}</select></label>
+      <span class="muted">${list.length}／${cs.length} 位</span></div>
+    <div class="small muted" style="margin-bottom:6px">「主導」＝最後作者或通訊作者，而且那篇的標題或摘要真的寫到你的興趣（不是只有主題標籤）。</div>
+    <div id="disc-msg" class="small"></div>
+    ${list.map(c => `<details class="profcard"><summary><div class="pc-head"><div><strong class="pc-name">${esc(c.name)}</strong>
+        <div class="small muted">${esc(c.institution || "")}${c.country ? "｜" + esc(c.country) : ""}</div>
+        <div class="small" style="margin-top:4px">主導 ${c.n_led} 篇 · h-index ${c.h_index ?? "–"} · 最近 ${c.last_year || "–"} ${(c.funders || []).length ? '<span class="pill g">有經費</span>' : '<span class="pill">沒列經費</span>'}</div></div>
+        <div class="row" style="gap:4px;justify-content:flex-end;max-width:45%">${c.interests.map(i => `<span class="pill">${esc(i)}</span>`).join("")}</div></div></summary>
+      <div class="pc-body">
+        <ol class="top5">${c.papers.slice(0, 6).map(p => `<li>${p.doi ? `<a href="${esc(p.doi)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : esc(p.title)} <span class="small muted">${p.year}</span></li>`).join("")}</ol>
+        ${(c.funders || []).length ? `<div class="small"><strong>經費：</strong>${c.funders.slice(0, 6).map(esc).join("、")}</div>` : ""}
+        <div class="row" style="margin-top:10px"><a class="btn btn-sm" href="https://openalex.org/${esc(c.id)}" target="_blank" rel="noopener">OpenAlex</a>
+          ${c.orcid ? `<a class="btn btn-sm" href="https://orcid.org/${esc(c.orcid)}" target="_blank" rel="noopener">ORCID</a>` : ""}
+          <button class="btn btn-green btn-sm" data-disc-add="${esc(c.id)}">＋ 加入目標教授</button></div>
+      </div></details>`).join("") || `<div class="empty">${cs.length ? "沒有符合篩選的，放寬條件看看。" : "按「開始查詢」。"}</div>`}`;
+  const re = () => renderDiscover();
+  el.querySelector("#df-funded").onchange = e => { DF.funded = e.target.checked; re(); };
+  el.querySelector("#df-led").onchange = e => { DF.min_led = +e.target.value; re(); };
+  el.querySelector("#df-h").onchange = e => { DF.min_h = +e.target.value; re(); };
+  el.querySelector("#df-recent").onchange = e => { DF.recent = e.target.checked; re(); };
+  el.querySelector("#df-country").onchange = e => { DF.country = e.target.value; re(); };
+  el.querySelector("#disc-run").onclick = async ev => {
+    ev.target.disabled = true;
+    const before = (DISC || {}).created, msg = el.querySelector("#disc-msg");
+    try {
+      await API("discover", {query: el.querySelector("#disc-q").value});
+      msg.textContent = "查詢中（OpenAlex，約 1–3 分鐘）…";
+      for (let i = 0; i < 90; i++){ await new Promise(r => setTimeout(r, 3000)); await loadDiscover(); if (DISC && DISC.created !== before) break; }
+      renderDiscover();
+    } catch (e) { msg.textContent = "查詢失敗：" + e.message; ev.target.disabled = false; }
+  };
+  el.querySelectorAll("[data-disc-add]").forEach(b => b.onclick = async () => {
+    const c = cs.find(x => x.id === b.dataset.discAdd);
+    if (!confirm(`把 ${c.name}（${c.institution}）加入目標教授？Claude Code 會開始建她的教授檔案（約 10–30 分鐘）。`)) return;
+    b.disabled = true;
+    try { await API("new", {name: c.name, institution: c.institution, orcid: c.orcid || ""}); location.href = "settings.html"; }
+    catch (e) { alert(e.message); b.disabled = false; }
+  });
+}
+
 function renderProfs(ps){
   /* 目標教授：每位一張收合卡，只放重要資訊與「必讀前五篇」（跟你最相關的），其他點進教授頁看；右上角可依星星排序 */
   const el = body("professors");
@@ -287,7 +349,9 @@ function renderProfs(ps){
       <span></span>
       <span class="row" style="flex:none"><label class="small" for="prof-sort">${T("排序", "Sort")}</label><select id="prof-sort">
         <option value="stars">★ ↓</option><option value="stars-asc">★ ↑</option><option value="name">A–Z</option></select>
-        ${window.APP_REMATCH ? `<button class="btn btn-green" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ 新增教授</button>` : ""}</span></div>
+        ${window.APP_REMATCH ? `<button class="btn" id="disc-btn" aria-expanded="false" aria-controls="disc-panel">🔍 ${T("查詢教授", "Find professors")}</button>
+          <button class="btn btn-green" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ ${T("新增教授", "Add")}</button>` : ""}</span></div>
+      ${window.APP_REMATCH ? `<div class="card" id="disc-panel" hidden style="margin-bottom:12px"></div>` : ""}
       ${window.APP_REMATCH ? `<form class="card" id="add-prof-form" hidden style="margin-bottom:12px">
         <p class="small muted" style="margin-top:0">按「開始建檔」後，Claude Code 會在背景找身分、列文章、找全文，跑到停 1 停下來請你確認（通常 10–30 分鐘，進度在右上角「工作進度」）。</p>
         <label for="np-name">教授姓名（必填）</label><input type="text" id="np-name" placeholder="例：Liliana Laranjo" required>
@@ -310,6 +374,8 @@ function renderProfs(ps){
       };
       if (location.hash === "#new") toggle(true);
     }
+    const dbtn = document.getElementById("disc-btn"), dpanel = document.getElementById("disc-panel");
+    if (dbtn) dbtn.onclick = () => { dpanel.hidden = !dpanel.hidden; dbtn.setAttribute("aria-expanded", String(!dpanel.hidden)); if (!dpanel.hidden) renderDiscover(); };
   }
   if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按上面的「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
   const score = p => (matchStars(p.recommend) || {score: -1}).score;
