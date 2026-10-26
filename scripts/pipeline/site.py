@@ -309,6 +309,7 @@ def build_site_data(run):
         "me_query": _me_query(owner),
         "basic": {**_basic(wd, grants), "programs": _programs(run)},
         "library": _library(run), "drafts": _drafts(run),
+        "meeting": _j(run / "meeting.json"),  # 會議準備（本人資料，只在本機與雲端硬碟）
         "joint_proposal": _joint(run, owner),
         "proposal_draft": _proposal(run, owner, grants),
         "recommend": _recommend(run, owner),

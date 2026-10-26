@@ -192,7 +192,7 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
     </div>
   </div></div></header>
 <nav class="sections" aria-label="區段"><div class="wrap"><a href="#match">與我的研究比對</a><a href="#overview">總覽</a><a href="#profile">教授總覽</a><a href="#decisions">待你決定</a><a href="#coauthors">合作者</a><a href="#topics">研究領域</a><a href="#grants">研究計畫</a><a href="#papers">文章解析</a><a href="#exceptions">例外紀錄</a><a href="#files">檔案</a></div></nav>
-<main class="wrap"><section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">研究計畫書</h2><div class="body"></div></section><section id="library" aria-labelledby="h-library"><h2 id="h-library">討論文獻</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
+<main class="wrap"><section id="meeting" aria-labelledby="h-meeting"><h2 id="h-meeting">會議準備</h2><div class="body"></div></section><section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">研究計畫書</h2><div class="body"></div></section><section id="library" aria-labelledby="h-library"><h2 id="h-library">討論文獻</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
 <footer class="wrap" id="foot"></footer>
 <!-- 大意 --><!-- 研究設計 --><!-- 研究樣本 --><!-- 研究缺口 --><!-- 解決什麼 --><!-- 發現 --><!-- 研究限制 -->
 <script id="inline-data" type="application/json">__INLINE__</script>
@@ -652,6 +652,8 @@ let OFFLINE = false;
 const VIEW = () => new URLSearchParams(location.search).get("v") || (location.hash.startsWith("#paper-") ? "papers" : "");
 const viewHref = v => `professor.html?p=${encodeURIComponent(new URLSearchParams(location.search).get("p") || "")}${v ? "&v=" + v : ""}`;
 const VIEWS = [
+  ["meeting", "會議準備", "下次會議的時間、你寄過的信、要問的問題、會前要讀的",
+   d => d.meeting ? (d.meeting.when || {}).local || "已準備" : "還沒有"],
   ["proposal", "研究計畫書", "定案的計畫書，或 AI 依她的方向擬的幾個版本",
    d => [d.joint_proposal ? "已定案" : "", draftVersions(d).length ? `草稿 ${draftVersions(d).length} 版${d.proposal_draft.stale ? "（過期）" : ""}` : ""].filter(Boolean).join("＋") || "還沒有"],
   ["library", "討論文獻", "她給你的文獻：中英重點、研究方法、圖表；勾選幾篇擬初稿",
@@ -886,6 +888,29 @@ function versionHTML(v, opt = {}){
     ${sec("風險與限制｜Risks", v.risks)}`;
 }
 
+function meetingView(){
+  /* 會議小抄：左英右中；開會時對著問（英文可以直接念） */
+  const el = body("meeting"), m = D.meeting;
+  if (!el) return;
+  if (!m){ el.innerHTML = `<div class="empty">還沒有會議準備。要跟這位教授開會時，跟 Claude 說「幫我準備跟 ${esc(D.professor.name || "")} 的會議」。</div>`; return; }
+  const refs = r => (r || []).length ? `<div class="small muted">依據：${r.map(x => /^W\d+$/.test(x) ? `<a href="${OFFLINE ? "#paper-" + esc(x) : paperPage(x)}">${esc(x)}</a>` : esc(x)).join("、")}</div>` : "";
+  const items = xs => (xs || []).map(x => `<div style="margin:8px 0">${lr(x.zh, x.en)}${refs(x.refs)}</div>`).join("");
+  const w = m.when || {};
+  el.innerHTML = `<div class="card" style="margin-top:8px">
+      <div class="row" style="justify-content:space-between"><strong style="font-size:1.15rem">${esc(m.title || "會議")}</strong>${m.format ? pill("", m.format) : ""}</div>
+      <div style="margin-top:6px">${w.local ? `<strong>${esc(w.local)}</strong>` : ""}${w.theirs ? ` <span class="muted">（${esc(w.theirs)}）</span>` : ""}</div>
+      ${m.updated ? `<div class="small muted" style="margin-top:4px">整理於 ${esc(m.updated)}</div>` : ""}</div>
+    ${m.email ? `<h3>你寄給她的信${m.email.date ? `（${esc(m.email.date)}）` : ""}</h3>
+      ${m.email.subject ? `<div class="small muted">主旨：${esc(m.email.subject)}${m.email.link ? `　<a href="${esc(m.email.link)}" target="_blank" rel="noopener">在 Gmail 打開</a>` : ""}</div>` : ""}
+      ${items(m.email.points)}
+      ${(m.email.asked || []).length ? `<h4>你在信裡問的</h4>${items(m.email.asked)}` : ""}` : ""}
+    ${(m.context || []).length ? `<h3>開會前要知道</h3>${items(m.context)}` : ""}
+    ${(m.questions || []).map((g, i) => `<h3>${i === 0 ? "要問的問題｜" : ""}${esc((g.group || {}).zh || "")}<span class="small muted" lang="en"> ${esc((g.group || {}).en || "")}</span></h3>
+      <ol style="padding-left:20px">${(g.items || []).map(x => `<li style="margin:10px 0">${lr(x.zh, x.en)}${refs(x.refs)}</li>`).join("")}</ol>`).join("")}
+    ${(m.readings || []).length ? `<h3>會前快速看</h3><ul>${m.readings.map(r => { const wk = (D.works || []).find(x => x.id === r.id);
+        return `<li style="margin:6px 0"><a href="${OFFLINE ? "#paper-" + esc(r.id) : paperPage(r.id)}">${esc((wk && (wk.title_zh || wk.title)) || r.id)}</a>${r.why ? `<div class="small muted">${esc(r.why)}</div>` : ""}</li>`; }).join("")}</ul>` : ""}`;
+}
+
 function proposalView(){
   const el = body("proposal"), p = D.joint_proposal, d = D.proposal_draft, vs = draftVersions(D);
   if (!p && !vs.length){
@@ -1046,7 +1071,7 @@ async function loadData(){
   document.title = (D.professor.name || "") + " 研究檔案";
   setLang(store.get("lang") || "both");
   initLangMenu(setLang);
-  header(); proposalView(); libraryView(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files();
+  header(); meetingView(); proposalView(); libraryView(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files();
   if (OFFLINE){ navHighlight(); }   // 離線單檔版：全部放在一頁
   else { setupViews(); }            // 應用程式：教授首頁是按鈕，一個按鈕進一個區塊
   openFromHash();
