@@ -65,7 +65,16 @@ def apply_filters(cands, funded=False, min_led=1, active_since=None, country=Non
     return [c for c in cands if (not funded or c.get("funders")) and c.get("n_led", 0) >= min_led and (c.get("h_index") or 0) >= min_h
             and (not active_since or (c.get("last_year") or 0) >= active_since) and (not country or c.get("country") == country)
             and within(c.get("qs_rank"), qs_max) and within(c.get("usnews_rank"), usnews_max)
-            and (not full_funding or c.get("phd_funding") == "full") and (not has_lab or c.get("lab_url"))]
+            and (not full_funding or best_funding(c) == "full") and (not has_lab or c.get("lab_url"))]
+
+
+def best_funding(c):
+    """全額資助看教授本人掛名的博士學程（有查到就只看學程）；沒查到學程才退回學校層級。"""
+    progs = c.get("programs") or []
+    if progs:
+        vals = [(p.get("funding") or {}).get("value") for p in progs]
+        return next((v for v in FUNDING if v in vals), None)
+    return c.get("phd_funding")
 
 
 FUNDING = ("full", "partial", "none", "unknown")
@@ -94,9 +103,44 @@ def check_enrich(enr):
             elif f["value"] != "unknown" and not _src_ok(f.get("src")):
                 fails.append({"where": f"{inst}.funding", "why": "no_source"})
     for aid, d in (enr.get("people") or {}).items():
+        fails += [{**f, "where": f"{aid}.{f['where']}"} for f in check_programs(d.get("programs") or [])]
         if d.get("lab_url") and (not _src_ok(d["lab_url"]) or not _src_ok(d.get("src"))):
             fails.append({"where": f"{aid}.lab_url", "why": "no_source"})
     return fails
+
+
+def check_programs(progs):
+    """教授掛名的博士學程：名稱、官方教員名單（看得到他名字的那頁）出處；資助值與出處。"""
+    fails = []
+    for i, p in enumerate(progs):
+        w = f"programs[{i}]"
+        if not (p.get("name") or "").strip():
+            fails.append({"where": w, "why": "no_name"})
+        elif not _src_ok(p.get("member_src")):
+            fails.append({"where": w, "why": "no_member_source"})
+        f = p.get("funding") or {"value": "unknown"}
+        if f.get("value") not in FUNDING:
+            fails.append({"where": w, "why": "bad_funding_value"})
+        elif f["value"] != "unknown" and not _src_ok(f.get("src")):
+            fails.append({"where": w, "why": "no_source"})
+    return fails
+
+
+def enrich_todo(cands, enr):
+    """還沒補過的學校與人（重新查詢後只補新出現的）。"""
+    insts, people = enr.get("institutions") or {}, enr.get("people") or {}
+    return {"institutions": sorted({c["institution"] for c in cands if c.get("institution") and c["institution"] not in insts}),
+            "people": [{"id": c["id"], "name": c["name"] if "name" in c else None, "institution": c.get("institution")}
+                       for c in cands if "programs" not in (people.get(c["id"]) or {})]}  # programs 是空清單＝查過、沒有掛名的學程
+
+
+def combine_enrich(old, new):
+    """新補的併進舊的（同一所學校、同一個人：新的欄位蓋過舊的）。"""
+    out = {"institutions": dict(old.get("institutions") or {}), "people": dict(old.get("people") or {})}
+    for k in ("institutions", "people"):
+        for key, v in (new.get(k) or {}).items():
+            out[k][key] = {**(out[k].get(key) or {}), **v}
+    return out
 
 
 def merge_enrich(cands, enr):
@@ -109,5 +153,6 @@ def merge_enrich(cands, enr):
                     "usnews_rank": (i.get("usnews") or {}).get("rank"), "usnews_src": (i.get("usnews") or {}).get("src"),
                     "phd_funding": (i.get("funding") or {}).get("value"), "funding_note": (i.get("funding") or {}).get("note"),
                     "funding_src": (i.get("funding") or {}).get("src"),
-                    "lab_url": c.get("lab_url") or pz.get("lab_url"), "lab_src": c.get("lab_src") or pz.get("src")})
+                    "lab_url": c.get("lab_url") or pz.get("lab_url"), "lab_src": c.get("lab_src") or pz.get("src"),
+                    "programs": pz.get("programs")})
     return out

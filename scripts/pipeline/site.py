@@ -198,6 +198,19 @@ def _basic(wd, grants):
     return {**(_j(wd / "basic.json") or {}), "active_grants": act}
 
 
+def _programs(run):
+    """教授掛名的博士學程：自己查過的（out/programs.json）優先；沒有就用查詢教授結果裡同一個人（ORCID 或全名）的。"""
+    own = _j(run / "out" / "programs.json")
+    if own is not None:
+        return {**own, "from": "own"}
+    prof = (_j(run / "state.json", {}) or {}).get("professor") or {}
+    norm = lambda n: " ".join((n or "").lower().replace(".", " ").split())
+    for c in (_j(run.parent / "_discover" / "latest.json", {}) or {}).get("candidates") or []:
+        if c.get("programs") is not None and ((prof.get("orcid") and c.get("orcid") == prof["orcid"]) or norm(c.get("name")) == norm(prof.get("name"))):
+            return {"checked": None, "programs": c["programs"], "from": "discover"}
+    return None
+
+
 def _me_query(owner):
     """比對表單的預填：本人 CV 摘要＋研究興趣＋能力領域（不用與教授共同討論的研究計畫）。"""
     if not owner:
@@ -292,7 +305,7 @@ def build_site_data(run):
         "grants": grants, "grants_reviewed": grants_reviewed,
         "match_docs": match_docs(wlist, grants),
         "me_query": _me_query(owner),
-        "basic": _basic(wd, grants),
+        "basic": {**_basic(wd, grants), "programs": _programs(run)},
         "library": _library(run), "drafts": _drafts(run),
         "joint_proposal": _joint(run, owner),
         "proposal_draft": _proposal(run, owner, grants),

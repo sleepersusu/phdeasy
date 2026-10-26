@@ -35,7 +35,7 @@ from urllib.parse import unquote, urlparse
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
-from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue,
+from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue, prompt_programs,
                            prompt_discover_enrich, prompt_doc_edit, prompt_doc_translate, prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
@@ -814,6 +814,11 @@ class App:
                 raise ValueError("找不到這筆未解決的例外（可能已經處理過，重新整理看看）")
             return self.jobs.start("exception", prompt_exception(slug, exc, body.get("action"), body.get("note") or ""),
                                    f"例外：{slug} {exc['id']}", slug=slug)
+        if path == "programs":
+            slug = self._lib_slug(body.get("slug"))
+            pr = (json.loads((self.runs / slug / "state.json").read_text()) or {}).get("professor") or {}
+            return self.jobs.start("programs", prompt_programs(slug, pr.get("name") or slug, pr.get("institution") or "", pr.get("orcid")),
+                                   f"博士學程：{pr.get('name') or slug}", slug=slug)
         if path == "match":
             slug = (body.get("slug") or "").strip()
             if not (self.runs / slug / "state.json").exists():

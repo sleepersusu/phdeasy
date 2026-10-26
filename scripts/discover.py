@@ -1,8 +1,10 @@
 """查詢教授：依本人的研究興趣（runs/_me/me.json）找近幾年主導相關研究的人 → runs/_discover/latest.json（首頁「查詢教授」讀它）。
 
   uv run python scripts/discover.py [--query "額外關鍵字"] [--from 2022] [--top 40]
-  uv run python scripts/discover.py --enrich-todo     # 列出要補排名／獎學金的學校與要補實驗室網址的人（給 AI 補資訊）
-  uv run python scripts/discover.py --merge           # 核對 runs/_discover/enrich.json（每個值都要有出處）並併進 latest.json
+  uv run python scripts/discover.py --enrich-todo     # 列出還沒補過的學校（排名、獎學金）與人（掛名的博士學程、實驗室網址）
+  uv run python scripts/discover.py --merge           # 核對 AI 新補的 runs/_discover/enrich-new.json（每個值都要有出處），累積進 enrich.json 再併進 latest.json
+
+重新查詢時，enrich.json 裡已補過的學校與人照留，只有新出現的要補。
 
 只呼叫 OpenAlex（公開資料）；本人按「加入目標教授」之前，不會開始建教授檔案。
 """
@@ -12,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
-from pipeline.discover import aggregate, check_enrich, interest_query, merge_enrich
+from pipeline.discover import aggregate, check_enrich, best_funding, combine_enrich, enrich_todo, interest_query, merge_enrich
 from pipeline.http import get_json, openalex_params
 
 RUNS = Path(__file__).resolve().parent.parent / "runs"
@@ -66,24 +68,28 @@ def main():
     out = RUNS / "_discover"
     if a.enrich_todo or a.merge:
         d = json.loads((out / "latest.json").read_text())
+        enr_p, new_p = out / "enrich.json", out / "enrich-new.json"
+        enr = json.loads(enr_p.read_text()) if enr_p.exists() else {}
         if a.enrich_todo:
-            insts = sorted({c["institution"] for c in d["candidates"] if c.get("institution")})
-            print(json.dumps({"institutions": insts, "people_without_lab": [{"id": c["id"], "name": c["name"], "institution": c.get("institution")}
-                                                                            for c in d["candidates"] if not c.get("lab_url")]}, ensure_ascii=False, indent=1))
+            print(json.dumps(enrich_todo(d["candidates"], enr), ensure_ascii=False, indent=1))
             return
-        enr = json.loads((out / "enrich.json").read_text())
-        fails = check_enrich(enr)
+        new = json.loads(new_p.read_text()) if new_p.exists() else {}
+        fails = check_enrich(new)
         for f in fails:
             print(f"FAIL {f['where']} {f['why']}")
         if fails:
             raise SystemExit(1)
+        enr = combine_enrich(enr, new)
+        enr_p.write_text(json.dumps(enr, ensure_ascii=False, indent=1))
+        if new_p.exists():
+            new_p.unlink()
         d["candidates"] = merge_enrich(d["candidates"], enr)
         d["enriched"] = datetime.now().astimezone().isoformat(timespec="seconds")
         (out / "latest.json").write_text(json.dumps(d, ensure_ascii=False, indent=1))
         cs = d["candidates"]
         cnt = lambda f: sum(1 for c in cs if f(c))
         print(f"DONE 補資訊併入 {len(cs)} 位：QS {cnt(lambda c: c.get('qs_rank'))}、US News {cnt(lambda c: c.get('usnews_rank'))}、"
-              f"全額 {cnt(lambda c: c.get('phd_funding') == 'full')}、實驗室網址 {cnt(lambda c: c.get('lab_url'))}")
+              f"全額 {cnt(lambda c: best_funding(c) == 'full')}、查過學程 {cnt(lambda c: c.get('programs') is not None)}、實驗室網址 {cnt(lambda c: c.get('lab_url'))}")
         return
     me = json.loads((RUNS / "_me" / "me.json").read_text())
     labels = [i.get("en") for i in me.get("interests") or [] if i.get("en")] + ([a.query] if a.query.strip() else [])
@@ -100,8 +106,11 @@ def main():
     enrich(cands)
     cands = [c for c in cands if c.get("institution")][: a.top]  # 沒有機構的（多半是署名或資料不全）不列
     out.mkdir(exist_ok=True)
-    (out / "latest.json").write_text(json.dumps({"created": datetime.now().astimezone().isoformat(timespec="seconds"), "since": a.since,
-                                                 "interests": labels, "candidates": cands}, ensure_ascii=False, indent=1))
+    res = {"created": datetime.now().astimezone().isoformat(timespec="seconds"), "since": a.since, "interests": labels, "candidates": cands}
+    if (out / "enrich.json").exists():  # 之前補過的學校與人照留
+        res["candidates"] = merge_enrich(cands, json.loads((out / "enrich.json").read_text()))
+        res["enriched"] = res["created"]
+    (out / "latest.json").write_text(json.dumps(res, ensure_ascii=False, indent=1))
     print(f"DONE 查詢教授：{len(cands)} 位（{a.since} 年起、主導的論文標題或摘要寫到你的興趣）")
 
 

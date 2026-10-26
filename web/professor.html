@@ -659,6 +659,7 @@ function basicHTML(){
       ${subs ? `<dt><strong>近五年主要領域</strong></dt><dd style="margin:0">${subs}</dd>` : ""}
       ${(b.keywords || []).length ? `<dt><strong>關鍵字（ORCID）</strong></dt><dd style="margin:0">${b.keywords.map(esc).join("、")}</dd>` : ""}
       ${co ? `<dt><strong>最常合作</strong></dt><dd style="margin:0">${co}</dd>` : ""}
+      <dt><strong>博士學程</strong></dt><dd style="margin:0" id="prog-cell">${programsHTML(b.programs)}</dd>
       <dt><strong>期間內的經費</strong></dt><dd style="margin:0">${ag.length ? ag.map(g => `<div>${pill(...(GSTAT[g.status] || ["", g.status]))} ${esc(g.title || g.funder || g.key)} <span class="muted">（${esc(g.period || "")}）</span></div>`).join("") : "目前查不到"}</dd>
       ${hist.length > 1 ? `<dt><strong>經歷（ORCID）</strong></dt><dd style="margin:0">${hist.map(e => `<div>${esc([e.title, e.department, e.institution].filter(Boolean).join("｜"))}${e.since || e.until ? `（${esc(e.since || "?")}–${esc(e.until || "今")}）` : ""}</div>`).join("")}</dd>` : ""}
       ${(b.educations || []).length ? `<dt><strong>學歷（ORCID）</strong></dt><dd style="margin:0">${b.educations.map(e => `<div>${esc([e.title, e.institution].filter(Boolean).join("｜"))}${e.until ? `（${esc(e.until)}）` : ""}</div>`).join("")}</dd>` : ""}
@@ -708,6 +709,27 @@ async function meetingsCard(){
     } catch (e) { alert(e.message); b.disabled = false; }
   });
 }
+
+const FUND = {full: ["g", "全額資助"], partial: ["y", "部分資助"], none: ["r", "自費"], unknown: ["", "資助查不到"]};
+function programsHTML(pg){
+  /* 她本人掛名、可以收博士生的學程（官方教員名單為證）與各學程的資助；能不能收你、有沒有錢看的是學程，不是全校 */
+  const btn = APP ? ` <button class="btn btn-sm" data-programs>${pg ? "重新查" : "查博士學程"}</button>` : "";
+  if (!pg) return `<span class="muted">還沒查</span>${btn}`;
+  if (!(pg.programs || []).length) return `<span class="muted">查過，官方名單上找不到她掛名的博士學程${pg.checked ? `（${esc(pg.checked)}）` : ""}</span>${btn}`;
+  return pg.programs.map(p => { const f = p.funding || {}, [c, t] = FUND[f.value] || FUND.unknown;
+    return `<div style="margin-bottom:6px"><a href="${esc(p.url || p.member_src)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a>
+      ${pill(c, t + (f.years ? `・${f.years} 年` : ""))}${f.stipend ? ` <span class="small">${esc(f.stipend)}</span>` : ""}
+      <div class="small muted">${f.note ? esc(f.note) + "｜" : ""}<a href="${esc(p.member_src)}" target="_blank" rel="noopener">教員名單</a>${f.src ? `・<a href="${esc(f.src)}" target="_blank" rel="noopener">資助出處</a>` : ""}</div></div>`; }).join("")
+    + `<div class="small muted">${pg.from === "discover" ? "來自查詢教授的結果" : pg.checked ? "查於 " + esc(pg.checked) : ""}${btn}</div>`;
+}
+document.addEventListener("click", async ev => {
+  const b = ev.target.closest("[data-programs]");
+  if (!b) return;
+  if (APP.running){ alert("已經有一個工作在跑，等它跑完再按"); return; }
+  if (!confirm(`請 AI 上網查 ${D.professor.name} 本人掛名的博士學程（官方教員名單）與各學程的資助？約 5–10 分鐘。`)) return;
+  b.disabled = true;
+  try { await APIX("programs", {slug: SLUG}); location.href = "settings.html"; } catch (e) { alert(e.message); b.disabled = false; }
+});
 
 let HOME_HREF = "index.html";
 function crumbs(v){
@@ -996,7 +1018,8 @@ async function loadData(){
   openFromHash();
   window.addEventListener("hashchange", openFromHash);
   meetingsCard();
-  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); proposalView(); libraryView(); meetingsCard(); } } catch (e) {}  // 離線單檔版沒有 /api
+  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok){ APP = await r.json(); exceptions(); proposalView(); libraryView(); meetingsCard();
+    const pc = document.getElementById("prog-cell"); if (pc) pc.innerHTML = programsHTML((D.basic || {}).programs); } } catch (e) {}  // 離線單檔版沒有 /api
 })();
 </script>
 </body>

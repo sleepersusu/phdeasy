@@ -71,3 +71,46 @@ def test_enrichment_checked_merged_and_filtered():
     assert [c["id"] for c in apply_filters(cs, usnews_max=50)] == []
     assert [c["id"] for c in apply_filters(cs, full_funding=True)] == ["A1"]
     assert [c["id"] for c in apply_filters(cs, has_lab=True)] == ["A1"]
+
+
+CPH = {"name": "Computational Precision Health (UCSF–UC Berkeley joint PhD)", "url": "https://computationalhealth.ucsf.edu/",
+       "member_src": "https://computationalhealth.ucsf.edu/faculty/page/3",
+       "funding": {"value": "full", "years": 5, "note": "學費、雜費＋生活津貼 5 年", "src": "https://computationalhealth.ucsf.edu/?p=181"}}
+
+
+def test_programs_checked():
+    """教授掛名的博士學程：要有官方教員名單出處；資助要有出處；值只能是四種。"""
+    from pipeline.discover import check_enrich, check_programs
+    assert check_programs([CPH]) == []
+    bad = [{**CPH, "member_src": None}, {**CPH, "funding": {"value": "full"}}, {**CPH, "funding": {"value": "lots", "src": "https://x"}},
+           {**CPH, "name": ""}]
+    assert [f["why"] for f in check_programs(bad)] == ["no_member_source", "no_source", "bad_funding_value", "no_name"]
+    whys = {f["why"] for f in check_enrich({"people": {"A1": {"programs": [{**CPH, "member_src": "x"}]}}})}
+    assert whys == {"no_member_source"}
+
+
+def test_full_funding_uses_professor_programs_over_school():
+    from pipeline.discover import apply_filters, merge_enrich
+    enr = {"institutions": {"UCSF": {"funding": {"value": "unknown"}}, "Uni B": {"funding": {"value": "full", "src": "https://b"}}},
+           "people": {"A1": {"programs": [CPH]}, "A3": {"programs": [{**CPH, "funding": {"value": "partial", "src": "https://p"}}]}}}
+    cs = merge_enrich([{"id": a, "institution": i, "n_led": 1} for a, i in (("A1", "UCSF"), ("A2", "Uni B"), ("A3", "Uni B"))], enr)
+    assert cs[0]["programs"][0]["name"].startswith("Computational Precision Health")
+    # A1：學校查不到，但他掛名的學程全額 → 算；A2：沒查到學程，用學校的；A3：他掛名的學程只有部分資助 → 不算（看學程，不看學校）
+    assert [c["id"] for c in apply_filters(cs, full_funding=True)] == ["A1", "A2"]
+
+
+def test_reenrich_keeps_previous_on_new_search():
+    """重新查詢：之前補過的人與學校照留，只有新出現的要補。"""
+    from pipeline.discover import enrich_todo, merge_enrich
+    enr = {"institutions": {"UCSF": {"qs": {"rank": 20, "src": "https://q"}}}, "people": {"A1": {"programs": [CPH]}}}
+    cs = merge_enrich([{"id": "A1", "institution": "UCSF"}, {"id": "A9", "institution": "Uni Z"}], enr)
+    assert cs[0]["qs_rank"] == 20 and cs[1].get("programs") is None
+    todo = enrich_todo(cs, enr)
+    assert todo["institutions"] == ["Uni Z"] and [p["id"] for p in todo["people"]] == ["A9"]
+
+
+def test_combine_enrich_accumulates():
+    from pipeline.discover import combine_enrich
+    old = {"institutions": {"UCSF": {"qs": {"rank": 20, "src": "https://q"}}}, "people": {"A1": {"lab_url": "https://l", "src": "https://s"}}}
+    got = combine_enrich(old, {"institutions": {"Uni Z": {}}, "people": {"A1": {"programs": [CPH]}}})
+    assert set(got["institutions"]) == {"UCSF", "Uni Z"} and got["people"]["A1"]["lab_url"] == "https://l" and got["people"]["A1"]["programs"]

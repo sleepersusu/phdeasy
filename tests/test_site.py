@@ -207,7 +207,7 @@ def test_site_data_has_basic_info_and_current_grants(tmp_path):
     assert d["basic"]["position"]["title"] == "Professor" and d["basic"]["metrics"]["h_index"] == 3
     assert isinstance(d["basic"]["active_grants"], list)
     (run / "work" / "basic.json").unlink()
-    assert build_site_data(run)["basic"] == {"active_grants": build_site_data(run)["basic"]["active_grants"]}
+    assert build_site_data(run)["basic"] == {"active_grants": build_site_data(run)["basic"]["active_grants"], "programs": None}
 
 
 def test_site_data_lists_library_papers_and_drafts(tmp_path):

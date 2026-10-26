@@ -117,8 +117,14 @@ def prompt_doc_edit(key, version, block, instruction):
 
 
 def prompt_discover_enrich():
-    return ("幫查詢教授的結果補資訊：照 .claude/skills/prof-discover/SKILL.md（--enrich-todo → 查詢者上網查 QS／US News 排名、"
-            "博士班全額資助、實驗室網址，每個值附出處 → 合成 enrich.json → --merge），完成後回報 DONE 那一行。" + UNATTENDED)
+    return ("幫查詢教授的結果補資訊：照 .claude/skills/prof-discover/SKILL.md 的 A（--enrich-todo 只列還沒補過的 → 查詢者上網查 QS／US News 排名、"
+            "每位教授掛名的博士學程與資助、實驗室網址，每個值附出處 → 合成 enrich-new.json → --merge），完成後回報 DONE 那一行。" + UNATTENDED)
+
+
+def prompt_programs(slug, name, institution, orcid=None):
+    return (f"查 {name}（{institution}{'，ORCID ' + orcid if orcid else ''}）本人掛名、可以收博士生的博士學程與各學程的資助："
+            f"照 .claude/skills/prof-discover/SKILL.md 的 B，寫 runs/{slug}/work/programs.json，再跑 scripts/programs.py runs/{slug}，"
+            "完成後回報 DONE 那一行。" + UNATTENDED)
 
 
 def prompt_propose(slug):

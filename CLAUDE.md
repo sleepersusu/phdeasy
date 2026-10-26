@@ -61,7 +61,7 @@
 | verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
 | 本人計畫書與自述 | `me_proposal.py import <計畫書.docx>`、`me_proposal.py statement ps|sop <檔案.docx>`（首頁 Personal Statement／SOP 頁籤）：依原檔順序匯入段落、圖（原始圖檔）、表（真的表格）到 `runs/_me/`（不進 git），教授頁「研究計畫書」照原排版顯示 |
 | 本人文件 | `mydocs.py upload／block／apply-edit／check／index／migrate`（skill `my-docs`）：Research Proposal、Personal Statement、Statement of Purpose 的版本（`runs/_me/docs/`），上傳成新版、每段 AI 編修成新版、背景翻中文 |
-| 查詢教授 | `discover.py`：依本人研究興趣找近年主導相關研究（最後或通訊作者、標題或摘要寫到該興趣）的人 → `runs/_discover/latest.json`；本人按「加入目標教授」才開始建檔 |
+| 查詢教授 | `discover.py`：依本人研究興趣找近年主導相關研究（最後或通訊作者、標題或摘要寫到該興趣）的人 → `runs/_discover/latest.json`；`--enrich-todo／--merge` 補排名、教授掛名的博士學程與資助、實驗室網址（skill `prof-discover`，已補的累積在 `enrich.json`，重新查詢不丟）；`programs.py runs/<slug>` 核對已建檔教授的博士學程；本人按「加入目標教授」才開始建檔 |
 | 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |
 | 應用程式 | `app.py`（Windows 安裝版／雙擊 `開啟教授檔案.command`）：伺服 `web/`（做好的 HTML／JS）與 `runs/` 的 JSON；首頁可建新教授、停點回覆、繼續，由 `pipeline/jobs.py` 在背景叫 Claude Code（dontAsk＋限定工具；設定可改用 Codex 當備用引擎）；打開、每 3 分鐘、關掉時同步雲端；打開時匯入 Notion「博士申請追蹤」（`pipeline/notion.py` → `runs/_me/applications.json`）與 Google 日曆會議（`pipeline/gcal.py` → `runs/_me/calendar.json`） |
 | 前端 | `web/index.html`、`web/professor.html`、`web/site_match.js`、`web/app.js` 是正本；`build_site.py`／`build_home.py` 只產生資料（`data.json`、`professors.json`）與離線單檔版 |
