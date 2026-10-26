@@ -207,7 +207,7 @@ def run_all(run):
     run = Path(run)
     works = _j(run / "work" / "works.json", [])
     out = [check_hashes(run), check_works(run, works)]
-    out += check_cards(run, works)
+    out += check_cards(run, [w for w in works if w.get("kind") != "title"])  # 只列標題的（不在必讀前五篇）沒有解析卡
     out += [check_network(run), check_grants(run), check_profile(run, works)]
     out += check_index(run, works)
     out += [check_ris(run, works), check_state(run, works), check_i18n(run, works)]

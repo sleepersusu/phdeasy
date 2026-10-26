@@ -115,6 +115,8 @@ def is_preprint_url(url):
 
 
 def needs_fulltext(w):
+    if w["kind"] == "title":  # 不在必讀前五篇：只列標題，不找全文
+        return False
     return w["kind"] == "full" or w.get("short_reason") == "not_led"
 
 

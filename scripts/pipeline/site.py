@@ -87,6 +87,8 @@ def _card(run, wid, kind, source_type):
             fields.append({"key": key, "label": label, "state": v.get("status", "ok"), "text": v.get("text"),
                            "text_en": en.get(key) if isinstance(en.get(key), str) else None, "citations": v.get("citations") or [], "facts": facts})
     note = "由「文章解析卡（cards）」階段產生，尚未執行" if c is None else None
+    if kind == "title":
+        note = "不在你必讀的前五篇：只列標題與摘要，沒有解析（停 1 可以換進必讀）"
     if kind == "short":
         note = (note + "；" if note else "") + "短卡：會議摘要或社論只填大意"
     if source_type == "abstract":

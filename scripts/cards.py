@@ -21,7 +21,8 @@ from pipeline.state import append_progress
 
 
 def _works(run):
-    return json.loads((run / "work" / "works.json").read_text())
+    """要寫解析卡的文章：只列標題的（不在必讀前五篇）不寫。"""
+    return [w for w in json.loads((run / "work" / "works.json").read_text()) if w.get("kind") != "title"]
 
 
 def _text(run, wid):

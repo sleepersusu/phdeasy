@@ -46,12 +46,22 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
    uv run python scripts/setup_list_works.py runs/<slug> --author <A id> --from 2022 --to 2026 --affil "<機構關鍵字>"
    ```
    `--affil` 用 PubMed 能比對到的機構片語（例 `San Francisco`），避免同姓縮寫的其他人混進來。
-   - 文章超過 80 篇 → 熔斷：`state_cli.py stage runs/<slug> halted --set 'circuit={"tripped":true,"reason":"文章 N 篇 > 80"}'`，問本人要不要縮範圍，停下。
+   - 文章多也不熔斷：只有必讀前五篇會做完整流程（本人 2026-10-26）。
    接著補摘要（OpenAlex 沒摘要的改向 Europe PMC 要）：
    ```bash
    uv run python scripts/fill_abstracts.py runs/<slug>
    ```
-3. **全文找尋鏈**（可能要幾分鐘，超過 2 分鐘就背景執行）
+   **挑必讀前五篇**（本人 2026-10-26：只有這幾篇抓全文、寫解析卡與重點，其他只列標題）：
+   ```bash
+   uv run python scripts/focus.py inputs runs/<slug>
+   ```
+   派一個挑選者（`model: opus`）：「讀 `.claude/skills/prof-setup/focus-picker.md` 照做。<slug>」。回來後：
+   ```bash
+   uv run python scripts/focus.py check runs/<slug>    # FAIL 就把失敗清單交回挑選者修一輪
+   uv run python scripts/focus.py apply runs/<slug>
+   ```
+   套用後其他文章 `kind` 變成 `title`：全文找尋、轉文字、解析卡、重點、圖表都會跳過它們。
+3. **全文找尋鏈**（只找必讀的幾篇，很快）
    ```bash
    uv run python scripts/setup_fulltext.py runs/<slug>
    ```
@@ -71,13 +81,14 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
 ## 3. 給本人看（停 1 呈現順序）
 
 1. 熔斷或例外（有的話）
-2. 身分：作者 id、ORCID、機構；與本人描述不符之處
-3. 需要決定的事：外部候選要不要加入、未合併的預印本是否同一篇、機構不符或疑似重複的文章
-4. 數字：篇數、全文找到幾篇、各來源各幾篇
-5. 找不到免費全文的清單（`missing.md`），請本人下載後丟進 `runs/<slug>/inbox/`，檔名隨意
-6. 檔案位置：`stop1-report.md`、`pdfs/<年>/`、`out/zotero/<slug>.ris`（Zotero「檔案 → 匯入」即可連同 PDF 一起進文獻庫）
+2. **必讀前五篇**（`work/focus.json`）：每篇標題、年份、挑選理由；告訴本人想換哪篇可以直接說（例：「W123 換成 W456」）
+3. 身分：作者 id、ORCID、機構；與本人描述不符之處
+4. 需要決定的事：外部候選要不要加入、未合併的預印本是否同一篇、機構不符或疑似重複的文章
+5. 數字：篇數、必讀幾篇找到全文、各來源各幾篇
+6. 必讀裡找不到免費全文的（`missing.md`），請本人下載後丟進 `runs/<slug>/inbox/`，檔名隨意
+7. 檔案位置：`stop1-report.md`、`pdfs/<年>/`、`out/zotero/<slug>.ris`（Zotero「檔案 → 匯入」即可連同 PDF 一起進文獻庫）
 
-不要替本人做 3 的決定。
+不要替本人做 4 的決定。
 
 ## 4. 本人確認之後
 
@@ -88,6 +99,7 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
   uv run python scripts/setup_fulltext.py runs/<slug> --only <新 id，逗號分隔>
   ```
   年份不一致、作者 id 沒連上會自動記成註記類例外（不算熔斷）。OpenAlex 查不到的 DOI → 回報本人，記例外。
+- 本人要換必讀的篇：`uv run python scripts/focus.py apply runs/<slug> --ids <五個 id，逗號分隔>`，再 `setup_fulltext.py runs/<slug> --only <新換進來的 id>`、重跑 `setup_report.py`。
 - 本人說要移除的文章：從 `works.json` 移到 `work/dropped.json`，`reason: "removed_by_owner"`。
 - 本人補了 inbox → `uv run python scripts/setup_fulltext.py runs/<slug> --retry-missing`，再重跑 `setup_report.py`。
 - 把本人的決定逐條追加到 `protocol.md` 的「例外」與 `progress.md`。

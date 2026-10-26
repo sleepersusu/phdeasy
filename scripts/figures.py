@@ -87,7 +87,7 @@ def figure_pdf(run, w):
 
 def extract(run):
     ing = json.loads((run / "work" / "ingest.json").read_text())
-    wmap = {w["id"]: w for w in json.loads((run / "work" / "works.json").read_text())}
+    wmap = {w["id"]: w for w in json.loads((run / "work" / "works.json").read_text()) if w.get("kind") != "title"}
     works = set(wmap)
     fd = run / "work" / "figures"
     fd.mkdir(parents=True, exist_ok=True)

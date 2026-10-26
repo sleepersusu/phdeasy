@@ -62,7 +62,7 @@ def build_inputs(me, works, cards, grants):
     for w in works:
         c = cards.get(w["id"])
         if not c or c.get("basis") == "title_only":
-            text = ""
+            text = w.get("abstract") or ""  # 沒有解析卡（只列標題的文章）：用摘要
         else:
             text = _card_text(c)
         papers[w["id"]] = {"title": w.get("title"), "year": w.get("year"), "kind": w.get("kind"), "text": (w.get("title") or "") + "\n" + text}

@@ -39,7 +39,8 @@ def steps_of(run):
     run = Path(run)
     w = run / "work"
     works = _j(w / "works.json", None)
-    n = len(works) if isinstance(works, list) else 0
+    deep = [x for x in works if x.get("kind") != "title"] if isinstance(works, list) else []  # 只列標題的不算進後面的步驟
+    n = len(deep)
     tried = set()
     try:
         for line in open(w / "fulltext_log.jsonl", encoding="utf-8"):
@@ -49,11 +50,13 @@ def steps_of(run):
                 pass
     except OSError:
         pass
+    ids = {x["id"] for x in deep}
+    tried &= ids
     one = lambda ok: (1 if ok else 0, 1)
     counts = {
         "list": one(works is not None),
         "fulltext": (min(len(tried), n), n),
-        "ingest": (min(len(list((w / "text").glob("*.txt"))), n), n),
+        "ingest": (len([t for t in (w / "text").glob("*.txt") if t.stem in ids]), n),
         "network": one((w / "network.json").exists()),
         "grants": one((run / "out" / "data" / "grants.csv").exists()),
         "cards": (min(len(list((w / "cards").glob("*/card.json"))), n), n),

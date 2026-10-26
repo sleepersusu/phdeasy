@@ -24,6 +24,7 @@ uv run python scripts/state_cli.py show runs/<slug>
 
 ## 2. 主流程
 
+0. **確認已挑必讀前五篇**：沒有 `work/focus.json`（停 1 之前開始的批次）→ 照 `prof-setup` 第 2 步「挑必讀前五篇」做（inputs → 挑選者 → check → apply），再 `uv run python scripts/setup_fulltext.py runs/<slug> --only <必讀的 id>` 補這幾篇的全文。之後所有步驟只處理這幾篇；其他文章 `kind` 是 `title`，只列標題。
 1. **補 inbox 的全文**（本人在停 1 後丟進 `inbox/` 的 PDF；沒有新檔也照跑，很快）
    ```bash
    uv run python scripts/setup_fulltext.py runs/<slug> --retry-missing

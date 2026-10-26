@@ -91,7 +91,7 @@ def main():
     run = Path(args.run)
     wd = run / "work"
     (wd / "text").mkdir(exist_ok=True)
-    works = json.loads((wd / "works.json").read_text())
+    works = [w for w in json.loads((wd / "works.json").read_text()) if w.get("kind") != "title"]  # 只列標題的（不在必讀前五篇）不轉文字
     index = load_index(run)
     hashes_p = wd / "hashes.json"
     hashes = json.loads(hashes_p.read_text()) if hashes_p.exists() else {}

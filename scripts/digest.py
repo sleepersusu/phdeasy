@@ -20,7 +20,7 @@ def _j(p, d=None):
 
 
 def _ctx(run):
-    works = {w["id"]: w for w in _j(run / "work" / "works.json", [])}
+    works = {w["id"]: w for w in _j(run / "work" / "works.json", []) if w.get("kind") != "title"}  # 只列標題的不整理
     ing = _j(run / "work" / "ingest.json", {})
     return works, ing
 
