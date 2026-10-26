@@ -461,6 +461,7 @@ function topics(){
 }
 
 let grantFilter = "mine";
+let grantPage = 1;  // 研究計畫分頁：一頁 5 筆
 function grants(){
   const el = body("grants");
   if (!D.grants.length){ el.innerHTML = `<div class="empty">還沒有研究計畫資料，由「研究計畫」階段產生。</div>`; return; }
@@ -471,7 +472,17 @@ function grants(){
     other: ["協同主持人", g => g.status === "other"],
   };
   const btn = (k, cls) => `<button class="btn ${cls}" aria-pressed="${grantFilter === k}" data-g="${k}">${groups[k][0]}（${D.grants.filter(groups[k][1]).length}）</button>`;
-  const list = D.grants.filter(groups[grantFilter][1]);
+  const all = D.grants.filter(groups[grantFilter][1])
+    .sort((a, b) => (b.end || b.start || b.announced || b.round || "").localeCompare(a.end || a.start || a.announced || a.round || ""));  // 時間最新的在前
+  const PER = 5, pages = Math.max(1, Math.ceil(all.length / PER));
+  grantPage = Math.min(Math.max(1, grantPage), pages);
+  const list = all.slice((grantPage - 1) * PER, grantPage * PER);
+  const pager = pages > 1 ? `<nav class="row" aria-label="計畫分頁" style="justify-content:center;gap:4px;margin-top:10px">
+      <button class="btn btn-sm" data-gp="${grantPage - 1}" ${grantPage === 1 ? "disabled" : ""} aria-label="上一頁">‹</button>
+      ${Array.from({length: pages}, (_, i) => i + 1).filter(n => n === 1 || n === pages || Math.abs(n - grantPage) <= 2).map((n, i, arr) =>
+        (i && n - arr[i - 1] > 1 ? `<span class="muted">…</span>` : "") + `<button class="btn btn-sm" data-gp="${n}" ${n === grantPage ? 'aria-current="page" style="background:var(--green);color:#fff"' : ""}>${n}</button>`).join("")}
+      <button class="btn btn-sm" data-gp="${grantPage + 1}" ${grantPage === pages ? "disabled" : ""} aria-label="下一頁">›</button>
+      <span class="small muted" style="margin-left:6px">共 ${all.length} 筆</span></nav>` : "";
   el.innerHTML = `
     ${D.grants_reviewed ? "" : `<div class="item attn">${pill("y", "? 尚未經推翻者檢查")} 這份清單還沒跑完研究計畫階段。</div>`}
     <p class="muted">只有 NIH／NSF 等資料庫列她為主持人、且姓名與機構都吻合的才算「主持人」。只在論文致謝出現的不算她的計畫。</p>
@@ -486,8 +497,9 @@ function grants(){
       ${g.works.length ? `<div class="small">相關文章：${g.works.map(id => `<a href="#paper-${id}">${id}</a>`).join(" ")}</div>` : ""}
       ${(g.evidence || []).filter(e => e.quote).slice(0, 2).map(e => `<blockquote>"${esc(e.quote)}" <span class="loc">[${esc(e.work_id)}, ${esc(e.loc)}]</span></blockquote>`).join("")}
       ${g.refute && g.refute.reason ? `<div class="small muted">檢查結果：${esc(g.refute.reason)}</div>` : ""}
-    </li>`).join("") || `<li class="empty">這一類沒有計畫。試試其他分類。</li>`}</ul>`;
-  el.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { grantFilter = b.dataset.g; grants(); el.querySelector(`[data-g="${grantFilter}"]`).focus(); });
+    </li>`).join("") || `<li class="empty">這一類沒有計畫。試試其他分類。</li>`}</ul>${pager}`;
+  el.querySelectorAll("[data-g]").forEach(b => b.onclick = () => { grantFilter = b.dataset.g; grantPage = 1; grants(); el.querySelector(`[data-g="${grantFilter}"]`).focus(); });
+  el.querySelectorAll("[data-gp]").forEach(b => b.onclick = () => { grantPage = +b.dataset.gp; grants(); el.scrollIntoView({block: "start"}); });
 }
 
 const PF = {q: "", ft: "all", year: "all"};
