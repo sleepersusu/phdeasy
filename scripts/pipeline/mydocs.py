@@ -19,12 +19,13 @@ DOC_KINDS = {"proposal": ("Research Proposal", "研究計畫書"), "ps": ("Perso
 
 
 def doc_key(kind, slug=None):
-    """Personal Statement 與 SOP 各一份；Research Proposal 可以每位教授一份（proposal--<教授>）。"""
+    """Personal Statement 一份；Research Proposal 每位教授一份（proposal--<教授>）；
+    Statement of Purpose 每個學校系所一份（sop--<系所 id>，本人 2026-10-26）。"""
     if kind not in DOC_KINDS:
         raise ValueError(f"沒有這種文件：{kind}")
     if slug and not re.fullmatch(r"[a-z0-9-]+", slug):
         raise ValueError(f"教授代號不對：{slug}")
-    return f"{kind}--{slug}" if kind == "proposal" and slug else kind
+    return f"{kind}--{slug}" if kind in ("proposal", "sop") and slug else kind
 
 
 def parse_upload(path):

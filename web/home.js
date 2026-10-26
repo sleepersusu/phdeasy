@@ -194,13 +194,27 @@ async function renderDoc(key, el, opts = {}){
 }
 function renderStatement(kind){
   const el = body(kind);
-  if (el) renderDoc(kind, el);
+  if (!el) return;
+  if (kind === "sop") return renderSop(el);
+  renderDoc(kind, el);
+}
+function renderSop(el){
+  /* Statement of Purpose：一個學校的一個系所一份（本人 2026-10-26），依申請目標的學校 → 系所列出 */
+  const schools = (H.targets || {}).schools || [];
+  if (!schools.length){ el.innerHTML = `<div class="empty">還沒有申請目標的學校系所。到「申請目標」按右上角的學校 icon 新增，這裡就會出現每個系所一份 SOP。</div>`; return; }
+  el.innerHTML = schools.map(sc => `<section class="school" style="margin-bottom:16px"><h3 style="margin:6px 0 4px">🏛 ${esc(sc.name)}</h3>
+    ${sc.departments.map(d => { const key = `sop--${d.id}`, info = (H.docs || {})[key], n = info ? (info.versions.slice(-1)[0] || {}).n : null;
+      return `<details class="profcard" ${info ? "open" : ""}><summary><div class="pc-head"><div><strong class="pc-name">${esc(d.name)}</strong></div>
+          ${info ? `<span class="pill g" style="flex:none;white-space:nowrap">第 ${n} 版</span>` : `<span class="pill" style="flex:none;white-space:nowrap">還沒有</span>`}</div></summary>
+        <div class="pc-body" data-doc-root><div data-doc-slot="${esc(key)}"></div></div></details>`; }).join("")}</section>`).join("");
+  el.querySelectorAll("[data-doc-slot]").forEach(slot => renderDoc(slot.dataset.docSlot, slot));
 }
 document.addEventListener("change", async ev => {
   const t = ev.target;
   if (t.matches("[data-doc-ver]")){ DOC_VIEW[t.dataset.docVer] = +t.value; renderDoc(t.dataset.docVer, t.closest("[data-doc-slot]") || t.closest("section .body")); return; }
   if (t.matches("[data-doc-upload]") && t.files.length){
-    const key = t.dataset.docUpload, [kind, slug] = key.split("--"), f = t.files[0], ext = f.name.split(".").pop().toLowerCase();
+    const key = t.dataset.docUpload, cut = key.indexOf("--"), kind = cut < 0 ? key : key.slice(0, cut), slug = cut < 0 ? "" : key.slice(cut + 2);  // 系所 id 本身可能含 --
+    const f = t.files[0], ext = f.name.split(".").pop().toLowerCase();
     const msg = (t.closest("[data-doc-slot]") || t.closest("section .body")).querySelector("[data-doc-msg]");
     msg.textContent = "上傳中…";
     try {

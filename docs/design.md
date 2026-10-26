@@ -320,4 +320,5 @@ phdeasy/
   - 研究計畫：資料庫（NIH／NSF／NHMRC／ARC）列她為主持人、腳本已比對姓名機構而 confirmed 的不推翻；`grants.py merge` 寫 `refute_todo.json`，空的就不派推翻者。
   - 總覽：一頁速覽、研究設計與樣本、合作網絡、研究計畫由腳本套固定句型（`work/profile/auto.json`，期間以今天判斷）；撰寫者與推翻者只處理研究主線、演變、下一步、可以問的問題。
   - 學歷：UCSF 教授用官方 Profiles API（`scripts/education.py`）；其他學校由博士學程查詢者從官方個人頁、CV、LinkedIn 公開頁讀，每筆附出處（`out/education.json`），優先於 ORCID。
+- **SOP 依學校系所**（本人 2026-10-26）：Statement of Purpose 一個學校的一個系所一份（`runs/_me/docs/sop--<系所 id>/`），SOP 頁依申請目標的學校 → 系所列出，各自上傳、版本、每段 AI 編修；Personal Statement 仍只有一份。
 

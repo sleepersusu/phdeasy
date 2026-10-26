@@ -84,3 +84,10 @@ def test_manual_edit_delete_insert_each_make_new_versions(tmp_path):
         change(root, "ps", base=4, op="edit", block=0, en="")
     with pytest.raises(ValueError):
         change(root, "ps", base=4, op="drop-table", block=0)
+
+
+def test_sop_one_per_department():
+    """本人 2026-10-26：Statement of Purpose 一個學校的一個系所一份（系所 id 來自申請目標，可能含 --）。"""
+    dept = "university-of-california-san-francisco--computational-precision-health-phd-ucsfu"
+    assert doc_key("sop", dept) == f"sop--{dept}"
+    assert doc_key("sop") == "sop" and doc_key("ps", "x") == "ps"  # Personal Statement 仍只有一份
