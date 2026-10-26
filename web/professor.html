@@ -926,10 +926,11 @@ function meetingView(){
       <div class="row" style="justify-content:space-between"><strong style="font-size:1.15rem">${esc(m.title || "會議")}</strong>${m.format ? pill("", m.format) : ""}</div>
       <div style="margin-top:6px">${w.local ? `<strong>${esc(w.local)}</strong>` : ""}${w.theirs ? ` <span class="muted">（${esc(w.theirs)}）</span>` : ""}</div>
       ${m.updated ? `<div class="small muted" style="margin-top:4px">整理於 ${esc(m.updated)}</div>` : ""}</div>
-    ${m.email ? `<h3>你寄給她的信${m.email.date ? `（${esc(m.email.date)}）` : ""}</h3>
+    ${m.email ? `<h3>${esc(m.email.label || "你寄給她的信")}${m.email.date ? `（${esc(m.email.date)}）` : ""}</h3>
       ${m.email.subject ? `<div class="small muted">主旨：${esc(m.email.subject)}${m.email.link ? `　<a href="${esc(m.email.link)}" target="_blank" rel="noopener">在 Gmail 打開</a>` : ""}</div>` : ""}
       ${items(m.email.points)}
-      ${(m.email.asked || []).length ? `<h4>你在信裡問的</h4>${items(m.email.asked)}` : ""}` : ""}
+      ${(m.email.asked || []).length ? `<h4>${esc(m.email.asked_label || "你在信裡問的")}</h4>${items(m.email.asked)}` : ""}` : ""}
+    ${(m.sections || []).map(sec => `<h3>${esc(sec.title || "")}</h3>${items(sec.items)}`).join("")}
     ${(m.context || []).length ? `<h3>開會前要知道</h3>${items(m.context)}` : ""}
     ${(m.questions || []).map((g, i) => `<h3>${i === 0 ? "要問的問題｜" : ""}${esc((g.group || {}).zh || "")}<span class="small muted" lang="en"> ${esc((g.group || {}).en || "")}</span></h3>
       <ol style="padding-left:20px">${(g.items || []).map(x => `<li style="margin:10px 0">${lr(x.zh, x.en)}${refs(x.refs)}</li>`).join("")}</ol>`).join("")}

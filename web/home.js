@@ -46,6 +46,10 @@ function renderCard(m){
       return en || zh ? `<div class="small" style="margin-top:8px">${bi(zh, en, "div")}</div>` : ""; })()}
     ${(m.education || []).length ? `<div class="pedu"><div class="role" style="margin-bottom:6px">${T("學歷", "Education")}</div>${m.education.map(e =>
         `<div class="small"><strong>${esc(e.degree)}</strong><div class="muted">${esc(e.school)}（${esc(e.years)}）</div></div>`).join("")}</div>` : ""}
+    ${(m.supervision || []).map(sv => `<div class="pedu"><div class="role" style="margin-bottom:6px">${T("指導教授", "Supervisors")}</div>
+        <div class="small muted" style="margin-bottom:4px">${esc(sv.program || "")}${sv.intake ? `（${esc(sv.intake)}）` : ""}</div>
+        ${(sv.supervisors || []).map(x => `<div class="small" style="margin:3px 0">${x.slug ? `<a href="professor.html?p=${esc(x.slug)}"><strong>${esc(x.name)}</strong></a>` : `<strong>${esc(x.name)}</strong>`}
+          <div class="muted">${T(x.role, x.role_en || x.role)}${x.status ? `｜${esc(x.status)}` : ""}</div></div>`).join("")}</div>`).join("")}
     <ul class="plinks">
       ${row("⌖", c.location && esc(c.location))}
       ${row("✉", c.email && `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`)}

@@ -356,3 +356,26 @@ def nhmrc_projects(rows, target_name, target_inst, round_year):
                     "end": None, "round": str(round_year), "total_award": _money(_col(r, "total", "budget", "amount")),
                     "abstract": _col(r, "summary", "plain", "abstract")})
     return out
+
+
+OWNER_FIELDS = ("status", "target_role", "funder", "award_id", "title", "start", "end", "scheme")
+
+
+def apply_owner_grants(grants, decisions):
+    """本人轉述教授親口說的經費（work/owner_decisions.json 的 grant_overrides）：照寫入角色與期間，證據記 owner；
+    清單裡沒有的就新增一筆。只改本人寫明的欄位。"""
+    ov = (decisions or {}).get("grant_overrides") or {}
+    if not ov:
+        return grants
+    out, seen = [], set()
+    for g in grants:
+        o = ov.get(g["key"])
+        if o:
+            g = {**g, **{k: o[k] for k in OWNER_FIELDS if k in o}, "evidence": (g.get("evidence") or []) + [{"type": "owner", "text": o.get("note") or "本人轉述"}]}
+            seen.add(g["key"])
+        out.append(g)
+    for k, o in ov.items():
+        if k not in seen:
+            out.append({"key": k, **{f: o.get(f) for f in OWNER_FIELDS}, "pi_names": [], "works": [], "evidence": [{"type": "owner", "text": o.get("note") or "本人轉述"}],
+                        "refute": {"verdict": "not_in_scope", "reason": None, "evidence": None}})
+    return out

@@ -344,3 +344,22 @@ def test_openalex_awards_batches_over_100_ids():
     assert {"work_id": "W5", "funder": "NIH", "award_id": "R01CA5"} in awards
     assert {"work_id": "W7", "funder": "NSF", "award_id": None} in awards
     assert len(awards) == 2
+
+
+def test_owner_grant_overrides_from_professor_email():
+    """教授在信裡親口說的經費（本人轉述）：改成她主持、補上期間，證據記「本人轉述教授來信」；沒有的 key 也能新增。"""
+    from pipeline.grants import apply_owner_grants
+    grants = [{"key": "ID:NHMRC2017642", "status": "confirmed", "target_role": "pi", "start": None, "end": None, "evidence": [], "works": []},
+              {"key": "FUNDER:sydney horizon fellowship", "status": "acknowledged", "target_role": "acknowledged", "evidence": [], "works": ["W1"]}]
+    dec = {"grant_overrides": {
+        "ID:NHMRC2017642": {"start": "2023", "end": "2027-12", "note": "教授 2026-09-21 來信"},
+        "FUNDER:sydney horizon fellowship": {"status": "confirmed", "target_role": "pi", "start": "2024", "end": "2029", "note": "教授 2026-09-21 來信"},
+        "OWNER:new": {"status": "confirmed", "target_role": "pi", "funder": "X", "note": "教授來信"}}}
+    out = apply_owner_grants(grants, dec)
+    by = {g["key"]: g for g in out}
+    assert by["ID:NHMRC2017642"]["end"] == "2027-12" and by["ID:NHMRC2017642"]["status"] == "confirmed"
+    h = by["FUNDER:sydney horizon fellowship"]
+    assert h["status"] == "confirmed" and h["target_role"] == "pi" and h["works"] == ["W1"]
+    assert h["evidence"][-1] == {"type": "owner", "text": "教授 2026-09-21 來信"}
+    assert by["OWNER:new"]["funder"] == "X" and by["OWNER:new"]["works"] == []
+    assert apply_owner_grants(grants, {}) == grants

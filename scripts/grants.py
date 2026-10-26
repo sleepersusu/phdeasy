@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from pipeline.exceptions import add_exception
-from pipeline.grants import ack_snippets, currency, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match, openalex_awards
+from pipeline.grants import ack_snippets, currency, apply_owner_grants, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match, openalex_awards
 from pipeline.http import get_json, openalex_params
 from pipeline.state import load_state
 
@@ -284,6 +284,8 @@ def apply_refute(run):
         _rejected(run, "grants", f"{g['key']} {g.get('title') or g.get('funder')}", g["refute"]["reason"], g["refute"]["evidence"])
     for g in unresolved:
         add_exception(run, g["key"], "grants", "grant_unresolved", g["refute"]["reason"] or "")
+    dec_p = run / "work" / "owner_decisions.json"
+    final = apply_owner_grants(final, json.loads(dec_p.read_text()) if dec_p.exists() else {})  # 本人轉述教授來信說的經費
     (gd / "grants_final.json").write_text(json.dumps(final, ensure_ascii=False, indent=2))
     out = run / "out" / "data" / "grants.csv"
     out.parent.mkdir(parents=True, exist_ok=True)
