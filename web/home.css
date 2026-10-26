@@ -231,3 +231,13 @@ body.lang-both .facts .ll .t-en{display:none}
 .btn-red.btn-icon,.btn-icon.danger{color:#b42318}
 .btn-icon.danger{background:#fff}
 .btn-icon.danger:hover{background:#fef3f2;border-color:#f3b8b3}
+
+/* 區塊標題列：標題在左、工具在右，同一行 */
+.sec-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.sec-head h2{margin:0}
+.tools{display:flex;align-items:center;gap:2px}
+.tool-select{height:36px;border:1px solid transparent;background:transparent;border-radius:8px;padding:0 6px;font-size:.9rem;color:var(--muted,#555);cursor:pointer}
+.tool-select:hover,.tool-select:focus{background:var(--soft,#f3f4f6)}
+/* 輕量 icon：沒有框，滑過才有底色 */
+.btn.btn-icon.ghost{width:36px;min-width:36px;min-height:36px;border-color:transparent;background:transparent;box-shadow:none;color:var(--muted,#555)}
+.btn.btn-icon.ghost:hover,.btn.btn-icon.ghost[aria-expanded="true"]{background:var(--soft,#f3f4f6);color:var(--fg)}

@@ -473,13 +473,12 @@ function renderProfs(ps){
   const el = body("professors");
   const head = document.querySelector("#professors h2");
   if (head && !document.getElementById("prof-tools")){
-    head.insertAdjacentHTML("afterend", `<div class="row" id="prof-tools" style="justify-content:space-between;align-items:flex-end;margin:-4px 0 12px;flex-wrap:wrap">
-      <span></span>
-      <span class="row" style="flex-wrap:wrap;justify-content:flex-end"><label class="small" for="prof-sort">${T("排序", "Sort")}</label><select id="prof-sort">
-        <option value="stars">★ ↓</option><option value="stars-asc">★ ↑</option><option value="name">A–Z</option></select>
-        ${window.APP_REMATCH ? `<button class="btn btn-icon" id="disc-btn" aria-expanded="false" aria-controls="disc-panel" title="查詢教授 Find professors" aria-label="查詢教授">${icon("search")}</button>
-          <button class="btn btn-icon btn-green" id="add-dept-btn" aria-expanded="false" aria-controls="add-dept-form" title="新增學校／系所 Add school" aria-label="新增學校／系所">${icon("school")}</button>
-          <button class="btn btn-icon" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form" title="新增教授 Add professor" aria-label="新增教授">${icon("user-plus")}</button>` : ""}</span></div>
+    head.insertAdjacentHTML("afterend", `<div id="prof-tools" class="tools">
+        <select id="prof-sort" class="tool-select" aria-label="排序 Sort" title="排序 Sort">
+        <option value="stars">★ 高→低</option><option value="stars-asc">★ 低→高</option><option value="name">A–Z</option></select>
+        ${window.APP_REMATCH ? `<button class="btn btn-icon ghost" id="disc-btn" aria-expanded="false" aria-controls="disc-panel" title="查詢教授 Find professors" aria-label="查詢教授">${icon("search")}</button>
+          <button class="btn btn-icon ghost" id="add-dept-btn" aria-expanded="false" aria-controls="add-dept-form" title="新增學校／系所 Add school" aria-label="新增學校／系所">${icon("school")}</button>
+          <button class="btn btn-icon ghost" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form" title="新增教授 Add professor" aria-label="新增教授">${icon("user-plus")}</button>` : ""}</div>
       ${window.APP_REMATCH ? `<form class="card" id="add-dept-form" hidden style="margin-bottom:12px">
         <p class="small muted" style="margin-top:0">新增後會在背景查這個系所的教員名單（每人附官方個人頁），查好後在系所底下展開「教員名單」，勾選想了解的教授再按建檔。</p>
         <label for="nd-school">學校（必填）</label><input type="text" id="nd-school" list="nd-schools" placeholder="例：University of California, San Francisco" required>
@@ -497,6 +496,7 @@ function renderProfs(ps){
         <label for="np-dept">放進哪個學校系所（選填）</label><select id="np-dept">${deptOptions("")}</select>
         <div class="row" style="margin-top:12px"><button class="btn btn-green" type="submit">開始建檔</button><button class="btn" type="button" id="np-cancel">取消</button></div>
       </form>` : ""}`);
+    { const bar = document.createElement("div"); bar.className = "sec-head"; head.before(bar); bar.append(head, document.getElementById("prof-tools")); }
     document.getElementById("prof-sort").onchange = ev => { PROF_SORT = ev.target.value; renderProfs(H.professors); };
     const form = document.getElementById("add-prof-form"), btn = document.getElementById("add-prof-btn");
     if (form){  // 點「＋ 新增教授」才打開填寫欄位
@@ -647,8 +647,8 @@ function targetsHTML(list, card){
           <span class="muted">${T("打開勾選想詳細查詢的教授", "open to pick professors")}</span></div>`
       : `<div class="row small" style="margin:6px 0 10px"><span class="muted">${T("還沒有教員名單", "No faculty list yet")}</span>${ibtn("users", "查教員名單 Find faculty", `data-fac-refresh="${esc(d.id)}"`)}</div>`;
     return `<details class="dept" open style="margin:8px 0 14px 4px"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center;gap:8px">
-        <strong>${esc(d.name)}</strong><span class="small muted">${ps.length} ${T("位教授", "professors")}</span><span class="row" style="margin-left:auto;gap:6px">${d.url ? ilink("external", "系所網站 Department site", esc(d.url)) : ""}
-        ${window.APP_REMATCH ? ibtn("trash", "移除系所 Remove department", `data-dept-remove="${esc(d.id)}"`, "danger") : ""}</span></summary>
+        <strong>${esc(d.name)}</strong><span class="small muted" style="flex:none">${ps.length} 位</span><span style="margin-left:auto;display:flex;gap:2px;flex:none">${d.url ? ilink("external", "系所網站 Department site", esc(d.url), "ghost") : ""}
+        ${window.APP_REMATCH ? ibtn("trash", "移除系所 Remove department", `data-dept-remove="${esc(d.id)}"`, "ghost") : ""}</span></summary>
       ${fac}${ps.map(card).join("") || `<div class="small muted" style="margin:4px 0 8px">${T("這個系所還沒有建檔的教授", "No professors yet")}</div>`}</details>`;
   };
   const schools = (t.schools || []).map(sc => `<section class="school" style="margin-bottom:18px"><h3 style="margin:6px 0 2px">🏛 ${esc(sc.name)}</h3>${sc.departments.map(dept).join("")}</section>`).join("");
