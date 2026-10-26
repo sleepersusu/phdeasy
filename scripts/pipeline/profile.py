@@ -98,3 +98,62 @@ def render_profile_md(professor, facts, draft):
             lines.append(f"- {cl.get('text')} 〔{'、'.join(cl.get('refs') or [])}〕")
         lines.append("")
     return "\n".join(lines)
+
+
+# ---- 數字類章節由腳本套固定句型（本人 2026-10-26：不用 AI 寫、也不用推翻）----
+SECTION_ORDER = ("snapshot", "focus", "evolution", "methods", "collaboration", "grants", "gaps_next", "questions")
+TEMPLATE_KEYS = ("snapshot", "methods", "collaboration", "grants")
+TITLES = {"snapshot": "一頁速覽", "focus": "研究主線", "evolution": "近五年的演變", "methods": "常用研究設計與樣本",
+          "collaboration": "合作網絡", "grants": "研究計畫", "gaps_next": "文章自己指出的下一步", "questions": "可以問教授的問題"}
+DESIGN_ZH = {"rct": "隨機對照試驗", "pilot-rct": "前導隨機對照試驗", "quasi-experimental": "準實驗", "single-arm": "單組介入",
+             "cohort": "世代研究", "cross-sectional": "橫斷研究", "case-control": "病例對照", "qualitative": "質性研究",
+             "mixed-methods": "混合方法", "systematic-review": "系統性回顧", "scoping-review": "範域回顧", "meta-analysis": "統合分析",
+             "secondary-analysis": "次級分析", "protocol": "研究計畫書", "modeling": "建模", "machine-learning": "機器學習",
+             "text-mining": "文字探勘", "other": "其他"}
+
+
+def _c(text, *refs):
+    return {"text": text, "refs": list(refs), "auto": True}
+
+
+def template_sections(f, today=None):
+    from datetime import date
+    today = today or date.today().isoformat()
+    live = lambda g: (g.get("end") or "")[:10] >= today  # 迄日還沒到才算仍在期間內
+    yrs = sorted((f.get("years") or {}).items())
+    r = f.get("roles") or {}
+    snap = [_c(f"2022–2026 年共 {f.get('n_works', 0)} 篇" + (f"，年度篇數為 {'、'.join(f'{y} 年 {n} 篇' for y, n in yrs)}。" if yrs else "。"), "fact:n_works", "fact:years"),
+            _c(f"擔任第一作者 {r.get('first', 0)} 篇、最後作者 {r.get('last', 0)} 篇、中間作者 {r.get('middle', 0)} 篇，另有 {r.get('corresponding', 0)} 篇標為通訊作者。", "fact:roles")]
+    if f.get("fields"):
+        snap.append(_c("主要領域：" + "、".join(f"{n}（{c} 篇）" for n, c in f["fields"][:3]) + "。", "fact:fields"))
+    act = [g for g in f.get("grants_pi") or [] if live(g)]
+    snap.append(_c(("資料庫確認她主持、目前仍在期間內的計畫：" + "、".join(g.get("award_id") or g.get("title") or "" for g in act) + "。") if act
+                   else "資料庫查不到她主持、目前仍在期間內的計畫。", "fact:grants_pi"))
+    meth = []
+    if f.get("design_types"):
+        meth.append(_c("必讀文章的研究設計：" + "、".join(f"{DESIGN_ZH.get(k, k)} {v} 篇" for k, v in f["design_types"].items()) + "。", "fact:design_types"))
+    if f.get("sample_countries"):
+        meth.append(_c("樣本國家：" + "、".join(f"{k}（{v} 篇）" for k, v in f["sample_countries"].items()) + "。", "fact:sample_countries"))
+    if not meth:
+        meth.append(_c(f"必讀文章 {f.get('n_full_cards', 0)} 篇，研究設計與樣本見各篇解析。", "fact:n_full_cards"))
+    collab = [_c(f"近五年共有 {f.get('coauthors_total', 0)} 位合作者。", "fact:coauthors_total")]
+    for i, c in enumerate((f.get("top_coauthors") or [])[:6]):
+        ys = sorted((c.get("years") or {}).keys())
+        collab.append(_c(f"{c['name']}：合著 {c['n']} 篇" + (f"（{ys[0]}–{ys[-1]}）" if ys else "") + "。", f"fact:top_coauthors[{i}]"))
+    grants = []
+    for i, g in enumerate(f.get("grants_pi") or []):
+        period = f"{(g.get('start') or '?')[:10]} 至 {(g.get('end') or '?')[:10]}"
+        grants.append(_c(f"{g.get('award_id') or ''}（{g.get('funder') or '資助單位未提及'}，{period}）：{g.get('title') or ''}" + ("，仍在期間內。" if live(g) else "，已結束。"),
+                         f"fact:grants_pi[{i}]"))
+    if not grants:
+        grants.append(_c("資料庫查不到她主持的計畫。", "fact:grants_pi"))
+    if f.get("grants_other_n"):
+        grants.append(_c(f"另有 {f['grants_other_n']} 筆是合作者主持、她參與的計畫。", "fact:grants_other_n"))
+    return [{"key": k, "title": TITLES[k], "claims": v} for k, v in (("snapshot", snap), ("methods", meth), ("collaboration", collab), ("grants", grants))]
+
+
+def merge_sections(template, draft):
+    """腳本章節＋撰寫者章節（撰寫者寫了腳本章節的 key 也不用），照固定順序。"""
+    by = {s["key"]: s for s in (draft or {}).get("sections", []) if s.get("key") not in TEMPLATE_KEYS}
+    by.update({s["key"]: s for s in template})
+    return [by[k] for k in SECTION_ORDER if k in by] + [s for k, s in by.items() if k not in SECTION_ORDER]

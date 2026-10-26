@@ -80,3 +80,41 @@ def test_ref_to_named_item_must_mention_name():
     d = {"sections": [{"key": "c", "title": "x", "claims": [{"text": "Bob Smith 合作 2 篇。", "refs": ["fact:top_coauthors[0]"]}]}]}
     fails = check_draft(d, facts(), {"W1"})
     assert any(f["why"] == "ref_name_mismatch:Ann Lee" for f in fails)
+
+
+FACTS = {"professor": "Yoshimi Fukuoka", "n_works": 28, "n_full_cards": 5, "n_fulltext": 22,
+         "years": {"2022": 10, "2023": 6, "2024": 5, "2025": 6, "2026": 1}, "roles": {"first": 9, "middle": 10, "last": 9, "corresponding": 6, "total": 28},
+         "fields": [["Medicine", 15], ["Health Professions", 9]], "subfields": [], "topics": [], "coauthors_total": 75,
+         "top_coauthors": [{"name": "Jingwen Zhang", "n": 10, "works": ["W1"], "years": {"2022": 1, "2025": 3}},
+                           {"name": "Kenji Sagae", "n": 9, "works": ["W1"], "years": {"2022": 1}}],
+         "design_types": {"cross-sectional": 7, "pilot-rct": 4}, "sample_countries": {"United States": 20},
+         "grants_pi": [{"award_id": "R01HS027803", "title": "Digital diabetes prevention", "funder": "AHRQ", "start": "2021-08-01", "end": "2026-07-31", "active_2026": True, "works": []}],
+         "grants_other_n": 9, "grants_ack_funders": ["American Heart Association"]}
+
+
+def test_template_sections_are_scripted_and_pass_checks():
+    """本人 2026-10-26：一頁速覽、研究設計與樣本、合作網絡、研究計畫由腳本套固定句型（不用 AI），每句仍附出處、數字對得上。"""
+    from pipeline.profile import TEMPLATE_KEYS, check_draft, template_sections
+    secs = template_sections(FACTS)
+    assert [s["key"] for s in secs] == list(TEMPLATE_KEYS) == ["snapshot", "methods", "collaboration", "grants"]
+    assert all(cl.get("auto") for s in secs for cl in s["claims"])
+    assert check_draft({"sections": secs}, FACTS, {"W1"}) == []
+    text = " ".join(cl["text"] for s in secs for cl in s["claims"])
+    assert "Jingwen Zhang" in text and "R01HS027803" in text and "28 篇" in text
+
+
+def test_merge_sections_keeps_order_and_ignores_writer_template_keys():
+    from pipeline.profile import SECTION_ORDER, merge_sections, template_sections
+    draft = {"sections": [{"key": "questions", "title": "可以問教授的問題", "claims": [{"text": "q", "refs": ["W1"]}]},
+                          {"key": "snapshot", "title": "一頁速覽", "claims": [{"text": "AI 寫的速覽（不該用）", "refs": ["W1"]}]},
+                          {"key": "focus", "title": "研究主線", "claims": [{"text": "f", "refs": ["W1"]}]}]}
+    merged = merge_sections(template_sections(FACTS), draft)
+    keys = [s["key"] for s in merged]
+    assert keys == [k for k in SECTION_ORDER if k in keys] and "AI 寫的速覽（不該用）" not in str(merged)
+
+
+def test_template_active_uses_today():
+    from pipeline.profile import template_sections
+    txt = lambda t: " ".join(cl["text"] for s in template_sections(FACTS, today=t) for cl in s["claims"])
+    assert "仍在期間內的計畫：R01HS027803" in txt("2026-05-01")
+    assert "查不到她主持、目前仍在期間內" in txt("2026-10-26") and "已結束" in txt("2026-10-26")

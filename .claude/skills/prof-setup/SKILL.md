@@ -66,14 +66,22 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
    uv run python scripts/setup_fulltext.py runs/<slug>
    ```
    順序：Zotero → OpenAlex → 期刊落地頁 → Unpaywall → Europe PMC → PMC → Semantic Scholar → 預印本 → CORE → inbox。可接續，已找到的不重做。
-   **查博士學程**（本人 2026-10-26：建檔時自動查；`out/programs.json` 已有就跳過）：派一個查詢者（`model: sonnet`），可以跟全文找尋同時進行：
-   > 讀 `.claude/skills/prof-discover/researcher.md` 照做。學校＝無；人＝<姓名>（<機構>，ORCID <有就寫>）；寫到 runs/<slug>/work/programs.json，格式只要 `{"programs": [...]}`
+   **查博士學程**（本人 2026-10-26：建檔時自動查；`out/programs.json` 已有就跳過）。先試同系所沿用（不用 AI）：
+   ```bash
+   uv run python scripts/programs.py runs/<slug> --from-dept --no-site
+   ```
+   印 `DONE` 就完成這一步；印 `NEED` 才派一個查詢者（`model: sonnet`），可以跟全文找尋同時進行：
+   > 讀 `.claude/skills/prof-discover/researcher.md` 照做。學校＝無；人＝<姓名>（<機構>，ORCID <有就寫>）；系所＝<runs/_me/targets.json 裡這位教授所在的系所名稱，沒有就寫「無」>；寫到 runs/<slug>/work/programs.json，格式只要 `{"programs": [...]}`
 
    回來後：
    ```bash
    uv run python scripts/programs.py runs/<slug> --no-site
    ```
    `FAIL` → 把失敗清單交回同一個查詢者修一輪；仍不過就拿掉那幾筆學程，記例外 `programs_unchecked`（註記類），不擋後面。
+   接著讀學歷（UCSF 用官方 Profiles API，不用 AI；其他學校的由查詢者一起寫進 programs.json）：
+   ```bash
+   uv run python scripts/education.py runs/<slug>
+   ```
 4. **報告與 RIS**
    ```bash
    uv run python scripts/setup_report.py runs/<slug>

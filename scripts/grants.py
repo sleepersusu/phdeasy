@@ -16,7 +16,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from pipeline.exceptions import add_exception
-from pipeline.grants import ack_snippets, currency, apply_owner_grants, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match, openalex_awards
+from pipeline.grants import in_refute_scope, ack_snippets, currency, apply_owner_grants, apply_verdicts, check_mention, merge_grants, nhmrc_projects, nih_core, nih_numbers, nih_projects, normalize_award, nsf_projects, name_match, inst_match, openalex_awards
 from pipeline.http import get_json, openalex_params
 from pipeline.state import load_state
 
@@ -267,10 +267,12 @@ def merge(run):
     for g in grants:
         g["works"] = [w for w in g["works"] if w in keep]
     (gd / "grants.json").write_text(json.dumps(grants, ensure_ascii=False, indent=2))
+    todo = [g["key"] for g in grants if in_refute_scope(g)]  # 推翻者只判這些；空的就不用派推翻者
+    (gd / "refute_todo.json").write_text(json.dumps(todo, ensure_ascii=False, indent=1))
     by = {}
     for g in grants:
         by[g["status"]] = by.get(g["status"], 0) + 1
-    print(f"DONE 計畫 {len(grants)} 筆：{by}")
+    print(f"DONE 計畫 {len(grants)} 筆：{by}；要推翻者判的 {len(todo)} 筆（資料庫已確認主持人的不用判）")
 
 
 def apply_refute(run):

@@ -77,7 +77,25 @@ def _norm(s):
     return re.sub(r"\s+", " ", (s or "").replace("­", "")).strip().lower()
 
 
-def check_draft(draft, inputs):
+def prefill_from_focus(focus, inputs):
+    """必讀五篇（work/focus.json）→ 每個比對對象的文章：挑選者標的 targets 與理由（本人 2026-10-26：比對者不再重挑文章）。
+    回傳 {target id: [{"id", "why", "evidence", "source": "focus"}]}；舊批次（picks 沒有 targets）回傳 None，走原本的流程。"""
+    picks = (focus or {}).get("picks") or []
+    if not picks or not any(p.get("targets") for p in picks):
+        return None
+    tids = {t["id"] for t in inputs["targets"]}
+    out = {}
+    for p in picks:
+        if p.get("id") not in inputs["papers"]:
+            continue
+        for t in p.get("targets") or []:
+            if t in tids:
+                out.setdefault(t, []).append({"id": p["id"], "why": p.get("reason") or "", "evidence": p.get("quote") or "", "source": "focus"})
+    return out
+
+
+def check_draft(draft, inputs, prefill=None):
+    """prefill：文章由腳本從必讀五篇帶入時，比對者只寫 fit／why／grants，不寫 papers 與 read_first。"""
     fails = []
     tids = [t["id"] for t in inputs["targets"]]
     got = {}
@@ -91,7 +109,8 @@ def check_draft(draft, inputs):
         fit = t.get("fit")
         if fit not in FITS:
             fails.append({"path": f"targets[{ti}].fit", "why": "bad_fit"})
-        items = (t.get("papers") or []) + (t.get("grants") or [])
+        papers = ((prefill or {}).get(tid) or []) if prefill is not None else (t.get("papers") or [])
+        items = papers + (t.get("grants") or [])
         if fit == "none" and items:
             fails.append({"path": f"targets[{ti}]", "why": "none_with_items"})
         if fit in ("strong", "partial") and not items:
@@ -99,6 +118,8 @@ def check_draft(draft, inputs):
         if not (t.get("why") or "").strip():
             fails.append({"path": f"targets[{ti}].why", "why": "empty_why"})
         for kind, pool, label in (("papers", inputs["papers"], "paper"), ("grants", inputs["grants"], "grant")):
+            if kind == "papers" and prefill is not None:
+                continue
             for j, it in enumerate(t.get(kind) or []):
                 path = f"targets[{ti}].{kind}[{j}]"
                 key = it.get("id") if kind == "papers" else it.get("key")
@@ -115,7 +136,7 @@ def check_draft(draft, inputs):
     for tid in tids:
         if tid not in got:
             fails.append({"path": f"target:{tid}", "why": "missing_target"})
-    rf = draft.get("read_first") or []
+    rf = [] if prefill is not None else draft.get("read_first") or []
     if len(rf) != len(set(rf)):
         fails.append({"path": "read_first", "why": "read_first_duplicate"})
     for x in rf:
@@ -136,9 +157,10 @@ def missing_verdicts(draft, verdicts):
     return [p for p in item_paths(draft) if p not in ok]
 
 
-def assemble(draft, verdicts, inputs, fp):
-    """拿掉推翻者判 reject 與核對不過的項目；興趣標籤由腳本帶入（不信任 LLM 改寫）。"""
-    bad = {f["path"] for f in check_draft(draft, inputs)}
+def assemble(draft, verdicts, inputs, fp, prefill=None, read_first=None):
+    """拿掉推翻者判 reject 與核對不過的項目；興趣標籤由腳本帶入（不信任 LLM 改寫）。
+    prefill：文章由腳本從必讀五篇帶入（挑選者的理由與引句已由 focus.py 核對過），read_first 就是必讀的順序。"""
+    bad = {f["path"] for f in check_draft(draft, inputs, prefill=prefill)}
     rej = {v["path"]: v for v in verdicts if v.get("verdict") == "reject"}
     labels = {t["id"]: t for t in inputs["targets"]}
     out, rejected, kept = [], [], set()
@@ -148,7 +170,10 @@ def assemble(draft, verdicts, inputs, fp):
         lab = labels[t["target"]]
         row = {"target": t["target"], "kind": lab["kind"], "label": lab["label"], "label_zh": lab["label_zh"],
                "fit": t.get("fit"), "why": t.get("why"), "papers": [], "grants": []}
-        for kind in ("papers", "grants"):
+        if prefill is not None:
+            row["papers"] = list(prefill.get(t["target"]) or [])
+            kept |= {p["id"] for p in row["papers"]}
+        for kind in (("grants",) if prefill is not None else ("papers", "grants")):
             for j, it in enumerate(t.get(kind) or []):
                 path = f"targets[{ti}].{kind}[{j}]"
                 if path in rej or path in bad:
@@ -160,5 +185,8 @@ def assemble(draft, verdicts, inputs, fp):
         if row["fit"] != "none" and not row["papers"] and not row["grants"]:
             row["fit"], row["why"] = "none", (row["why"] or "") + "（推薦的項目都被推翻）"
         out.append(row)
-    read_first = [x for x in dict.fromkeys(draft.get("read_first") or []) if x in kept]
+    if read_first is not None:
+        read_first = list(dict.fromkeys(read_first))
+    else:
+        read_first = [x for x in dict.fromkeys(draft.get("read_first") or []) if x in kept]
     return {"fingerprint": fp, "targets": out, "read_first": read_first}, rejected

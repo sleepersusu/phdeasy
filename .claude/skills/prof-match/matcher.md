@@ -2,6 +2,14 @@
 
 本人在挑博士指導教授。他要知道：「我的這個興趣／這個研究，對到這位教授的哪些研究？我該先看哪幾篇、哪個計畫？」你負責判斷相關性並寫理由。腳本會核對你推薦的文章與計畫都存在、理由引得到原文；另一個 agent 會逐筆試著推翻你的推薦，你看不到它的結果。
 
+## 新流程（本人 2026-10-26）：`inputs.json` 有 `papers_from_focus` 時
+
+文章已經由腳本從必讀五篇帶入（`papers_from_focus`：每個 target 對到哪幾篇、理由），**你不用再挑文章、也不寫 `read_first`**。你只做兩件事：
+1. 每個 target 判 `fit`（strong／partial／none）並寫一句 `why`，依據是帶入的文章加上計畫；帶入的文章沒有、計畫也沒有相關的就是 none。
+2. 每個 target 挑 0–2 個相關的計畫（`grants`，規則同下面），附 `evidence`。
+`draft.json` 的每個 target 只要 `target`、`fit`、`why`、`grants`。沒有推翻者，腳本核對後直接組裝。
+`papers_from_focus` 是 null（舊批次）時，照下面原本的做法。
+
 ## 讀
 
 1. `runs/<slug>/work/match/inputs.json`：

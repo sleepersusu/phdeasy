@@ -14,7 +14,7 @@ from datetime import datetime
 from pathlib import Path
 
 from pipeline.export import basis_label, paper_dir_name, paper_md_name, render_paper_md, to_ris
-from pipeline.profile import build_facts, check_draft, render_profile_md
+from pipeline.profile import TEMPLATE_KEYS, merge_sections, template_sections, build_facts, check_draft, render_profile_md
 from pipeline.state import load_state
 
 
@@ -40,6 +40,7 @@ def facts(run):
         ok = sum(r["status"] == "ok" for r in csv.DictReader(fh))
     f = build_facts(st["professor"], works, net, cards, grants, fulltext_ok=ok)
     (pd / "facts.json").write_text(json.dumps(f, ensure_ascii=False, indent=2))
+    (pd / "auto.json").write_text(json.dumps({"sections": template_sections(f)}, ensure_ascii=False, indent=2))  # 數字類章節：腳本套句型
     papers = run / "out" / "papers"
     papers.mkdir(parents=True, exist_ok=True)
     for w in works:
@@ -79,6 +80,7 @@ def assemble(run):
     verdicts = {v["path"]: v for v in ref.get("verdicts", [])}
     failed = {x["path"] for x in _j(pd / "check.json", [])}
     missing, kept_sections, rejected = [], [], []
+    draft = {"sections": [x for x in draft["sections"] if x.get("key") not in TEMPLATE_KEYS]}  # 數字類章節用腳本的
     for s in draft["sections"]:
         claims = []
         for i, cl in enumerate(s.get("claims", [])):
@@ -94,7 +96,8 @@ def assemble(run):
     if missing:
         print(f"FAIL 推翻者漏判 {len(missing)} 句：{missing}")
         sys.exit(1)
-    final = {"sections": kept_sections}
+    auto = _j(pd / "auto.json") or {"sections": template_sections(f)}
+    final = {"sections": merge_sections(auto["sections"], {"sections": kept_sections})}
     (pd / "final.json").write_text(json.dumps(final, ensure_ascii=False, indent=2))
     (run / "out" / "profile.md").write_text(render_profile_md(st["professor"], f, final))
     if rejected:

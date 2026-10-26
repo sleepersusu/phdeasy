@@ -50,7 +50,7 @@
 
 | 階段 | 腳本 |
 |---|---|
-| setup | `state_cli.py`、`setup_find_author.py`、`setup_list_works.py`、`fill_abstracts.py`、`focus.py inputs／check／apply／add`（必讀前五篇；其他只列標題；本人在教授頁勾選的用 add 加進來）、`programs.py`（教授掛名的博士學程，建檔時自動查）、`setup_fulltext.py`、`setup_report.py`、`add_works.py` |
+| setup | `state_cli.py`、`setup_find_author.py`、`setup_list_works.py`、`fill_abstracts.py`、`focus.py inputs／check／apply／add`（必讀前五篇；其他只列標題；本人在教授頁勾選的用 add 加進來）、`programs.py`（教授掛名的博士學程，建檔時自動查；`--from-dept` 同系所沿用不派 AI）、`education.py`（UCSF 學歷用官方 API）、`setup_fulltext.py`、`setup_report.py`、`add_works.py` |
 | ingest | `setup_fulltext.py --retry-missing`、`ingest.py` |
 | network | `network.py build／check` |
 | grants | `grants.py fetch／check-mentions／merge／apply-refute` |

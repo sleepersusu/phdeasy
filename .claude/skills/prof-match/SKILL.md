@@ -5,7 +5,7 @@ description: 教授研究檔案流水線的比對推薦階段（自動段）。p
 
 # prof-match（自動段：依本人興趣推薦該看的文章與計畫）
 
-所有指令在專案根目錄執行。比對者用 `model: opus`；推翻者用 `model: sonnet`（本人 2026-10-26：推翻率 2–11%，改用較便宜的模型但保留）。
+所有指令在專案根目錄執行。比對者用 `model: sonnet`（新流程只判經費與適合度）；舊批次比對者用 `model: opus`、推翻者用 `model: sonnet`（本人 2026-10-26：推翻率 2–11%，改用較便宜的模型但保留）。
 
 ## 0. 開工檢查
 
@@ -39,7 +39,7 @@ uv run python scripts/state_cli.py show runs/<slug>
    uv run python scripts/match.py check runs/<slug>
    ```
    `FAIL` → **只修一輪**：把 FAIL 行用 SendMessage 傳給同一個比對者修，再跑一次。仍失敗 → 往下，組裝時核對不過的項目會被拿掉。
-4. **推翻**：派推翻者（`model: sonnet`）：
+4. **推翻**（只有舊批次：`inputs.json` 的 `papers_from_focus` 是 null 才做；新流程文章來自必讀五篇，比對者只判經費，不派推翻者——本人 2026-10-26）：派推翻者（`model: sonnet`）：
    > 讀 `.claude/skills/prof-match/refuter.md` 照做。slug=<slug>
    ```bash
    uv run python scripts/match.py check-refute runs/<slug>

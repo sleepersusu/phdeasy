@@ -11,7 +11,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from pipeline.match import assemble, build_inputs, check_draft, me_fingerprint, missing_verdicts
+from pipeline.match import prefill_from_focus, assemble, build_inputs, check_draft, me_fingerprint, missing_verdicts
 from pipeline.state import append_progress
 
 
@@ -40,8 +40,11 @@ def main():
     md = run / "work" / "match"
     md.mkdir(parents=True, exist_ok=True)
     me, inputs = _load(run)
+    focus = _j(run / "work" / "focus.json")
+    prefill = prefill_from_focus(focus, inputs)  # 必讀五篇已標對到哪些興趣：文章由腳本帶入，比對者只判經費與適合度，不派推翻者
     if a.cmd == "inputs":
-        (md / "inputs.json").write_text(json.dumps({**inputs, "me_summary": me.get("summary")}, ensure_ascii=False, indent=1))
+        (md / "inputs.json").write_text(json.dumps({**inputs, "me_summary": me.get("summary"),
+                                                     "papers_from_focus": prefill}, ensure_ascii=False, indent=1))
         print(f"DONE 比對對象 {len(inputs['targets'])}（興趣＋CV）；文章 {len(inputs['papers'])}；計畫 {len(inputs['grants'])}")
         return
     draft = _j(md / "draft.json")
@@ -49,7 +52,7 @@ def main():
         print("BLOCKED 沒有 work/match/draft.json")
         sys.exit(1)
     if a.cmd == "check":
-        fails = check_draft(draft, inputs)
+        fails = check_draft(draft, inputs, prefill=prefill)
         (md / "check.json").write_text(json.dumps(fails, ensure_ascii=False, indent=2))
         for f in fails:
             print(f"FAIL {f['path']} {f['why']}")
@@ -58,7 +61,7 @@ def main():
         print(f"PASS 推薦 {sum(len(t.get('papers') or []) + len(t.get('grants') or []) for t in draft['targets'])} 筆都指到真的文章／計畫，理由都引得到原文")
         return
     verdicts = (_j(md / "refute.json") or {}).get("verdicts", [])
-    miss = missing_verdicts(draft, verdicts)
+    miss = [] if prefill is not None else missing_verdicts(draft, verdicts)  # 新流程沒有推翻者
     if a.cmd == "check-refute":
         if miss:
             print("FAIL 推翻者漏判：" + ", ".join(miss))
@@ -68,7 +71,8 @@ def main():
     if miss:
         print("FAIL 推翻者漏判：" + ", ".join(miss))
         sys.exit(1)
-    final, rejected = assemble(draft, verdicts, inputs, fp=me_fingerprint(me))
+    final, rejected = assemble(draft, verdicts, inputs, fp=me_fingerprint(me), prefill=prefill,
+                               read_first=(focus or {}).get("ids") if prefill is not None else None)
     final["built"] = datetime.now().astimezone().isoformat(timespec="seconds")
     (run / "out").mkdir(exist_ok=True)
     (run / "out" / "match.json").write_text(json.dumps(final, ensure_ascii=False, indent=1))

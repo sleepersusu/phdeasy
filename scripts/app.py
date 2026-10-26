@@ -1016,7 +1016,8 @@ class App:
         if path == "programs":
             slug = self._lib_slug(body.get("slug"))
             pr = (json.loads((self.runs / slug / "state.json").read_text()) or {}).get("professor") or {}
-            return self.jobs.start("programs", prompt_programs(slug, pr.get("name") or slug, pr.get("institution") or "", pr.get("orcid")),
+            dept = next((d["name"] for sc in self._targets().get("schools") or [] for d in sc.get("departments") or [] if slug in (d.get("members") or [])), None)
+            return self.jobs.start("programs", prompt_programs(slug, pr.get("name") or slug, pr.get("institution") or "", pr.get("orcid"), dept),
                                    f"博士學程：{pr.get('name') or slug}", slug=slug)
         if path == "match":
             slug = (body.get("slug") or "").strip()

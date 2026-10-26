@@ -264,9 +264,16 @@ def check_mention(text, m):
 VERDICTS = {"keep", "reject", "unresolved"}
 
 
+API_SOURCES = ("nih", "nih_pi", "nih_lookup", "nsf", "nsf_pi", "nhmrc", "arc")
+
+
 def in_refute_scope(g):
     """推翻者要判的：她主持（confirmed）與待確認（pending）。本人 2026-10-26 縮小範圍：
-    致謝提及與合作者主持的不會當成她的經費，引句已由腳本逐字核對。"""
+    致謝提及與合作者主持的不會當成她的經費，引句已由腳本逐字核對；
+    資料庫（NIH／NSF／NHMRC／ARC）列她為主持人、腳本已比對姓名與機構而 confirmed 的也不推翻（資料庫本身就是證據）。"""
+    if g.get("status") == "confirmed" and g.get("target_role") in ("pi", "co_pi") and (
+            g.get("source") in API_SOURCES or any((e or {}).get("type") in API_SOURCES for e in g.get("evidence") or [])):
+        return False
     return g.get("status") in ("confirmed", "pending")
 
 

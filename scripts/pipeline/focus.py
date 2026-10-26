@@ -16,7 +16,7 @@ def _norm(s):
     return re.sub(r"\s+", " ", (s or "")).strip().lower()
 
 
-def check_picks(picks, works, n=5):
+def check_picks(picks, works, n=5, target_ids=None):
     by = {w["id"]: w for w in works}
     want = min(n, len(works))
     fails = []
@@ -34,6 +34,8 @@ def check_picks(picks, works, n=5):
             continue
         if not (p.get("reason") or "").strip():
             fails.append({"where": w, "why": "no_reason"})
+        if target_ids is not None and any(t not in target_ids for t in p.get("targets") or []):
+            fails.append({"where": w, "why": "unknown_target"})
         q = _norm(p.get("quote"))
         if len(q) < 12 or (q not in _norm(work.get("title")) and q not in _norm(work.get("abstract"))):
             fails.append({"where": w, "why": "quote_not_found"})

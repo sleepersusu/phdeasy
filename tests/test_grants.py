@@ -363,3 +363,13 @@ def test_owner_grant_overrides_from_professor_email():
     assert h["evidence"][-1] == {"type": "owner", "text": "教授 2026-09-21 來信"}
     assert by["OWNER:new"]["funder"] == "X" and by["OWNER:new"]["works"] == []
     assert apply_owner_grants(grants, {}) == grants
+
+
+def test_api_confirmed_pi_grants_skip_refute():
+    """本人 2026-10-26：資料庫（NIH／NSF／NHMRC／ARC）列她為主持人、腳本已比對姓名與機構的，不再派推翻者；
+    只有致謝段升級來的或待確認的才推翻。"""
+    from pipeline.grants import in_refute_scope
+    api = {"key": "NIH:1", "status": "confirmed", "target_role": "pi", "source": "nih_pi", "evidence": [{"type": "nih_pi"}]}
+    ack_up = {"key": "X", "status": "confirmed", "target_role": "pi", "source": None, "evidence": [{"type": "ack"}]}
+    pend = {"key": "P", "status": "pending", "target_role": "pi", "source": "nih_pi", "evidence": [{"type": "nih_pi"}]}
+    assert not in_refute_scope(api) and in_refute_scope(ack_up) and in_refute_scope(pend)

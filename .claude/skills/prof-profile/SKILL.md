@@ -37,7 +37,7 @@ uv run python scripts/state_cli.py show runs/<slug>
    - `work/profile/facts.json`
    - `out/papers/<年_作者_標題_id>/解析.md`：每篇一個資料夾，放解析、圖表頁（figures/）與 AI 重點（重點.json）
    - `out/zotero/<slug>.ris`：Zotero 匯入檔，每篇附解析卡大意當筆記
-2. **撰寫**：派總覽撰寫者（`model: opus`）：
+2. **撰寫**（本人 2026-10-26：一頁速覽、研究設計與樣本、合作網絡、研究計畫由 `profile.py facts` 套句型寫進 `work/profile/auto.json`，不用 AI、也不推翻；撰寫者與推翻者只處理研究主線、演變、下一步、可以問的問題）：派總覽撰寫者（`model: opus`）：
    > 讀 `.claude/skills/prof-profile/writer.md` 照做。slug=<slug>
 3. **核對**
    ```bash

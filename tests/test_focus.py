@@ -57,3 +57,11 @@ def test_focus_add_cli_keeps_existing_and_adds(tmp_path, capsys):
     kinds = {w["id"]: w["kind"] for w in json.loads((r / "work" / "works.json").read_text())}
     assert kinds["W0"] == "short" and kinds["W5"] == "full" and kinds["W3"] == "title"
     assert focus.main(["add", str(r), "--ids", "W404"]) == 1
+
+
+def test_picks_targets_must_be_known():
+    """挑選者標「這篇對到你的哪些興趣／CV」（比對階段直接用）：只能是 inputs 給的 id。"""
+    ps = [{**pick(i), "targets": ["i1"]} for i in range(5)]
+    assert check_picks(ps, WORKS, n=5, target_ids={"i1", "c1"}) == []
+    ps[0]["targets"] = ["i9"]
+    assert "unknown_target" in {f["why"] for f in check_picks(ps, WORKS, n=5, target_ids={"i1", "c1"})}

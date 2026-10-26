@@ -19,13 +19,18 @@ ME = Path(__file__).resolve().parent.parent / "runs" / "_me" / "me.json"
 
 
 def _me():
-    """本人的研究興趣與 CV（不含與教授共同討論的研究計畫）。"""
+    """本人的研究興趣與 CV（不含與教授共同討論的研究計畫）；targets 是比對階段用的 id（i1… 興趣、c1… CV）。"""
+    from pipeline.match import targets_from_me
     m = json.loads(ME.read_text()) if ME.exists() else {}
-    return {"interests": [i.get("en") or i.get("zh") for i in m.get("interests") or []],
+    return {"targets": [{"id": t["id"], "label": t["label"], "label_zh": t["label_zh"]} for t in targets_from_me(m)],"interests": [i.get("en") or i.get("zh") for i in m.get("interests") or []],
             "capabilities": [{"area": c.get("area"), "items": c.get("items")} for c in m.get("capabilities") or []],
             "experience": [{"role": e.get("role"), "org": e.get("org"), "skills": e.get("skills"),
                             "bullets": [b.get("en") for b in e.get("bullets") or []]} for e in m.get("experience") or []],
             "summary": m.get("summary")}
+
+
+def _target_ids():
+    return {t["id"] for t in _me()["targets"]}
 
 
 def main(argv=None):
@@ -48,7 +53,7 @@ def main(argv=None):
         return 0
     if a.cmd == "check":
         picks = json.loads((fd / "draft.json").read_text()).get("picks") or []
-        fails = check_picks(picks, works, a.n)
+        fails = check_picks(picks, works, a.n, target_ids=_target_ids())
         for f in fails:
             print(f"FAIL {f['where']} {f['why']} {f.get('detail', '')}")
         print("PASS" if not fails else f"{len(fails)} 個問題")

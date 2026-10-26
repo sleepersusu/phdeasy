@@ -748,7 +748,8 @@ function basicHTML(){
       <dt><strong>博士學程</strong></dt><dd style="margin:0" id="prog-cell">${programsHTML(b.programs)}</dd>
       <dt><strong>期間內的經費</strong></dt><dd style="margin:0">${ag.length ? grantRows(ag) : "目前查不到"}</dd>
       ${hist.length > 1 ? `<dt><strong>經歷（ORCID）</strong></dt><dd style="margin:0">${hist.map(e => `<div>${esc([e.title, e.department, e.institution].filter(Boolean).join("｜"))}${e.since || e.until ? `（${esc(e.since || "?")}–${esc(e.until || "今")}）` : ""}</div>`).join("")}</dd>` : ""}
-      ${(b.educations || []).length ? `<dt><strong>學歷（ORCID）</strong></dt><dd style="margin:0">${b.educations.map(e => `<div>${esc([e.title, e.institution].filter(Boolean).join("｜"))}${e.until ? `（${esc(e.until)}）` : ""}</div>`).join("")}</dd>` : ""}
+      ${(b.educations || []).length ? `<dt><strong>學歷</strong></dt><dd style="margin:0">${b.educations.map(e => `<div>${esc([e.title, e.institution].filter(Boolean).join("｜"))}${e.until ? `（${esc(e.until)}）` : ""}${e.src ? ` <a class="small" href="${esc(e.src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>`).join("")}
+        <div class="small muted">${{ucsf_api: "UCSF 官方個人頁", lookup: "官方個人頁／CV／LinkedIn"}[b.education_source] || "ORCID"}</div></dd>` : ""}
     </dl>
     ${!b.position && !b.metrics ? `<div class="small muted">基本資訊還沒抓：跑 <code>uv run python scripts/basic_info.py runs/${esc(SLUG || "")}</code></div>` : ""}
   </section>`;

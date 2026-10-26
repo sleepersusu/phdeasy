@@ -33,7 +33,9 @@
     - `deadline`：最近一次申請截止日（國際生與本地生不同就分開寫，放在 `note`）
     - 系所有多個相關博士班（例：醫學與健康博士、公共衛生博士）就各寫一筆，挑跟這位教授研究最接近的
   - 有些身分查得到本人掛名的學程、有些查不到時：查不到的那些身分，也照 department 的方式補它所屬系所的博士班。
+  - 工作說明有給「系所」時：屬於那個系所自己的博士學程（例：系所是 CPH，就是 CPH 那一筆；系所是研究中心，就是中心所屬學院的博士班）那一筆加 `"dept_program": true`。腳本會把它存成系所的學程資訊，同系所下一位教授直接沿用，所以這一筆的學費、資助、要繳文件、截止日要查完整。
   - 真的連系所的博士班都查不到才寫 `"programs": []`
+- **學歷**（本人 2026-10-26：ORCID 常沒填）：打開教授官方個人頁時一起讀學歷，寫在最上層 `"education": [{"degree": "PhD", "institution": "Harvard University", "field": "Epidemiology", "year": "2010", "src": "看到的那一頁網址"}]`。個人頁沒寫就依序找：教授自己放的 CV／個人資料檔（PDF，打開讀學歷段）、LinkedIn 公開頁或搜尋結果摘要（不登入；從 LinkedIn 來的 `src` 照寫 LinkedIn 網址）。都找不到就寫 `"education": []`。UCSF 教授不用查（腳本會從 UCSF Profiles 讀）。
 - 這個工作在背景跑，**不能用終端機指令**；要查 OpenAlex、ORCID 等 API 就用 WebFetch 直接開網址（例 `https://api.openalex.org/authors?search=<姓名>`）。
 - `lab_url`（實驗室或個人學術頁）、`src`（你在哪裡看到這個網址，例：學校人員頁）。已經有網址的人不用再查網址。
 
@@ -42,7 +44,8 @@
 ## 寫
 
 ```json
-{"institutions": {"The University of Sydney": {
+{"education": [{"degree": "…", "institution": "…", "year": "…", "src": "https://…"}],
+ "institutions": {"The University of Sydney": {
    "qs": {"rank": 25, "year": 2026, "src": "https://www.topuniversities.com/…"},
    "usnews": {"rank": 30, "src": "https://www.usnews.com/…"},
    "funding": {"value": "full", "note": "…", "src": "https://www.sydney.edu.au/…"}}},

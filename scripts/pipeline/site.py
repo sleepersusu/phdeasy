@@ -200,6 +200,15 @@ def _basic(wd, grants):
     return {**(_j(wd / "basic.json") or {}), "active_grants": act}
 
 
+def _education(run):
+    """官方個人頁（UCSF API、或查詢者讀的官方頁／CV／LinkedIn）的學歷優先於 ORCID；每筆附出處。"""
+    e = _j(run / "out" / "education.json")
+    if not e or not e.get("items"):
+        return {}
+    return {"educations": [{"title": " ".join(x for x in (x.get("degree"), x.get("field")) if x), "institution": x.get("institution"),
+                            "until": x.get("year"), "src": x.get("src")} for x in e["items"]], "education_source": e.get("source")}
+
+
 def _programs(run):
     """教授掛名的博士學程：自己查過的（out/programs.json）優先；沒有就用查詢教授結果裡同一個人（ORCID 或全名）的。"""
     own = _j(run / "out" / "programs.json")
@@ -307,7 +316,7 @@ def build_site_data(run):
         "grants": grants, "grants_reviewed": grants_reviewed,
         "match_docs": match_docs(wlist, grants),
         "me_query": _me_query(owner),
-        "basic": {**_basic(wd, grants), "programs": _programs(run)},
+        "basic": {**_basic(wd, grants), "programs": _programs(run), **_education(run)},
         "library": _library(run), "drafts": _drafts(run),
         "meeting": _j(run / "meeting.json"),  # 會議準備（本人資料，只在本機與雲端硬碟）
         "joint_proposal": _joint(run, owner),
