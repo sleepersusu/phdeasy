@@ -210,3 +210,8 @@ ul.bullets.cols2 li{break-inside:avoid}
 .setrow[open]>summary .setrow-t::before{transform:rotate(90deg)}
 .setrow-b{padding:4px 0 16px 1em}
 #pipeline .body,#settings .body{margin-top:-4px}
+/* 介面字（標題、標籤）：中文模式只中文、英文模式只英文、雙語時「中｜EN」同一行 */
+body.lang-both .ll .t-en{display:inline;color:inherit;font-size:inherit;margin:0}
+body.lang-both .ll .t-en::before{content:"｜"}
+.skills .sk-ic{color:var(--green);margin-right:4px}
+.skills .sk-l{font-weight:600;margin-right:4px}

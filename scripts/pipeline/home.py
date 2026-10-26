@@ -60,7 +60,7 @@ def professor_summary(run, me, use_node=True):
         "href": f"{run.name}/out/site/index.html",
         "built": (run / "out" / "site" / "index.html").exists(),
         "name": d["professor"]["name"],
-        "institution": d["professor"]["institution"],
+        "institution": ((d.get("basic") or {}).get("position") or {}).get("institution") or d["professor"]["institution"],
         "counts": d["counts"],
         "stage": d["pipeline"]["stage"],
         "n_overlap_papers": len(papers),

@@ -8,6 +8,7 @@ const has = id => !!document.getElementById(id);
 const paperLink = (p, id) => OFFLINE_HOME ? `${p.href}#paper-${id}` : `paper.html?p=${encodeURIComponent(p.slug)}&id=${encodeURIComponent(id)}`;
 const STATUS = {confirmed: ["g", "本人主持"], pending: ["y", "待確認"], acknowledged: ["", "論文致謝提及"], other: ["", "合作者主持"]};
 
+const T = (zh, en) => `<span class="ll"><span class="t-zh">${esc(zh)}</span><span class="t-en" lang="en">${esc(en)}</span></span>`;  // 介面字：跟著語言切換
 function setLang(l){
   document.body.className = "lang-" + l;
   document.querySelectorAll("[data-lang]").forEach(b => b.setAttribute("aria-checked", String(b.dataset.lang === l)));
@@ -43,7 +44,7 @@ function renderCard(m){
     ${(() => { const rest = (t, sep) => (t || "").split(sep).slice(1).map(x => x.trim()).filter(Boolean).join(" · ");  // 第一段已經是上面的職稱
       const en = rest(m.headline, "·"), zh = rest(m.headline_zh, "｜");
       return en || zh ? `<div class="small" style="margin-top:8px">${bi(zh, en, "div")}</div>` : ""; })()}
-    ${(m.education || []).length ? `<div class="pedu"><div class="role" style="margin-bottom:6px">學歷｜Education</div>${m.education.map(e =>
+    ${(m.education || []).length ? `<div class="pedu"><div class="role" style="margin-bottom:6px">${T("學歷", "Education")}</div>${m.education.map(e =>
         `<div class="small"><strong>${esc(e.degree)}</strong><div class="muted">${esc(e.school)}（${esc(e.years)}）</div></div>`).join("")}</div>` : ""}
     <ul class="plinks">
       ${row("⌖", c.location && esc(c.location))}
@@ -86,13 +87,12 @@ function renderMe(m){
   const bio = en.length === zh.length ? en.map((e, i) => [zh[i], e]) : [[m.summary_zh, m.summary]];
   body("me").innerHTML = `
     <ul class="bullets">${bio.map(([z, e]) => `<li>${bi(z, e, "div")}</li>`).join("")}</ul>
-    <h3 class="label">研究興趣｜Research interests</h3>
+    <h3 class="label">${T("研究興趣", "Research interests")}</h3>
     <ul class="bullets cols2">${(m.interests || []).map(i => `<li>${bi(i.zh, i.en, "div")}</li>`).join("")}</ul>
-    <h3 class="label">發表｜Publications</h3>
+    <h3 class="label">${T("發表", "Publications")}</h3>
     <ul class="bullets">${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul>
-    <h3 class="label">專案｜Projects</h3>
-    <ul class="bullets">${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul>
-    <div class="src">內容出處：${esc([...new Set([m.summary_src, m.interests_src, "CV"].filter(Boolean))].join("；"))}</div>`;
+    <h3 class="label">${T("專案", "Projects")}</h3>
+    <ul class="bullets">${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${bi(p.zh, p.en, "div")}</div></li>`).join("")}</ul>`;
   const head = document.querySelector("#me h2");
   if (window.APP_REMATCH && head && !document.getElementById("me-edit")){
     head.insertAdjacentHTML("afterend", `<div style="text-align:right;margin:-34px 0 8px"><button class="btn btn-sm" id="me-edit">編輯簡介與研究興趣</button></div>`);
@@ -222,19 +222,18 @@ document.addEventListener("click", async ev => {
 });
 
 function renderCaps(){
-  /* 工作經歷（本人 2026-10-26：取代「我能做到的事」）：每段經歷條列，括號裡是重點技能 */
+  /* 工作經歷（本人 2026-10-26：取代「我能做到的事」）：每段經歷條列，最後一行 Skills */
   const xs = (H.me || {}).experience || [];
-  const head = document.querySelector("#capabilities h2");
-  if (head) head.textContent = "工作經歷｜Experience";
+
   const group = (k, label) => {
     const list = xs.filter(x => x.kind === k);
     return list.length ? `<h3 class="label">${label}</h3>${list.map(x => `<div class="exp">
       <div class="exp-head"><div><strong>${bi(x.role_zh, x.role)}</strong><div class="small">${esc(x.org)}${x.place ? "｜" + esc(x.place) : ""}</div></div><span class="small muted">${esc(x.dates || "")}</span></div>
       <ul class="bullets">${(x.bullets || []).map(b => `<li>${bi(b.zh, b.en, "div")}</li>`).join("")}</ul>
-      ${(x.skills || []).length ? `<div class="small skills">（重點技能：${x.skills.map((sk, i) => `<span class="pill">${bi((x.skills_zh || [])[i], sk)}</span>`).join(" ")}）</div>` : ""}</div>`).join("")}` : "";
+      ${(x.skills || []).length ? `<div class="small skills"><span class="sk-ic" aria-hidden="true">⚙</span><span class="sk-l">Skills:</span> ${x.skills.map((sk, i) => `<span class="pill">${bi((x.skills_zh || [])[i], sk)}</span>`).join(" ")}</div>` : ""}</div>`).join("")}` : "";
   };
-  body("capabilities").innerHTML = xs.length ? group("professional", "工作｜Professional") + group("research", "研究｜Research")
-    + `<div class="src">內容出處：${esc((H.me || {}).experience_src || "CV")}</div>` : `<div class="empty">還沒有工作經歷。</div>`;
+  body("capabilities").innerHTML = xs.length ? group("professional", T("工作", "Professional")) + group("research", T("研究", "Research"))
+    : `<div class="empty">${T("還沒有工作經歷。", "No experience yet.")}</div>`;
 }
 
 const FIT = {strong: ["g", "強相關"], partial: ["y", "部分相關"], none: ["", "沒有相關"]};
@@ -285,9 +284,9 @@ function renderProfs(ps){
   const head = document.querySelector("#professors h2");
   if (head && !document.getElementById("prof-tools")){
     head.insertAdjacentHTML("afterend", `<div class="row" id="prof-tools" style="justify-content:space-between;align-items:flex-end;margin:-4px 0 12px;flex-wrap:nowrap">
-      <span class="small muted">星星＝你的興趣與 CV 項目裡，<br>她有多少強相關、部分相關的研究。</span>
-      <span class="row" style="flex:none"><label class="small" for="prof-sort">排序</label><select id="prof-sort">
-        <option value="stars">星星多→少</option><option value="stars-asc">星星少→多</option><option value="name">姓名</option></select>
+      <span></span>
+      <span class="row" style="flex:none"><label class="small" for="prof-sort">${T("排序", "Sort")}</label><select id="prof-sort">
+        <option value="stars">★ ↓</option><option value="stars-asc">★ ↑</option><option value="name">A–Z</option></select>
         ${window.APP_REMATCH ? `<button class="btn btn-green" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ 新增教授</button>` : ""}</span></div>
       ${window.APP_REMATCH ? `<form class="card" id="add-prof-form" hidden style="margin-bottom:12px">
         <p class="small muted" style="margin-top:0">按「開始建檔」後，Claude Code 會在背景找身分、列文章、找全文，跑到停 1 停下來請你確認（通常 10–30 分鐘，進度在右上角「工作進度」）。</p>
@@ -320,16 +319,16 @@ function renderProfs(ps){
     const c = p.counts || {}, r = p.recommend;
     const strong = r ? r.targets.filter(t => t.fit === "strong").length : null, partial = r ? r.targets.filter(t => t.fit === "partial").length : null;
     const top5 = r ? (r.read_first || []).slice(0, 5) : (p.top_papers || []).slice(0, 5);
-    const facts = [c.works != null && `${c.works} 篇（2022–2026）`, c.grants_pi != null && `本人主持計畫 ${c.grants_pi}`, c.coauthors != null && `合作者 ${c.coauthors} 位`,
-                   r && `強相關 ${strong}／部分相關 ${partial}`].filter(Boolean);
+    const facts = [c.works != null && T(`${c.works} 篇`, `${c.works} papers`), c.grants_pi != null && T(`主持計畫 ${c.grants_pi}`, `${c.grants_pi} grants as PI`),
+                   c.coauthors != null && T(`合作者 ${c.coauthors}`, `${c.coauthors} co-authors`), r && T(`強 ${strong}／部分 ${partial}`, `${strong} strong / ${partial} partial`)].filter(Boolean);
     return `<details class="profcard">
       <summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc(p.institution || "")}</div>
-          <div class="small" style="margin-top:4px">${facts.map(esc).join("｜")}</div></div>${starsHTML(r)}</div></summary>
+          <div class="small" style="margin-top:4px">${facts.join(" · ")}</div></div>${starsHTML(r)}</div></summary>
       <div class="pc-body">
-        ${top5.length ? `<div class="small muted" style="margin-bottom:4px">必讀前五篇（跟你最相關）</div>
+        ${top5.length ? `<div class="small muted" style="margin-bottom:4px">${T("必讀前五篇", "Top 5 to read")}</div>
           <ol class="top5">${top5.map(w => `<li><a href="${esc(paperLink(p, w.id))}">${bi(w.title_zh, w.title)}</a> <span class="small muted">${esc(w.year || "")}</span></li>`).join("")}</ol>`
-          : `<div class="small muted">還沒比對，沒有推薦的必讀文章。</div>`}
-        <div class="row" style="margin-top:10px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">進入教授頁 →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}
+          : `<div class="small muted">${T("還沒比對。", "Not matched yet.")}</div>`}
+        <div class="row" style="margin-top:10px">${p.built ? `<a class="btn btn-green" href="${esc(p.href)}">${T("進入教授頁", "Open profile")} →</a>` : `<span class="pill y">詳細頁尚未產生</span>`}
           ${window.APP_REMATCH ? `<button class="btn" data-rematch="${esc(p.slug)}">${r ? "重新比對" : "依我的興趣比對"}</button>` : ""}</div>
       </div></details>`;
   }).join("");
@@ -350,7 +349,7 @@ function summarize(p, d, me){
   const top = papers.length ? papers[0].score : 1, count = {}, designs = {};
   ranked.slice(0, 10).forEach(r => (r.terms || []).forEach(t => count[t] = (count[t] || 0) + 1));
   d.works.forEach(w => { const c = designCode(w); if (c) designs[c] = (designs[c] || 0) + 1; });
-  return {slug: p.slug, href: `professor.html?p=${encodeURIComponent(p.slug)}`, built: true, name: d.professor.name, institution: d.professor.institution,
+  return {slug: p.slug, href: `professor.html?p=${encodeURIComponent(p.slug)}`, built: true, name: d.professor.name, institution: ((d.basic || {}).position || {}).institution || d.professor.institution,  // ORCID 的機構乾淨，停 1 的機構可能夾註記
     counts: d.counts, stage: d.pipeline.stage, n_overlap_papers: papers.length, n_strong: papers.filter(r => r.score >= top * 0.5).length,
     shared_terms: Object.entries(count).sort((a, b) => b[1] - a[1]).map(x => x[0]).slice(0, 12),
     top_papers: papers.slice(0, 3).map(r => ({id: r.id, title: W[r.id].title, title_zh: W[r.id].title_zh, year: W[r.id].year, terms: (r.terms || []).slice(0, 6), pct: Math.round(r.score / top * 100)})),
@@ -388,7 +387,7 @@ async function loadHome(){
 }
 
 let OFFLINE_HOME = false;
-const PAGES = [["index.html", "簡介"], ["professors.html", "目標教授"], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
+const PAGES = [["index.html", T("簡介", "Profile")], ["professors.html", T("目標教授", "Professors")], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
 const MORE = [["settings.html", "設定與工作進度"]];
 const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "proposals.html": ["proposal"],
                        "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline", "settings"], "settings.html": ["pipeline", "settings"]};
@@ -398,7 +397,7 @@ function setupHomeViews(){
   const tabs = document.getElementById("tabs");
   const here = location.pathname.split("/").pop() || "index.html";
   if (OFFLINE_HOME){
-    tabs.innerHTML = [["me", "簡介"], ["professors", "目標教授"], ["proposal", "Research Proposal"], ["ps", "Personal Statement"], ["sop", "Statement of Purpose"]].map(([id, l]) => `<a href="#${id}">${l}</a>`).join("");
+    tabs.innerHTML = [["me", T("簡介", "Profile")], ["professors", T("目標教授", "Professors")], ["proposal", "Research Proposal"], ["ps", "Personal Statement"], ["sop", "Statement of Purpose"]].map(([id, l]) => `<a href="#${id}">${l}</a>`).join("");
     return;
   }
   const cur = here === "me.html" ? "index.html" : here;
