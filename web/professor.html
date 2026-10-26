@@ -754,6 +754,7 @@ function programRows(progs){
     const facts = [p.intake ? `${esc(p.intake)} 入學` : "", p.duration ? esc(p.duration) : "", p.tuition && p.tuition.text ? `學費：${esc(p.tuition.text)} ${a(p.tuition.src, "出處")}` : ""].filter(Boolean).join("｜");
     return `<div style="margin-bottom:10px"><a href="${esc(p.url || p.src || p.member_src)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a>
       ${dept ? pill("y", "系所的博士班（她本人沒掛名）") : pill("g", "她本人掛名")} ${pill(c, t + (f.years ? `・${f.years} 年` : ""))}${f.stipend ? ` <span class="small">${esc(f.stipend)}</span>` : ""}
+      ${p.via ? `<div class="small muted">透過：${esc(p.via)}</div>` : ""}
       ${facts ? `<div class="small" style="margin-top:2px">${facts}</div>` : ""}
       ${f.note ? `<div class="small">資助：${esc(f.note)} ${a(f.src, "出處")}</div>` : ""}
       ${(p.requirements || []).length ? `<div class="small">要繳：${p.requirements.map(esc).join("、")} ${a(p.requirements_src, "出處")}</div>` : ""}

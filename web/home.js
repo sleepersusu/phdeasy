@@ -92,7 +92,10 @@ function renderMe(m){
     <h3 class="label">${T("發表", "Publications")}</h3>
     <ul class="bullets">${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul>
     <h3 class="label">${T("專案", "Projects")}</h3>
-    <ul class="bullets">${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${bi(p.zh, p.en, "div")}</div></li>`).join("")}</ul>`;
+    <ul class="bullets">${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a>
+      ${p.summary ? `<div class="small" style="margin-top:4px">${bi(p.summary.zh, p.summary.en, "div")}</div>` : `<div class="small">${bi(p.zh, p.en, "div")}</div>`}
+      ${(p.overview || []).length ? `<details style="margin-top:4px"><summary class="small" style="cursor:pointer;min-height:36px;display:flex;align-items:center">${T("專案大概", "Overview")}</summary>
+        <ul class="small" style="margin:4px 0 0;padding-left:18px">${p.overview.map(o => `<li style="margin:4px 0">${bi(o.zh, o.en, "div")}</li>`).join("")}</ul></details>` : ""}</li>`).join("")}</ul>`;
   const head = document.querySelector("#me h2");
   if (window.APP_REMATCH && head && !document.getElementById("me-edit")){
     head.insertAdjacentHTML("afterend", `<div id="me-edit-wrap" style="text-align:right;margin:-34px 0 8px"><button class="btn btn-sm" id="me-edit">編輯簡介與研究興趣</button></div>`);
@@ -403,7 +406,7 @@ async function renderDiscover(){
         ${(c.programs || []).length ? `<div class="small"><strong>博士學程：</strong>${c.programs.map(p => { const f = p.funding || {}, [k, t] = FUND[f.value] || FUND.unknown;
             const dept = p.basis === "department", facts = [p.intake && `${esc(p.intake)} 入學`, p.duration && esc(p.duration), p.tuition && p.tuition.text && `學費 ${esc(p.tuition.text)}`].filter(Boolean).join("｜");
             return `<div style="margin:2px 0 4px 8px"><a href="${esc(p.url || p.src || p.member_src)}" target="_blank" rel="noopener">${esc(p.name)}</a> ${dept ? '<span class="pill y">系所的博士班</span> ' : ""}<span class="pill ${k}">${t}${f.years ? `・${f.years} 年` : ""}</span>${f.stipend ? ` ${esc(f.stipend)}` : ""}
-              ${facts ? `<div class="muted">${facts}</div>` : ""}${(p.requirements || []).length ? `<div class="muted">要繳：${p.requirements.map(esc).join("、")}</div>` : ""}
+              ${p.via ? `<div class="muted">透過：${esc(p.via)}</div>` : ""}${facts ? `<div class="muted">${facts}</div>` : ""}${(p.requirements || []).length ? `<div class="muted">要繳：${p.requirements.map(esc).join("、")}</div>` : ""}
               <span class="muted">${f.note ? esc(f.note) + "｜" : ""}<a href="${esc(dept ? p.src : p.member_src)}" target="_blank" rel="noopener">${dept ? "學程頁" : "教員名單"}</a>${f.src ? `・<a href="${esc(f.src)}" target="_blank" rel="noopener">資助出處</a>` : ""}</span></div>`; }).join("")}</div>`
           : c.programs ? `<div class="small muted">查過：他本人沒掛名、系所的博士班也查不到</div>` : ""}
         ${!(c.programs || []).length && c.funding_note ? `<div class="small"><strong>學校博士班資助（備用）：</strong>${esc(c.funding_note)} ${c.funding_src ? `<a href="${esc(c.funding_src)}" target="_blank" rel="noopener">出處</a>` : ""}</div>` : ""}
