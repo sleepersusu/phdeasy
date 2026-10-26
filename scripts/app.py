@@ -34,7 +34,7 @@ from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
 from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, prompt_continue,
-                           prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
+                           prompt_doc_edit, prompt_doc_translate, prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
 FROZEN = getattr(sys, "frozen", False)  # Windows 安裝版（PyInstaller）
@@ -393,7 +393,55 @@ class App:
         if uv:
             subprocess.run([uv, "run", "python", "scripts/build_site.py", f"runs/{slug}"], cwd=str(self.workspace), capture_output=True, timeout=300)
 
+    def doc_script(self, *args):
+        """本人文件的腳本（上傳成新版本）：用工作區的流水線。"""
+        uv = find_uv()
+        if not uv:
+            raise ValueError("這台還沒有 uv，先到「設定」安裝")
+        r = subprocess.run([uv, "run", "python", "scripts/mydocs.py", *args], cwd=str(self.workspace), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300)
+        if r.returncode:
+            raise ValueError((r.stdout + r.stderr).strip()[-400:] or "上傳失敗")
+        return r.stdout.strip()
+
+    def doc_upload(self, q, data, limit=50 * 1024 * 1024):
+        """本人上傳 Research Proposal／Personal Statement／SOP（Word 或 PDF）：存成新版本、馬上顯示英文，背景翻成中文。"""
+        import re as _re
+        from pipeline.mydocs import doc_key
+        key = doc_key(q.get("kind") or "", q.get("for") or None)
+        ext = (q.get("ext") or "").lower()
+        if ext not in ("docx", "pdf") or len(data) > limit:
+            raise ValueError("只收 Word（.docx）或 PDF，50 MB 以內")
+        if (ext == "pdf" and b"%PDF-" not in data[:1024]) or (ext == "docx" and not data.startswith(b"PK")):
+            raise ValueError("檔案內容跟副檔名對不上")
+        up = self.runs / "_me" / "docs" / "_uploads"
+        up.mkdir(parents=True, exist_ok=True)
+        f = up / f"{datetime.now().strftime('%Y%m%d-%H%M%S')}.{ext}"
+        f.write_bytes(data)
+        args = ["upload", q["kind"], str(f)] + (["--for", q["for"]] if q.get("for") else [])
+        out = self.doc_script(*args)
+        m = _re.search(r"第 (\d+) 版", out)
+        n = int(m.group(1)) if m else None
+        started = False
+        if n and not self.jobs.running() and not self.blocked:  # 馬上顯示英文；中文在背景翻
+            self.jobs.start("doc-translate", prompt_doc_translate(key, n), f"翻成中文：{key} 第 {n} 版")
+            started = True
+        return {"ok": True, "key": key, "version": n, "translating": started, "result": out}
+
     def post(self, path, body):
+        if path in ("doc-edit", "doc-translate"):
+            import re as _re
+            if self.blocked:
+                raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑；那台關掉後重開這個程式")
+            key, v = body.get("key") or "", body.get("version")
+            if not _re.fullmatch(r"(ps|sop|proposal)(--[a-z0-9-]+)?", key) or not isinstance(v, int) or v < 1:
+                raise ValueError("文件或版本不對")
+            if path == "doc-translate":
+                return self.jobs.start("doc-translate", prompt_doc_translate(key, v), f"翻成中文：{key} 第 {v} 版")
+            b = body.get("block")
+            if not isinstance(b, int) or b < 0:
+                raise ValueError("段落不對")
+            return self.jobs.start("doc-edit", prompt_doc_edit(key, v, b, (body.get("instruction") or "")[:300]), f"AI 編修：{key} 第 {v} 版第 {b + 1} 段")
         if path in ("library-add", "zotero"):
             slug = self._lib_slug(body.get("slug"))
             if path == "zotero":
@@ -536,6 +584,14 @@ def make_handler(app):
         def do_POST(self):
             if not self.path.startswith("/api/") or self.headers.get("X-Phdeasy-App") != "1":  # 擋其他網站偷送請求
                 return self._json(403, {"error": "forbidden"})
+            if self.path.startswith("/api/doc-upload"):
+                try:
+                    from urllib.parse import parse_qs
+                    q = {k: v[0] for k, v in parse_qs(urlparse(self.path).query).items()}
+                    n = int(self.headers.get("Content-Length") or 0)
+                    return self._json(200, app.doc_upload(q, self.rfile.read(n)))
+                except (ValueError, RuntimeError) as e:
+                    return self._json(400, {"error": str(e)})
             if self.path.startswith("/api/library-upload/"):
                 try:
                     u = urlparse(self.path)

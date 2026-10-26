@@ -64,6 +64,17 @@ def prompt_library_draft(slug, ids):
             "只能引這幾篇與她的文章，完成後回報 DONE 那一行。" + UNATTENDED)
 
 
+def prompt_doc_translate(key, version):
+    return (f"把本人的文件 {key} 第 {version} 版翻成中文：照 .claude/skills/my-docs/SKILL.md 的 A 段（翻譯者 → check → index → drive_sync），"
+            "完成後回報 DONE 那一行。" + UNATTENDED)
+
+
+def prompt_doc_edit(key, version, block, instruction):
+    req = (instruction or "").strip() or "整體潤飾"
+    return (f"AI 編修本人的文件 {key}：第 {version} 版、第 {block + 1} 段（--block {block}），本人的要求：「{req}」。"
+            "照 .claude/skills/my-docs/SKILL.md 的 B 段（編修者 → apply-edit 存成新版本 → index → drive_sync），只改這一段，完成後回報 DONE 那一行。" + UNATTENDED)
+
+
 def prompt_propose(slug):
     return (f"幫 runs/{slug} 擬研究構想草稿：先跑 drive_sync；已有 work/proposal/draft.json 就先移到 work/proposal/_old/（不要刪）；"
             "照 .claude/skills/prof-propose/SKILL.md 跑 inputs → 擬稿 → check（只修一輪）→ assemble → build_site，"

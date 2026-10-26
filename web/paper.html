@@ -85,6 +85,13 @@ header.top{border-bottom:1px solid var(--line)}
 .crumbs a:hover{color:var(--fg);text-decoration:underline}
 .crumbs .sep{color:#b8bcc2}
 .crumbs [aria-current]{color:var(--fg);font-weight:600}
+
+/* 圖表逐步解讀：每一步一列，左英右中 */
+.steps{margin-top:12px}
+.steps .bi{border-radius:0;border-top:none}
+.steps .steps-head{border-top:1px solid var(--line);border-radius:8px 8px 0 0;background:var(--soft)}
+.steps .step:last-child{border-radius:0 0 8px 8px}
+.steps .step>div{padding:8px 14px}
 </style>
 </head>
 <body>
@@ -162,7 +169,9 @@ function render(d, w){
       <div class="small" lang="en" style="margin-top:4px">${esc(f.caption || "")}</div>
       ${f.en || f.zh ? `<div style="margin-top:8px">${pair(f.en, f.zh, "What it shows", "這張在講什麼")}</div>${cites(f.citations)}` : `<div class="small muted" style="margin-top:6px">（還沒有 AI 說明）</div>`}
       ${f.table_html ? `<div class="tbl">${f.table_html}</div>` : ""}
-      ${f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)}（${esc(f.loc || "原文")}）">` : (f.table_html ? "" : `<div class="small muted" style="margin-top:6px">這張圖沒有拿到圖檔。</div>`)}</div>`;
+      ${f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)}（${esc(f.loc || "原文")}）">` : (f.table_html ? "" : `<div class="small muted" style="margin-top:6px">這張圖沒有拿到圖檔。</div>`)}
+      ${(f.detail || []).length ? `<div class="steps"><div class="bi steps-head"><div class="en lab" lang="en">Step by step</div><div class="lab">逐步解讀</div></div>
+        ${f.detail.map((st, i) => `<div class="bi step"><div class="en" lang="en"><b>${i + 1}.</b> ${esc(st.en)}</div><div><b>${i + 1}.</b> ${esc(st.zh)}</div></div>`).join("")}</div>` : ""}</div>`;
   });
   // 4. 解析卡其他欄位（左英右中）
   if ((w.card.fields || []).length) h += `<h2>完整解析</h2>`;  // 討論文獻沒有解析卡：不放空標題

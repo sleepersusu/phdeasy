@@ -3,6 +3,7 @@
   uv run python scripts/digest.py todo runs/<slug>                 # 列出還沒寫重點的文章（有全文或摘要的）
   uv run python scripts/digest.py check runs/<slug> [--ids W1,W2]  # 核對 work/digest/<id>.json；有錯 exit 1
   uv run python scripts/digest.py assemble runs/<slug>             # → out/papers/<這篇的資料夾>/重點.json
+  uv run python scripts/digest.py figures runs/<slug> [--ids W1]   # 每張圖表的圖檔絕對路徑與是否已有逐步解讀（給看圖解讀的 agent）
 """
 import argparse
 import json
@@ -41,7 +42,7 @@ def eligible(run):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["todo", "check", "assemble"])
+    ap.add_argument("cmd", choices=["todo", "check", "assemble", "figures"])
     ap.add_argument("run")
     ap.add_argument("--ids", default=None)
     a = ap.parse_args()
@@ -56,6 +57,18 @@ def main():
         return
     if a.ids:
         ids = [w for w in ids if w in set(a.ids.split(","))]
+    if a.cmd == "figures":
+        rows = []
+        for w in ids:
+            dg = {f.get("label"): f for f in (_j(dd / f"{w}.json", {}) or {}).get("figures") or []}
+            for f in _figs(run, w):
+                img = (run / "out" / "site" / f["image"]).resolve() if f.get("image") else None
+                rows.append({"id": w, "label": f["label"], "caption": f.get("caption"), "image": str(img) if img and img.exists() else None,
+                             "table_html": bool(f.get("table_html")), "has_detail": bool((dg.get(f["label"]) or {}).get("detail"))})
+        print(json.dumps(rows, ensure_ascii=False, indent=1))
+        left = [r for r in rows if not r["has_detail"] and (r["image"] or r["table_html"])]
+        print(f"還沒有逐步解讀 {len(left)}/{len(rows)} 張（有圖檔或表格的）", file=sys.stderr)
+        return
     if a.cmd == "check":
         total = 0
         for wid in ids:

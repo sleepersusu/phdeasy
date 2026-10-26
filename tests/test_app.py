@@ -179,3 +179,29 @@ def test_library_add_doi_and_jobs(tmp_path):
     assert calls[-1][1] == "library-draft" and "W1,L1abc" in calls[-1][3]
     with pytest.raises(ValueError):
         app.post("library-draft", {"slug": "doe-jane", "ids": ["W1; rm -rf"]})
+
+
+def test_doc_upload_saves_file_runs_upload_and_starts_translation(tmp_path):
+    import pytest
+    app, calls = _lib_app(tmp_path)
+    app.doc_script = lambda *a: calls.append(("doc",) + a) or "DONE ps 第 2 版：11 段"
+    app.jobs.running = lambda: False
+    with pytest.raises(ValueError):
+        app.doc_upload({"kind": "cv"}, b"%PDF-1.7")
+    with pytest.raises(ValueError):
+        app.doc_upload({"kind": "ps", "ext": "pdf"}, b"not a pdf")
+    r = app.doc_upload({"kind": "ps", "ext": "docx"}, b"PK\x03\x04 docx")
+    assert r["ok"] and r["version"] == 2
+    up = [c for c in calls if c[0] == "doc"][0]
+    assert up[1] == "upload" and up[2] == "ps" and up[3].endswith(".docx")
+    assert ("job", "doc-translate", None) == calls[-1][:3] and "my-docs" in calls[-1][3]
+
+
+def test_doc_edit_job_validates_inputs(tmp_path):
+    import pytest
+    app, calls = _lib_app(tmp_path)
+    app.post("doc-edit", {"key": "proposal--doe-jane", "version": 3, "block": 4, "instruction": "更精簡"})
+    assert calls[-1][1] == "doc-edit" and "第 3 版" in calls[-1][3] and "更精簡" in calls[-1][3]
+    for bad in ({"key": "../x", "version": 1, "block": 0}, {"key": "ps", "version": "a", "block": 0}, {"key": "ps", "version": 1, "block": -1}):
+        with pytest.raises(ValueError):
+            app.post("doc-edit", bad)

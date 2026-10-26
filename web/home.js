@@ -73,36 +73,123 @@ function renderMe(m){
 
 const CONF = {high: ["g", "信心 高"], medium: ["y", "信心 中"], low: ["r", "信心 低"]};
 function renderProposal(){
-  /* 計畫書：每位目標教授一列。跟她定案的放定案版；其他教授是 AI 依她的方向與經費擬的幾個版本 */
+  /* Research Proposal：每位目標教授一份。有上傳的計畫書（例：跟 Liliana 定案的）可以打開、看版本、每段 AI 編修；
+     沒有的列出 AI 依她的方向與經費擬的草稿各版 */
   const el = body("proposal");
   if (!el) return;
   const ps = H.professors || [];
   if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。</div>`; return; }
-  const href = p => OFFLINE_HOME ? p.href : `professor.html?p=${encodeURIComponent(p.slug)}&v=proposal`;
   el.innerHTML = ps.map(p => {
-    const pr = p.proposal || {};
-    const body = pr.joint ? `<div class="row">${'<span class="pill g">已定案</span>'}<strong>${bi(pr.joint_title_zh, pr.joint_title)}</strong></div>`
-      : (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
-          return `<li><span class="pill ${c[0]}">${c[1]}</span> <strong>${esc(v.id)}</strong>｜${bi(v.direction_zh, v.direction_en)}</li>`; }).join("")}</ul>${pr.stale ? `<div class="small muted">你的 CV 或她的資料改過，這幾版可能過期。</div>` : ""}`
-      : `<div class="small muted">還沒有計畫書。到她的頁面可以產生 AI 草稿。</div>`;
-    return `<article class="card" style="margin-bottom:12px"><div class="row" style="justify-content:space-between;align-items:flex-start">
-        <div><h3 style="margin:0">${esc(p.name)}</h3><div class="small muted">${esc(p.institution || "")}</div></div>
-        <a class="btn btn-green" href="${esc(href(p))}">${pr.joint ? "看定案版" : (pr.versions || []).length ? "看草稿" : "到她的頁面"} →</a></div>
-      <div style="margin-top:10px">${body}</div></article>`;
+    const key = `proposal--${p.slug}`, has = !!(H.docs || {})[key], pr = p.proposal || {};
+    const drafts = (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
+        return `<li><span class="pill ${c[0]}">${c[1]}</span> <strong>${esc(v.id)}</strong>｜${bi(v.direction_zh, v.direction_en)}</li>`; }).join("")}</ul>` : "";
+    return `<details class="profcard" ${has ? "open" : ""}><summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc(p.institution || "")}</div></div>
+        ${has ? `<span class="pill g">第 ${(H.docs[key].versions.slice(-1)[0] || {}).n} 版</span>` : (pr.versions || []).length ? `<span class="pill y">AI 草稿 ${pr.versions.length} 版</span>` : `<span class="pill">還沒有</span>`}</div></summary>
+      <div class="pc-body" data-doc-root>${has ? "" : drafts ? `<div class="small muted">AI 依她的方向與經費擬的草稿（<a href="professor.html?p=${encodeURIComponent(p.slug)}&v=proposal">到她的頁面看全文</a>）：</div>${drafts}` : ""}<div data-doc-slot="${esc(key)}"></div></div></details>`;
   }).join("");
+  el.querySelectorAll("[data-doc-slot]").forEach(slot => renderDoc(slot.dataset.docSlot, slot));
 }
 
-function renderStatement(kind){
-  /* Personal Statement／SOP：左英右中逐段對照；[方括號] 的待填段落標黃 */
-  const el = body(kind);
-  if (!el) return;
-  const st = ((H.me || {}).statements || {})[kind];
-  if (!st){ el.innerHTML = `<div class="empty">還沒有${kind === "sop" ? " SOP" : " Personal Statement"}。把 Word 檔給 Claude，它會用 <code>me_proposal.py statement ${kind} &lt;檔案&gt;</code> 匯入並翻成中文。</div>`; return; }
-  const lr = (zh, en) => `<div class="lr"><div class="en" lang="en">${esc(en || "")}</div><div class="zh">${zh ? esc(zh) : '<span class="muted">（尚無中文）</span>'}</div></div>`;
-  el.innerHTML = `<div class="card"><div class="small muted">出處：${esc(st.src || "")}</div>
-      <h3 style="margin:8px 0 0">${lr(st.title_zh, st.title)}</h3></div>
-    ${st.blocks.map(b => `<div class="${b.type === "note" ? "item attn" : "stmt-p"}">${b.type === "note" ? '<span class="pill y">待填</span> ' : ""}${lr(b.zh, b.en)}</div>`).join("")}`;
+/* ===== 本人的文件：上傳就顯示、每段 AI 編修、版本 ===== */
+const DOC_NAMES = {proposal: ["Research Proposal", "研究計畫書"], ps: ["Personal Statement", "個人陳述"], sop: ["Statement of Purpose", "研究目的陳述"]};
+const ME_ROOT = () => OFFLINE_HOME ? "_me/" : "../runs/_me/";
+const DOC_VIEW = {};  // key → 正在看的版本號
+function lrHTML(zh, en){ return `<div class="lr"><div class="en" lang="en">${esc(en || "")}</div><div class="zh">${zh ? esc(zh) : '<span class="muted">（翻譯中／尚無中文）</span>'}</div></div>`; }
+function docBlocksHTML(doc, editable){
+  /* 依顯示順序編號可編修的段落（跟 scripts/pipeline/mydocs.py 的 blocks_of 同順序）；計畫書有章節、圖、表 */
+  let k = 0;
+  const editBtn = () => editable ? `<button class="btn btn-sm" data-doc-edit="${k}">AI 編修</button>` : "";
+  const block = b => {
+    if (["p", "h2", "h3", "note"].includes(b.type)){
+      const html = `<div class="docb ${b.type}" data-block="${k}">${b.type === "note" ? '<span class="pill y">待填</span> ' : ""}${lrHTML(b.zh, b.en)}<div class="docb-tools">${editBtn()}</div></div>`;
+      k++; return html;
+    }
+    if (b.type === "figure") return `<figure class="doc-fig"><img loading="lazy" src="${esc(ME_ROOT() + b.src)}" alt="${esc(b.caption_en || "圖")}"><figcaption class="small">${lrHTML(b.caption_zh, b.caption_en)}</figcaption></figure>`;
+    if (b.type === "table"){
+      const t = rows => `<div class="tablebox"><table><thead><tr>${rows[0].map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${rows.slice(1).map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+      const rz = (b.rows_zh || []).length === b.rows.length ? b.rows_zh : null;
+      return `<figure class="doc-tbl"><figcaption class="small">${lrHTML(b.caption_zh, b.caption_en)}</figcaption><div class="lr"><div class="en">${t(b.rows)}</div><div class="zh">${rz ? t(rz) : ""}</div></div></figure>`;
+    }
+    if (b.type === "ref") return `<li class="small" lang="en">${esc(b.en.replace(/^\d+\.\s*/, ""))}</li>`;
+    return "";
+  };
+  if (doc.sections) return doc.sections.map(sec => {
+    const refs = (sec.blocks || []).filter(b => b.type === "ref"), rest = (sec.blocks || []).filter(b => b.type !== "ref");
+    return `<details class="doc-sec" ${sec.key === "references" ? "" : "open"}><summary><strong>${esc(sec.heading_zh || "")}｜<span lang="en">${esc(sec.heading_en || "")}</span></strong></summary>
+      ${rest.map(block).join("")}${refs.length ? `<ol class="doc-refs">${refs.map(block).join("")}</ol>` : ""}</details>`;
+  }).join("");
+  return (doc.blocks || []).map(block).join("");
 }
+async function renderDoc(key, el, opts = {}){
+  /* 一份文件：版本選單、上傳新版、翻成中文、每段 AI 編修 */
+  const info = (H.docs || {})[key];
+  const kind = key.split("--")[0], [nameEn, nameZh] = DOC_NAMES[kind];
+  const app = !!window.APP_REMATCH;
+  const upload = app ? `<label class="btn btn-green" style="cursor:pointer">上傳 Word／PDF${info ? "（存成新版本）" : ""}<input type="file" accept=".docx,.pdf" hidden data-doc-upload="${esc(key)}"></label>` : "";
+  if (!info){ el.innerHTML = `<div class="empty">還沒有 ${nameEn}。${app ? "" : "在應用程式裡打開可以上傳。"}<div class="row" style="margin-top:10px">${upload}</div><div class="small" data-doc-msg></div></div>`; return; }
+  const vs = info.versions, cur = DOC_VIEW[key] || vs[vs.length - 1].n, latest = vs[vs.length - 1].n;
+  let doc = info.latest;
+  if (cur !== latest && !OFFLINE_HOME){ try { doc = await getJSON(`${ME_ROOT()}docs/${key}/v${cur}/doc.json`); } catch (e) {} }
+  const v = vs.find(x => x.n === cur) || vs[vs.length - 1];
+  const texts = (doc.sections ? doc.sections.flatMap(x => x.blocks || []) : doc.blocks || []).filter(b => ["p", "h2", "h3", "note"].includes(b.type));
+  const needZh = texts.some(b => !b.zh);
+  const ORIGIN = {upload: "上傳", "ai-edit": "AI 編修"};
+  el.innerHTML = `<div class="doc-bar">
+      <div class="row"><label class="small" for="ver-${esc(key)}">版本</label><select id="ver-${esc(key)}" data-doc-ver="${esc(key)}">${[...vs].reverse().map(x =>
+        `<option value="${x.n}" ${x.n === cur ? "selected" : ""}>第 ${x.n} 版｜${esc(ORIGIN[x.origin] || x.origin)}｜${esc((x.created || "").slice(0, 10))}${x.note ? "｜" + esc(x.note) : ""}</option>`).join("")}</select>
+        ${cur !== latest ? '<span class="pill y">舊版本（只能看）</span>' : '<span class="pill g">最新版</span>'}</div>
+      <div class="row">${needZh && app ? `<button class="btn" data-doc-translate="${esc(key)}" data-v="${cur}">翻成中文</button>` : ""}${upload}</div></div>
+    ${v.origin === "ai-edit" && v.changed ? `<div class="small muted" style="margin:8px 0">這一版是從第 ${v.base} 版 AI 編修第 ${v.changed.map(i => i + 1).join("、")} 段而來${v.note ? "：" + esc(v.note) : ""}。</div>` : ""}
+    <div class="small" data-doc-msg></div>
+    <h3 style="margin:14px 0 6px">${lrHTML(doc.title_zh, doc.title || nameEn)}</h3>
+    <div class="doc-body" data-doc-key="${esc(key)}" data-v="${cur}">${docBlocksHTML(doc, app && cur === latest)}</div>`;
+  if (v.origin === "ai-edit") (v.changed || []).forEach(i => el.querySelector(`.docb[data-block="${i}"]`)?.classList.add("changed"));
+}
+function renderStatement(kind){
+  const el = body(kind);
+  if (el) renderDoc(kind, el);
+}
+document.addEventListener("change", async ev => {
+  const t = ev.target;
+  if (t.matches("[data-doc-ver]")){ DOC_VIEW[t.dataset.docVer] = +t.value; renderDoc(t.dataset.docVer, t.closest("[data-doc-slot]") || t.closest("section .body")); return; }
+  if (t.matches("[data-doc-upload]") && t.files.length){
+    const key = t.dataset.docUpload, [kind, slug] = key.split("--"), f = t.files[0], ext = f.name.split(".").pop().toLowerCase();
+    const msg = (t.closest("[data-doc-slot]") || t.closest("section .body")).querySelector("[data-doc-msg]");
+    msg.textContent = "上傳中…";
+    try {
+      const q = new URLSearchParams({kind, ext, ...(slug ? {for: slug} : {})});
+      const r = await fetch(`/api/doc-upload?${q}`, {method: "POST", headers: {"X-Phdeasy-App": "1"}, body: await f.arrayBuffer()}).then(x => x.json());
+      if (r.error) throw new Error(r.error);
+      msg.textContent = `已存成第 ${r.version} 版。${r.translating ? "中文正在背景翻譯（右上角工作進度看進度），" : ""}重新整理就會看到。`;
+      setTimeout(() => location.reload(), 1200);
+    } catch (e) { msg.textContent = "上傳失敗：" + e.message; }
+  }
+});
+document.addEventListener("click", async ev => {
+  const ed = ev.target.closest("[data-doc-edit]"), tr = ev.target.closest("[data-doc-translate]"), go = ev.target.closest("[data-doc-go]");
+  if (ed){
+    const box = ed.closest(".docb");
+    if (box.querySelector(".doc-ask")) return;
+    box.insertAdjacentHTML("beforeend", `<div class="doc-ask row"><input type="text" placeholder="要怎麼改？例：更精簡、更強調研究動機（空白＝整體潤飾）" style="flex:1">
+      <button class="btn btn-green btn-sm" data-doc-go>交給 AI</button><button class="btn btn-sm" onclick="this.closest('.doc-ask').remove()">取消</button></div>`);
+    box.querySelector(".doc-ask input").focus();
+    return;
+  }
+  if (go){
+    const box = go.closest(".docb"), bodyEl = go.closest(".doc-body");
+    go.disabled = true;
+    try {
+      await API("doc-edit", {key: bodyEl.dataset.docKey, version: +bodyEl.dataset.v, block: +box.dataset.block, instruction: box.querySelector(".doc-ask input").value});
+      box.querySelector(".doc-ask").innerHTML = `<span class="small">已交給 AI，改好會存成新版本（右上角工作進度看進度），完成後重新整理。</span>`;
+    } catch (e) { alert(e.message); go.disabled = false; }
+    return;
+  }
+  if (tr){
+    tr.disabled = true;
+    try { await API("doc-translate", {key: tr.dataset.docTranslate, version: +tr.dataset.v}); tr.textContent = "翻譯中…（完成後重新整理）"; }
+    catch (e) { alert(e.message); tr.disabled = false; }
+  }
+});
 
 function renderCaps(cs){
   /* 我能做到的事：條列式；跟發表、專案、學歷重複的項目不再列（那些在上面或左邊個人卡） */
@@ -257,16 +344,17 @@ async function loadHome(){
   if (inline && inline !== "__INLINE__") return JSON.parse(inline);
   const me = await getJSON("../runs/_me/me.json").catch(() => null);
   const list = await getJSON("../runs/professors.json").catch(() => []);
+  const docs = await getJSON("../runs/_me/docs/index.json").catch(() => ({}));
   const profs = [];
   for (const p of list){
     try { profs.push(summarize(p, await getJSON("../runs/" + p.data), me)); }
     catch (e) { profs.push({slug: p.slug, name: p.name, institution: p.institution, built: false, counts: {}, n_strong: 0, n_overlap_papers: 0, shared_terms: [], top_papers: [], top_grants: [], design_overlap: []}); }
   }
-  return {me, professors: profs};
+  return {me, professors: profs, docs};
 }
 
 let OFFLINE_HOME = false;
-const PAGES = [["index.html", "簡介"], ["professors.html", "目標教授"], ["proposals.html", "計畫書"], ["ps.html", "Personal Statement"], ["sop.html", "SOP"]];
+const PAGES = [["index.html", "簡介"], ["professors.html", "目標教授"], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
 const MORE = [["pipeline.html", "工作進度"], ["settings.html", "設定"]];
 const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "proposals.html": ["proposal"],
                        "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline"], "settings.html": ["settings"]};
@@ -276,7 +364,7 @@ function setupHomeViews(){
   const tabs = document.getElementById("tabs");
   const here = location.pathname.split("/").pop() || "index.html";
   if (OFFLINE_HOME){
-    tabs.innerHTML = [["me", "簡介"], ["professors", "目標教授"], ["proposal", "計畫書"], ["ps", "Personal Statement"], ["sop", "SOP"]].map(([id, l]) => `<a href="#${id}">${l}</a>`).join("");
+    tabs.innerHTML = [["me", "簡介"], ["professors", "目標教授"], ["proposal", "Research Proposal"], ["ps", "Personal Statement"], ["sop", "Statement of Purpose"]].map(([id, l]) => `<a href="#${id}">${l}</a>`).join("");
     return;
   }
   const cur = here === "me.html" ? "index.html" : here;

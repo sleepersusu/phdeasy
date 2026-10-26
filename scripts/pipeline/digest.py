@@ -77,6 +77,13 @@ def check_digest(d, text, figure_labels):
         fails += check_method(d["method"], text)
     else:  # 重點與研究方法由同一個 agent 一次寫完（本人 2026-10-26），不能缺
         fails.append({"path": "method", "why": "missing_method"})
+    for i, f in enumerate(d.get("figures") or []):  # 看圖逐步解讀（本人 2026-10-26）：每步中英都要有、數字一致
+        for j, st in enumerate(f.get("detail") or []):
+            en, zh = (st.get("en") or "").strip(), (st.get("zh") or "").strip()
+            if not en or not zh:
+                fails.append({"path": f"figures[{i}].detail[{j}]", "why": "need_en_and_zh"})
+            elif not numbers_match(zh, en):
+                fails.append({"path": f"figures[{i}].detail[{j}]", "why": "numbers_differ"})
     for path, it in _items(d):
         en, zh = (it.get("en") or "").strip(), (it.get("zh") or "").strip()
         if not en or not zh:
@@ -98,6 +105,7 @@ def assemble_digest(d, text, figure_labels, figures):
     """拿掉核對不過的條目（記下來給 rejected），圖表說明併入圖片位置與標題，給前端直接用。"""
     bad = {f["path"].split(".citations")[0] for f in check_digest(d, text, figure_labels)
            if f["why"] not in ("need_3_to_6", "figure_missing", "figure_not_in_paper", "figure_duplicate", "missing_method")}
+    bad_detail = {f["path"] for f in check_digest(d, text, figure_labels) if ".detail[" in f["path"]}
     rejected = []
     out = {"id": d.get("id"), "key_points": [], "design": None, "figures": [], "method": None}
     if d.get("method"):
@@ -118,7 +126,9 @@ def assemble_digest(d, text, figure_labels, figures):
     for lab in figure_labels:  # 依原文順序；沒有通過核對的圖表也要列出（只有標題，沒有 AI 說明）
         src = by[lab]
         e = explained.get(lab) or {}
+        i = next((k for k, f in enumerate(d.get("figures") or []) if f.get("label") == lab), None)
+        detail = [st for j, st in enumerate(e.get("detail") or []) if f"figures[{i}].detail[{j}]" not in bad_detail]
         out["figures"].append({"label": lab, "caption": src.get("caption"), "image": src.get("image"), "loc": src.get("loc"),
                                "table_html": src.get("table_html"),
-                               "en": e.get("en"), "zh": e.get("zh"), "citations": e.get("citations") or []})
+                               "en": e.get("en"), "zh": e.get("zh"), "citations": e.get("citations") or [], "detail": detail})
     return out, rejected

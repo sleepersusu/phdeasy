@@ -117,7 +117,8 @@ def build_home_data(runs, use_node=True):
     for d in sorted(runs.iterdir()):
         if d.is_dir() and not d.name.startswith("_") and (d / "state.json").exists() and (d / "work" / "works.json").exists():
             profs.append(professor_summary(d, me, use_node=use_node))
-    return {"me": me, "professors": profs}
+    from .mydocs import index
+    return {"me": me, "professors": profs, "docs": index(runs / "_me" / "docs")}
 
 
 WEB = Path(__file__).resolve().parents[2] / "web"

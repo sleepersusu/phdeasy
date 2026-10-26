@@ -111,3 +111,18 @@ def test_home_summary_has_proposal_status(tmp_path):
                                                                                   "direction": {"zh": "方向", "en": "Dir"}}], "fingerprint": "x"}))
     pr = build_home_data(runs, use_node=False)["professors"][0]["proposal"]
     assert pr["joint"] is False and pr["versions"] == [{"id": "v1", "level": "medium", "direction_zh": "方向", "direction_en": "Dir"}]
+
+
+def test_joint_proposal_uses_latest_document_version(tmp_path):
+    # 計畫書上傳新版或 AI 編修後，教授頁的「研究計畫書」顯示最新版
+    from pipeline.mydocs import _write
+    runs = runs_with_prof(tmp_path)
+    me = json.loads((runs / "_me" / "me.json").read_text())
+    (runs / "_me" / "me.json").write_text(json.dumps({**me, "proposal_with": "demo"}))
+    root = runs / "_me" / "docs"
+    _write(root, "proposal--demo", {"title": "V1", "sections": [{"key": "synopsis", "heading_en": "Synopsis", "blocks": [{"type": "p", "en": "a"}]}]}, {"origin": "upload"})
+    _write(root, "proposal--demo", {"title": "V2", "sections": [{"key": "synopsis", "heading_en": "Synopsis", "blocks": [{"type": "p", "en": "b"}]}]}, {"origin": "ai-edit"})
+    d = build_site_data(runs / "demo")
+    assert d["joint_proposal"]["title"] == "V2" and d["joint_proposal"]["version"] == 2
+    assert d["joint_proposal"]["document"][0]["blocks"][0]["en"] == "b"
+    assert build_home_data(runs, use_node=False)["docs"]["proposal--demo"]["versions"][-1]["n"] == 2

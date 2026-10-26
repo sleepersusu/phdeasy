@@ -57,3 +57,17 @@ def test_method_detail_needs_every_part_and_allows_not_reported():
     bad["design"] = {"en": "RCT.", "zh": "隨機對照試驗。", "citations": []}
     whys = {f["why"] for f in check_method(bad, TEXT)}
     assert {"missing_part", "numbers_differ", "no_citation"} <= whys
+
+
+def test_figure_detail_is_checked_and_kept():
+    # 本人 2026-10-26：圖不能只給一句話，要看圖逐步解讀（流程圖每一格、圖的軸與各組、表的列與欄）
+    d = good()
+    d["figures"][1]["detail"] = [{"en": "Assessed for eligibility (n=103).", "zh": "評估資格（103 人）。"},
+                                 {"en": "Randomized 1:1.", "zh": "以 1:1 隨機分派。"}]
+    assert check_digest(d, TEXT, LABELS) == []
+    figs = [{"label": "Table 1", "caption": "Baseline", "image": None}, {"label": "Figure 1", "caption": "Flow", "image": "f1.png"}]
+    out, _ = assemble_digest(d, TEXT, LABELS, figs)
+    assert [x["en"] for x in next(f for f in out["figures"] if f["label"] == "Figure 1")["detail"]] == ["Assessed for eligibility (n=103).", "Randomized 1:1."]
+    d["figures"][1]["detail"] = [{"en": "Randomized 120 people.", "zh": "隨機分派 100 人。"}, {"en": "Only English."}]
+    whys = {f["why"] for f in check_digest(d, TEXT, LABELS)}
+    assert {"numbers_differ", "need_en_and_zh"} <= whys

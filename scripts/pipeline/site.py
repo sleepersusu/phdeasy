@@ -149,6 +149,19 @@ def _recommend(run, owner):
     return {**m, "stale": bool(owner) and m.get("fingerprint") != me_fingerprint(owner)}
 
 
+def _joint(run, owner):
+    """跟這位教授的計畫書：runs/_me/docs/proposal--<教授>/ 有版本就用最新版（上傳或 AI 編修後的），否則用 me.json 的。"""
+    from .mydocs import list_versions, load
+    key = f"proposal--{run.name}"
+    root = run.parent / "_me" / "docs"
+    vs = list_versions(root, key) if (root / key).exists() else []
+    if vs:
+        d = load(root, key, vs[-1]["n"])
+        return {"title": d.get("title"), "title_zh": d.get("title_zh"), "subtitle": d.get("subtitle"), "document_meta": d.get("meta") or [],
+                "document": d.get("sections") or [], "version": vs[-1]["n"], "document_src": f"第 {vs[-1]['n']} 版｜{vs[-1].get('note') or ''}"}
+    return (owner or {}).get("proposal") if (owner or {}).get("proposal_with") == run.name else None
+
+
 def _library(run):
     """討論文獻（runs/<slug>/library/，結構同教授批次）：給教授頁清單與單篇頁用，形狀跟 works 一樣。"""
     import csv
@@ -281,7 +294,7 @@ def build_site_data(run):
         "me_query": _me_query(owner),
         "basic": _basic(wd, grants),
         "library": _library(run), "drafts": _drafts(run),
-        "joint_proposal": (owner or {}).get("proposal") if (owner or {}).get("proposal_with") == run.name else None,
+        "joint_proposal": _joint(run, owner),
         "proposal_draft": _proposal(run, owner, grants),
         "recommend": _recommend(run, owner),
         "home_href": "../../../index.html",

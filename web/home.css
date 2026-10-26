@@ -179,3 +179,20 @@ ul.bullets.cols2{columns:2;column-gap:28px}
 ul.bullets.cols2 li{break-inside:avoid}
 #capabilities h3.label:first-of-type{margin-top:0}
 @media (max-width:860px){ul.bullets.cols2{columns:1}}
+
+/* 本人的文件：版本列、每段 AI 編修 */
+.btn-sm{min-height:32px;padding:0 10px;font-size:.85rem}
+.doc-bar{display:flex;flex-wrap:wrap;justify-content:space-between;gap:10px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.docb{position:relative;padding:10px 0;border-bottom:1px solid var(--line)}
+.docb.h2,.docb.h3{font-weight:700}
+.docb.changed{background:#fffbea;box-shadow:inset 3px 0 0 #e9b949;padding-left:10px}
+.docb-tools{display:flex;justify-content:flex-end;margin-top:4px;opacity:0;transition:opacity .15s}
+.docb:hover .docb-tools,.docb:focus-within .docb-tools{opacity:1}
+.doc-ask{margin-top:8px}
+.doc-sec{border:1px solid var(--line);border-radius:10px;padding:8px 14px;margin:10px 0}
+.doc-sec>summary{cursor:pointer;min-height:40px;display:flex;align-items:center}
+.doc-fig img{display:block;max-width:100%;height:auto;border:1px solid var(--line);border-radius:8px}
+.doc-fig,.doc-tbl{margin:12px 0}
+.doc-tbl td,.doc-tbl th{font-size:.86rem;min-width:7em}
+.doc-refs{padding-left:1.4em}
+@media (hover:none){.docb-tools{opacity:1}}
