@@ -94,9 +94,24 @@ def crosscheck(author_rec, name, affil, works, a, b, log):
     return external_only(works, recs)
 
 
+def main_institutions(author_rec, works, author, share=0.1):
+    """主要機構：OpenAlex 的「最近機構」；OpenAlex 沒給（有些人這欄是空的）就用他在這批文章裡至少 10% 都掛的機構。"""
+    last = {i.get("display_name") for i in author_rec.get("last_known_institutions") or [] if i.get("display_name")}
+    if last:
+        return last
+    cnt = {}
+    for w in works:
+        me = next((x for x in w["authors"] if x["id"] == author), None)
+        for i in set((me or {}).get("institutions") or []):
+            cnt[i] = cnt.get(i, 0) + 1
+    return {i for i, n in cnt.items() if n >= max(1, share * len(works))}
+
+
 def affiliation_flags(works, author, main_insts):
-    """目標作者在該篇的機構不在主要機構清單 → 給停 1 本人看。"""
+    """目標作者在該篇的機構不在主要機構清單 → 給停 1 本人看。沒有主要機構可比時不標（不然整批都會是不符）。"""
     flags = []
+    if not main_insts:
+        return flags
     for w in works:
         me = next((x for x in w["authors"] if x["id"] == author), None)
         insts = set((me or {}).get("institutions") or [])
@@ -122,7 +137,7 @@ def main():
     works = [normalize_work(w, args.author) for w in raw]
     kept, dropped = dedupe(works, args.a, args.b)
 
-    main_insts = {i.get("display_name") for i in author_rec.get("last_known_institutions") or []}
+    main_insts = main_institutions(author_rec, kept, args.author)
     flags = affiliation_flags(kept, args.author, main_insts)
     for w in kept:
         w["affiliation_flag"] = any(f["id"] == w["id"] for f in flags)
