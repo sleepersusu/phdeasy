@@ -45,11 +45,7 @@ function renderCard(m){
       const en = rest(m.headline, "·"), zh = rest(m.headline_zh, "｜");
       return en || zh ? `<div class="small" style="margin-top:8px">${bi(zh, en, "div")}</div>` : ""; })()}
     ${(m.education || []).length ? `<div class="pedu"><div class="role" style="margin-bottom:6px">${T("學歷", "Education")}</div>${m.education.map(e =>
-        `<div class="small"><strong>${esc(e.degree)}</strong><div class="muted">${esc(e.school)}（${esc(e.years)}）</div></div>`).join("")}</div>` : ""}
-    ${(m.supervision || []).map(sv => `<div class="pedu"><div class="role" style="margin-bottom:6px">${T("指導教授", "Supervisors")}</div>
-        <div class="small muted" style="margin-bottom:4px">${esc(sv.program || "")}${sv.intake ? `（${esc(sv.intake)}）` : ""}</div>
-        ${(sv.supervisors || []).map(x => `<div class="small" style="margin:3px 0">${x.slug ? `<a href="professor.html?p=${esc(x.slug)}"><strong>${esc(x.name)}</strong></a>` : `<strong>${esc(x.name)}</strong>`}
-          <div class="muted">${T(x.role, x.role_en || x.role)}${x.status ? `｜${esc(x.status)}` : ""}</div></div>`).join("")}</div>`).join("")}
+        `<div class="small"><strong>${esc(e.degree)}</strong><div class="muted">${esc(e.school)}（${esc(e.years)}）</div>${e.advisor ? `<div class="muted">${T("指導教授：", "Advisor: ")}${esc(e.advisor)}</div>` : ""}</div>`).join("")}</div>` : ""}
     <ul class="plinks">
       ${row("⌖", c.location && esc(c.location))}
       ${row("✉", c.email && `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`)}
@@ -477,18 +473,28 @@ function renderProfs(ps){
   const el = body("professors");
   const head = document.querySelector("#professors h2");
   if (head && !document.getElementById("prof-tools")){
-    head.insertAdjacentHTML("afterend", `<div class="row" id="prof-tools" style="justify-content:space-between;align-items:flex-end;margin:-4px 0 12px;flex-wrap:nowrap">
+    head.insertAdjacentHTML("afterend", `<div class="row" id="prof-tools" style="justify-content:space-between;align-items:flex-end;margin:-4px 0 12px;flex-wrap:wrap">
       <span></span>
-      <span class="row" style="flex:none"><label class="small" for="prof-sort">${T("排序", "Sort")}</label><select id="prof-sort">
+      <span class="row" style="flex-wrap:wrap;justify-content:flex-end"><label class="small" for="prof-sort">${T("排序", "Sort")}</label><select id="prof-sort">
         <option value="stars">★ ↓</option><option value="stars-asc">★ ↑</option><option value="name">A–Z</option></select>
         ${window.APP_REMATCH ? `<button class="btn" id="disc-btn" aria-expanded="false" aria-controls="disc-panel">🔍 ${T("查詢教授", "Find professors")}</button>
-          <button class="btn btn-green" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ ${T("新增教授", "Add")}</button>` : ""}</span></div>
+          <button class="btn btn-green" id="add-dept-btn" aria-expanded="false" aria-controls="add-dept-form">＋ ${T("新增學校／系所", "Add school")}</button>
+          <button class="btn" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ ${T("新增教授", "Add")}</button>` : ""}</span></div>
+      ${window.APP_REMATCH ? `<form class="card" id="add-dept-form" hidden style="margin-bottom:12px">
+        <p class="small muted" style="margin-top:0">新增後會在背景查這個系所的教員名單（每人附官方個人頁），查好後在系所底下展開「教員名單」，勾選想了解的教授再按建檔。</p>
+        <label for="nd-school">學校（必填）</label><input type="text" id="nd-school" list="nd-schools" placeholder="例：University of California, San Francisco" required>
+        <datalist id="nd-schools">${((H.targets || {}).schools || []).map(sc => `<option value="${esc(sc.name)}">`).join("")}</datalist>
+        <label for="nd-dept">系所、學程或研究中心（必填）</label><input type="text" id="nd-dept" placeholder="例：Computational Precision Health PhD" required>
+        <label for="nd-url">系所網址（選填，有的話查得比較準）</label><input type="url" id="nd-url" placeholder="https://…">
+        <div class="row" style="margin-top:12px"><button class="btn btn-green" type="submit">新增並查教員名單</button><button class="btn" type="button" id="nd-cancel">取消</button></div>
+      </form>` : ""}
       ${window.APP_REMATCH ? `<div class="card" id="disc-panel" hidden style="margin-bottom:12px"></div>` : ""}
       ${window.APP_REMATCH ? `<form class="card" id="add-prof-form" hidden style="margin-bottom:12px">
         <p class="small muted" style="margin-top:0">按「開始建檔」後，Claude Code 會在背景一路跑完：找身分、列文章、挑跟你最相關的必讀前五篇並完整解析、合作網絡、研究計畫、總覽（進度與預估時間在右上角「工作進度」）。有問題的地方事後在教授頁按按鈕處理，不用中途確認。</p>
         <label for="np-name">教授姓名（必填）</label><input type="text" id="np-name" placeholder="例：Liliana Laranjo" required>
         <label for="np-inst">學校／機構（必填）</label><input type="text" id="np-inst" placeholder="例：The University of Sydney（Westmead Applied Research Centre）" required>
         <label for="np-orcid">ORCID（選填）</label><input type="text" id="np-orcid" placeholder="0000-0000-0000-0000">
+        <label for="np-dept">放進哪個學校系所（選填）</label><select id="np-dept">${deptOptions("")}</select>
         <div class="row" style="margin-top:12px"><button class="btn btn-green" type="submit">開始建檔</button><button class="btn" type="button" id="np-cancel">取消</button></div>
       </form>` : ""}`);
     document.getElementById("prof-sort").onchange = ev => { PROF_SORT = ev.target.value; renderProfs(H.professors); };
@@ -501,10 +507,20 @@ function renderProfs(ps){
         ev.preventDefault();
         const sub = form.querySelector('[type="submit"]'); sub.disabled = true;
         try { await API("new", {name: form.querySelector("#np-name").value.trim(), institution: form.querySelector("#np-inst").value.trim(),
-                                orcid: form.querySelector("#np-orcid").value.trim()}); location.href = "pipeline.html"; }
+                                orcid: form.querySelector("#np-orcid").value.trim(), dept: form.querySelector("#np-dept").value}); location.href = "pipeline.html"; }
         catch (e) { alert(e.message); sub.disabled = false; }
       };
       if (location.hash === "#new") toggle(true);
+    }
+    const dform = document.getElementById("add-dept-form"), dbtn2 = document.getElementById("add-dept-btn");
+    if (dform){
+      const tg = open => { dform.hidden = !open; dbtn2.setAttribute("aria-expanded", String(open)); if (open) dform.querySelector("#nd-school").focus(); };
+      dbtn2.onclick = () => tg(dform.hidden);
+      dform.querySelector("#nd-cancel").onclick = () => tg(false);
+      dform.onsubmit = async ev => { ev.preventDefault(); const b = dform.querySelector('[type="submit"]'); b.disabled = true;
+        try { const r = await API("target-add", {school: dform.querySelector("#nd-school").value.trim(), department: dform.querySelector("#nd-dept").value.trim(), url: dform.querySelector("#nd-url").value.trim()});
+          alert(r.job && r.job.queued ? "已新增；查教員名單排隊中（目前有 3 個工作在跑）" : "已新增，正在背景查教員名單（右上角齒輪看進度，約 5–10 分鐘）"); location.reload(); }
+        catch (e) { alert(e.message); b.disabled = false; } };
     }
     const dbtn = document.getElementById("disc-btn"), dpanel = document.getElementById("disc-panel");
     if (dbtn) dbtn.onclick = () => { dpanel.hidden = !dpanel.hidden; dbtn.setAttribute("aria-expanded", String(!dpanel.hidden)); if (!dpanel.hidden) renderDiscover(); };
@@ -518,7 +534,7 @@ function renderProfs(ps){
   const score = p => (matchStars(p.recommend) || {score: -1}).score;
   const list = [...ps].sort(PROF_SORT === "name" ? (a, b) => (a.name || "").localeCompare(b.name || "")
     : PROF_SORT === "stars-asc" ? (a, b) => score(a) - score(b) : (a, b) => score(b) - score(a));
-  el.innerHTML = list.map(p => {
+  const card = p => {
     const c = p.counts || {}, r = p.recommend;
     const strong = r ? r.targets.filter(t => t.fit === "strong").length : null, partial = r ? r.targets.filter(t => t.fit === "partial").length : null;
     const top5 = r ? (r.read_first || []).slice(0, 5) : (p.top_papers || []).slice(0, 5);
@@ -539,12 +555,80 @@ function renderProfs(ps){
           ${window.APP_REMATCH ? `<button class="btn" data-rematch="${esc(p.slug)}">${r ? "重新比對" : "依我的興趣比對"}</button>
             <button class="btn btn-sm" data-prof-edit="${esc(p.slug)}">${T("編輯", "Edit")}</button><button class="btn btn-sm btn-red" data-prof-remove="${esc(p.slug)}">${T("移除", "Remove")}</button>` : ""}</div>
         <form class="prof-edit" data-slug="${esc(p.slug)}" hidden style="margin-top:10px">
+          ${window.APP_REMATCH ? `<label>${T("學校系所", "Department")}<select name="dept">${deptOptions(deptOf(p.slug))}</select></label>` : ""}
           <label>${T("顯示的機構", "Institution")}<input type="text" name="institution" value="${esc((p.owner || {}).institution || p.institution || "")}"></label>
-          <label>Email<input type="email" name="email" value="${esc((p.owner || {}).email || "")}" placeholder="${T("對 Google 日曆的會議用", "Matches calendar meetings")}"></label>
+          <label>Email<input type="email" name="email" value="${esc((p.owner || {}).email || "")}" placeholder="對 Google 日曆的會議用"></label>
           <label>${T("備註", "Note")}<input type="text" name="note" value="${esc((p.owner || {}).note || "")}" placeholder="例：11/3 面談、想申請 2027 入學"></label>
           <div class="row" style="margin-top:6px"><button class="btn btn-green btn-sm" type="submit">${T("儲存", "Save")}</button><button class="btn btn-sm" type="button" data-cancel>${T("取消", "Cancel")}</button></div></form>
       </div></details>`;
-  }).join("") + notionPendingHTML() + removedHTML;
+  };
+  el.innerHTML = targetsHTML(list, card) + notionPendingHTML() + removedHTML;
+}
+
+document.addEventListener("input", ev => {
+  const q = ev.target.closest("[data-fac-q]"); if (!q) return;
+  const v = q.value.trim().toLowerCase();
+  document.querySelectorAll(`[data-fac-list="${CSS.escape(q.dataset.facQ)}"] [data-fac-row]`).forEach(r => { r.style.display = !v || r.textContent.toLowerCase().includes(v) ? "flex" : "none"; });
+});
+document.addEventListener("click", async ev => {
+  const b = ev.target.closest("[data-fac-build], [data-fac-refresh], [data-dept-remove]");
+  if (!b) return;
+  ev.preventDefault();
+  try {
+    if (b.dataset.facBuild){
+      const names = [...document.querySelectorAll(`[data-fac="${CSS.escape(b.dataset.facBuild)}"]:checked`)].map(x => x.value);
+      if (!names.length) return alert("先勾選教授");
+      if (!confirm(`幫這 ${names.length} 位建教授檔案？${names.length > 3 ? "同時最多跑 3 位，其他會排隊自動開始。" : ""}\n${names.join("、")}`)) return;
+      b.disabled = true;
+      const r = await API("faculty-build", {dept: b.dataset.facBuild, names});
+      alert(`已開始 ${r.started.length} 位${r.queued.length ? `、排隊 ${r.queued.length} 位` : ""}${r.existing.length ? `、已經有檔案 ${r.existing.length} 位（放進這個系所）` : ""}。進度在右上角齒輪。`);
+      location.reload();
+    } else if (b.dataset.facRefresh){
+      b.disabled = true;
+      const r = await API("faculty-lookup", {dept: b.dataset.facRefresh});
+      alert(r.queued ? "查教員名單排隊中" : "正在背景查教員名單（約 5–10 分鐘）");
+    } else if (b.dataset.deptRemove){
+      if (!confirm("移除這個系所？裡面教授的檔案都會留著，只是改列在「還沒分學校系所」。")) return;
+      await API("target-remove", {dept: b.dataset.deptRemove}); location.reload();
+    }
+  } catch (e) { alert(e.message); b.disabled = false; }
+});
+function deptOptions(sel){
+  return `<option value="">${T("（不分系所）", "(none)")}</option>` + ((H.targets || {}).schools || []).map(sc => `<optgroup label="${esc(sc.name)}">${sc.departments.map(d =>
+    `<option value="${esc(d.id)}" ${d.id === sel ? "selected" : ""}>${esc(d.name)}</option>`).join("")}</optgroup>`).join("");
+}
+function deptOf(slug){
+  for (const sc of (H.targets || {}).schools || []) for (const d of sc.departments) if ((d.members || []).includes(slug)) return d.id;
+  return "";
+}
+const slugOfName = n => { const toks = (n || "").split(",")[0].replace(/\(.*?\)/g, " ").normalize("NFKD").replace(/[^\x00-\x7f]/g, "").split(/[^A-Za-z-]+/)
+  .filter(x => x && !/^(dr|prof|professor|md|phd|ms|mph|rn)$/i.test(x));
+  return toks.length > 1 ? `${toks.at(-1)}-${toks[0]}`.toLowerCase() : (toks[0] || "").toLowerCase(); };  // 同 pipeline/jobs.py slug_of
+function targetsHTML(list, card){
+  /* 目標學校 → 系所 → 教授；每個系所可以展開教員名單，勾選後建檔 */
+  const t = H.targets || {schools: []}, by = Object.fromEntries(list.map(p => [p.slug, p])), used = new Set();
+  const built = new Set((H.professors || []).map(p => p.slug));
+  const dept = d => {
+    const ps = (d.members || []).map(x => by[x]).filter(Boolean); ps.forEach(p => used.add(p.slug));
+    const f = d.faculty, people = (f && f.people) || [];
+    const fac = !window.APP_REMATCH ? "" : people.length ? `<details class="faculty" style="margin:6px 0 10px"><summary class="small" style="cursor:pointer;min-height:36px;display:flex;align-items:center">${T("教員名單", "Faculty")}（${people.length} 位）<span class="muted">　${T("勾選想了解的，再按建檔", "tick, then build")}</span></summary>
+        <div class="row" style="margin:6px 0"><input type="search" data-fac-q="${esc(d.id)}" placeholder="搜尋姓名或研究方向" style="flex:1">
+          <button class="btn btn-sm" data-fac-refresh="${esc(d.id)}">${T("重新查名單", "Refresh")}</button></div>
+        <div data-fac-list="${esc(d.id)}">${people.map(x => { const has = built.has(slugOfName(x.name));
+          return `<label class="small" data-fac-row style="display:flex;gap:8px;align-items:flex-start;margin:4px 0">${has ? `<span class="pill g" style="flex:none">已建檔</span>` : `<input type="checkbox" data-fac="${esc(d.id)}" value="${esc(x.name)}" style="width:18px;height:18px;flex:none;margin-top:2px">`}
+            <span><strong>${esc(x.name)}</strong> <span class="muted">${esc(x.title || "")}</span> ${x.profile_url ? `<a href="${esc(x.profile_url)}" target="_blank" rel="noopener">${T("個人頁", "profile")}</a>` : ""}${x.research ? `<div class="muted">${esc(x.research)}</div>` : ""}</span></label>`; }).join("")}</div>
+        <div class="row" style="margin-top:8px"><button class="btn btn-green btn-sm" data-fac-build="${esc(d.id)}">${T("建檔勾選的教授", "Build selected")}</button>
+          <span class="small muted">${T("同時最多跑 3 位，其他會排隊自動開始", "Up to 3 at once; the rest queue")}${f.src ? `｜<a href="${esc(f.src)}" target="_blank" rel="noopener">${T("名單出處", "source")}</a>` : ""}</span></div></details>`
+      : `<div class="row small" style="margin:6px 0 10px"><span class="muted">${T("還沒有教員名單", "No faculty list yet")}</span><button class="btn btn-sm" data-fac-refresh="${esc(d.id)}">${T("查教員名單", "Find faculty")}</button></div>`;
+    return `<details class="dept" open style="margin:8px 0 14px 4px"><summary style="cursor:pointer;min-height:40px;display:flex;align-items:center;gap:8px">
+        <strong>${esc(d.name)}</strong><span class="small muted">${ps.length} ${T("位教授", "professors")}</span>${d.url ? `<a class="small" href="${esc(d.url)}" target="_blank" rel="noopener">${T("系所網站", "site")}</a>` : ""}
+        ${window.APP_REMATCH ? `<button class="btn btn-sm" data-dept-remove="${esc(d.id)}" style="margin-left:auto">${T("移除系所", "Remove")}</button>` : ""}</summary>
+      ${fac}${ps.map(card).join("") || `<div class="small muted" style="margin:4px 0 8px">${T("這個系所還沒有建檔的教授", "No professors yet")}</div>`}</details>`;
+  };
+  const schools = (t.schools || []).map(sc => `<section class="school" style="margin-bottom:18px"><h3 style="margin:6px 0 2px">🏛 ${esc(sc.name)}</h3>${sc.departments.map(dept).join("")}</section>`).join("");
+  const rest = list.filter(p => !used.has(p.slug));
+  return schools + (rest.length ? `<section class="school"><h3 style="margin:6px 0 2px">${T("還沒分學校系所", "Not in a department")}</h3>
+    <div class="small muted" style="margin-bottom:6px">${T("在教授卡片按「編輯」選系所", "Use Edit to choose a department")}</div>${rest.map(card).join("")}</section>` : "");
 }
 function notionPendingHTML(){
   /* Notion 裡填了、但還沒建檔的教授：按「建檔」才開始 */
@@ -576,7 +660,9 @@ document.addEventListener("submit", async ev => {
   const f = ev.target.closest(".prof-edit");
   if (!f) return;
   ev.preventDefault();
-  try { await API("prof-update", {slug: f.dataset.slug, institution: f.institution.value, email: f.email.value, note: f.note.value}); location.reload(); } catch (e) { alert(e.message); }
+  try { await API("prof-update", {slug: f.dataset.slug, institution: f.institution.value, email: f.email.value, note: f.note.value});
+        if (f.dept && f.dept.value !== deptOf(f.dataset.slug)) await API("prof-assign", {slug: f.dataset.slug, dept: f.dept.value});
+        location.reload(); } catch (e) { alert(e.message); }
 });
 
 function designCode(w){
@@ -624,6 +710,7 @@ async function loadHome(){
   const list = await getJSON("../runs/professors.json").catch(() => []);
   const docs = await getJSON("../runs/_me/docs/index.json").catch(() => ({}));
   const apps = await getJSON("../runs/_me/applications.json").catch(() => null);
+  const targets = await getJSON("../runs/_me/targets.json").catch(() => ({schools: []}));  // 目標學校 → 系所 → 教授
   const cal = await getJSON("../runs/_me/calendar.json").catch(() => null);  // Google 日曆裡跟教授有關的會議  // Notion「博士申請追蹤」匯入的
   const profs = [];
   for (const p of list){
@@ -631,7 +718,7 @@ async function loadHome(){
     try { profs.push({...summarize(p, await getJSON("../runs/" + p.data), me), owner}); }
     catch (e) { profs.push({slug: p.slug, name: p.name, institution: p.institution, built: false, counts: {}, n_strong: 0, n_overlap_papers: 0, shared_terms: [], top_papers: [], top_grants: [], design_overlap: []}); }
   }
-  return {me, professors: profs, docs, apps, cal};
+  return {me, professors: profs, docs, apps, cal, targets};
 }
 
 let OFFLINE_HOME = false;

@@ -406,3 +406,28 @@ def test_applicant_status_saved_and_in_settings(tmp_path):
     assert app.settings()["applicant"]["status"] == "international"
     with pytest.raises(ValueError):
         app.post("me-update", {"applicant": {"status": "alien"}})
+
+
+def test_targets_faculty_build_and_queue(tmp_path):
+    """新增學校系所 → 背景查教員名單；勾選建檔：放進系所，同時上限滿了就排隊，跑完一個自動開下一個。"""
+    import json
+    app, calls = _lib_app(tmp_path)
+    started = []
+
+    def start(kind, prompt, title, slug=None, key=None, session=None):
+        if len(started) >= 2:
+            raise RuntimeError("已經有 3 個工作在跑，等其中一個到停點或跑完再開新的")
+        started.append((kind, slug or key, prompt))
+        return {"id": title}
+    app.jobs.start = start
+    r = app.post("target-add", {"school": "University of California, San Francisco", "department": "Computational Precision Health"})
+    dept = r["dept"]
+    assert started[-1][0] == "faculty" and dept in started[-1][2]
+    r = app.post("faculty-build", {"dept": dept, "names": ["Yoshimi Fukuoka", "Julian Hong, M.D."]})
+    assert r["started"] == ["Yoshimi Fukuoka"] and r["queued"] == ["Julian Hong, M.D."]
+    t = json.loads((tmp_path / "runs" / "_me" / "targets.json").read_text())
+    assert t["schools"][0]["departments"][0]["members"] == ["fukuoka-yoshimi", "hong-julian"]
+    assert app.status()["queue"] == ["建檔：Julian Hong, M.D."]
+    started.clear()
+    app.after_job({"id": "x"})
+    assert started and started[0][:2] == ("new", "hong-julian") and app.queue == []

@@ -35,7 +35,7 @@ from urllib.parse import unquote, urlparse
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
-from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue, prompt_deep, prompt_programs, slug_of,
+from pipeline.jobs import (FULLTEXT_KINDS, REJUDGE_KINDS, UNATTENDED, Jobs, exception_actions, find_claude, find_codex, prompt_continue, prompt_deep, prompt_faculty, prompt_programs, slug_of,
                            prompt_discover_enrich, prompt_doc_edit, prompt_doc_translate, prompt_exception, prompt_library_draft, prompt_library_process, prompt_match, prompt_propose, prompt_new)
 
 SYNC_EVERY = 180
@@ -185,6 +185,7 @@ class App:
         self.codex_test = None
         self.port = 8790
         self._rebuild_lock = threading.Lock()
+        self.queue = []  # 同時已有 3 個工作在跑時，勾選建檔的教授先排隊，有空位就自動開始
         self._prog_samples = {}  # {工作 id: {步驟: (第一次看到的時間, 當時做完幾項)}}
         self.gcal_pending = None
         self.jobs.on_done = self.after_job
@@ -201,7 +202,42 @@ class App:
                      "order": [k for k, _ in BOOT_STEPS], "step": "drive", "sync": {}, "done": False}
         self.update_state = {"stage": "", "got": 0, "total": 0, "error": ""}
 
+    def start_or_queue(self, kind, prompt, title, slug=None, key=None):
+        """有空位就開始；已有 3 個工作在跑就排隊（同一位教授已在跑則照樣回錯誤）。"""
+        try:
+            return self.jobs.start(kind, prompt, title, slug=slug, key=key)
+        except RuntimeError as e:
+            if "個工作在跑" not in str(e):
+                raise
+            if not any(q["title"] == title for q in self.queue):
+                self.queue.append({"kind": kind, "prompt": prompt, "title": title, "slug": slug, "key": key})
+            return {"queued": True, "title": title, "position": len(self.queue)}
+
+    def _drain_queue(self):
+        while self.queue:
+            q = self.queue[0]
+            try:
+                self.jobs.start(q["kind"], q["prompt"], q["title"], slug=q["slug"], key=q["key"])
+            except RuntimeError as e:
+                if "個工作在跑" in str(e):
+                    return
+                print(f"排隊的工作開不了：{q['title']}：{e}")
+            self.queue.pop(0)
+
+    def _targets(self):
+        p = self.runs / "_me" / "targets.json"
+        return json.loads(p.read_text()) if p.exists() else {"schools": []}
+
+    def _save_targets(self, t):
+        p = self.runs / "_me" / "targets.json"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(json.dumps(t, ensure_ascii=False, indent=1))
+
     def after_job(self, job):
+        try:
+            self._drain_queue()
+        except Exception as e:
+            print(f"排隊處理失敗：{e}")
         try:
             with self._rebuild_lock:  # 好幾個工作同時跑完時，一次重建一個
                 rebuild(self.workspace)
@@ -220,7 +256,8 @@ class App:
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
                 "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split", "external_candidates", "possible_duplicate", "affiliation_mismatch"})},
                 "settings": self.settings(), "update": self.update_info, "version": self.version,
-                "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job), "jobs": self.job_list()}
+                "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job), "jobs": self.job_list(),
+                "queue": [q["title"] for q in self.queue]}
 
     def job_list(self):
         """工作進度頁：正在跑的全部，加上最近跑完的（每位教授／每份文件只留最新一個）；各自的紀錄與進度條。"""
@@ -853,7 +890,12 @@ class App:
                 raise ValueError("看不懂這個姓名：請用英文姓名")
             if (self.runs / slug / "state.json").exists():
                 raise ValueError(f"已經有這位教授的檔案（{slug}）：到「工作進度」按繼續跑")
-            return self.jobs.start("new", prompt_new(name, inst, body.get("orcid"), slug), f"建檔：{name}", slug=slug)
+            if body.get("dept"):  # 從目標系所新增：放進那個系所
+                from pipeline.targets import assign
+                t = self._targets()
+                assign(t, str(body["dept"]), slug)
+                self._save_targets(t)
+            return self.start_or_queue("new", prompt_new(name, inst, body.get("orcid"), slug), f"建檔：{name}", slug=slug)
         if path == "continue":
             slug = (body.get("slug") or "").strip()
             if not (self.runs / slug / "state.json").exists():
@@ -870,6 +912,59 @@ class App:
                 raise ValueError("找不到這筆未解決的例外（可能已經處理過，重新整理看看）")
             return self.jobs.start("exception", prompt_exception(slug, exc, body.get("action"), body.get("note") or ""),
                                    f"例外：{slug} {exc['id']}", slug=slug)
+        if path == "target-add":  # 目標學校 → 系所：新增後在背景查教員名單
+            from pipeline.targets import add_target, find_dept
+            t = self._targets()
+            dept = add_target(t, str(body.get("school") or "")[:200], str(body.get("department") or "")[:200], str(body.get("url") or "")[:500] or None)
+            self._save_targets(t)
+            sc, d = find_dept(t, dept)
+            job = None if self.blocked or (d.get("faculty") and not body.get("refresh")) else \
+                self.start_or_queue("faculty", prompt_faculty(dept, sc["name"], d["name"], d.get("url")), f"教員名單：{d['name']}", key=f"faculty:{dept}")
+            return {"ok": True, "dept": dept, "job": job}
+        if path == "faculty-lookup":
+            from pipeline.targets import find_dept
+            sc, d = find_dept(self._targets(), str(body.get("dept") or ""))
+            return self.start_or_queue("faculty", prompt_faculty(d["id"], sc["name"], d["name"], d.get("url")), f"教員名單：{d['name']}", key=f"faculty:{d['id']}")
+        if path == "target-remove":
+            from pipeline.targets import remove_target
+            t = self._targets()
+            remove_target(t, str(body.get("dept") or ""))
+            self._save_targets(t)
+            return {"ok": True}
+        if path == "prof-assign":
+            from pipeline.targets import assign, find_dept
+            t, slug = self._targets(), self._lib_slug(body.get("slug"))
+            if body.get("dept"):
+                assign(t, str(body["dept"]), slug)
+            else:  # 拿出系所
+                for sc in t.get("schools") or []:
+                    for d in sc["departments"]:
+                        if slug in d["members"]:
+                            d["members"].remove(slug)
+            self._save_targets(t)
+            return {"ok": True}
+        if path == "faculty-build":  # 勾選的教員：放進這個系所並開始建檔（超過同時上限就排隊）
+            from pipeline.targets import assign, find_dept
+            if self.blocked:
+                raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
+            t = self._targets()
+            sc, d = find_dept(t, str(body.get("dept") or ""))
+            names = [str(n).strip()[:200] for n in body.get("names") or [] if str(n).strip()][:30]
+            if not names:
+                raise ValueError("先勾選教授")
+            started, queued, existing = [], [], []
+            for n in names:
+                slug = slug_of(n)
+                if not slug:
+                    continue
+                assign(t, d["id"], slug)
+                if (self.runs / slug / "state.json").exists():
+                    existing.append(n)
+                    continue
+                r = self.start_or_queue("new", prompt_new(n, f"{sc['name']}（{d['name']}）", None, slug), f"建檔：{n}", slug=slug)
+                (queued if r.get("queued") else started).append(n)
+            self._save_targets(t)
+            return {"ok": True, "started": started, "queued": queued, "existing": existing}
         if path == "deep":  # 教授頁勾選「完全解析」：加進必讀，背景只處理這幾篇
             import re as _re
             slug = self._lib_slug(body.get("slug"))

@@ -143,6 +143,11 @@ def prompt_deep(slug, ids):
             "已經做好的文章不要重做，總覽與比對不用重寫。完成後回報 DONE 那一行（幾篇有全文、幾篇只用摘要）。" + UNATTENDED)
 
 
+def prompt_faculty(dept_id, school, dept, url=None):
+    return (f"列出 {school} 的「{dept}」所有教員：照 .claude/skills/prof-discover/faculty.md 做。系所 id＝{dept_id}"
+            + (f"；系所網址 {url}" if url else "") + "。完成後回報 DONE 那一行。" + UNATTENDED)
+
+
 def prompt_programs(slug, name, institution, orcid=None):
     return (f"查 {name}（{institution}{'，ORCID ' + orcid if orcid else ''}）本人掛名、可以收博士生的博士學程與各學程的資助："
             f"學費、獎學金、申請條件、截止日照 runs/_me/me.json 的 applicant（本人是國際生或本地生、想哪一年入學）寫；"
