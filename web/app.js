@@ -4,9 +4,9 @@ const API = (path, body) => fetch("/api/" + path, body === undefined ? {cache: "
   {method: "POST", headers: {"Content-Type": "application/json", "X-Phdeasy-App": "1"}, body: JSON.stringify(body)})
   .then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || r.status); return j; });
 
-const STAGE_ZH = {setup: "找文章與全文", stop1: "停 1：等你確認", ingest: "轉成文字", network: "合作與領域", grants: "研究計畫",
-  cards: "文章解析卡", profile: "總覽撰寫", verify: "獨立驗收", stop2: "停 2：等你決定", halted: "熔斷：等你決定"};
-const WAITING = new Set(["stop1", "stop2", "halted"]);
+const STAGE_ZH = {setup: "找文章與全文", stop1: "停在舊的停 1（按繼續跑）", ingest: "轉成文字", network: "合作與領域", grants: "研究計畫",
+  cards: "文章解析卡", profile: "總覽撰寫", verify: "獨立驗收", stop2: "完成", halted: "熔斷：等你決定"};
+const WAITING = new Set(["stop1", "halted"]);  // 不再停下等你（stop2＝完成）；只有舊批次的停 1 與熔斷要你按繼續
 let pollTimer = null;
 
 let wasSyncing = null;
@@ -44,7 +44,7 @@ function progressHTML(p){
   /* 進度條＋預估時間：看資料夾裡已產生的檔案算；速度是這次實際量到的，量不到用預設值，所以是「約」 */
   const cur = p.steps.find(x => x.key === p.current);
   return `<div style="margin:4px 0 12px">
-    <div class="row" style="justify-content:space-between"><strong>${p.percent}%</strong><span class="small">預估還要 ${dur(p.eta_s)}${p.steps.at(-1).key === "fulltext" ? "（到停 1）" : "（到停 2）"}</span></div>
+    <div class="row" style="justify-content:space-between"><strong>${p.percent}%</strong><span class="small">預估還要 ${dur(p.eta_s)}${p.steps.at(-1).key === "verify" ? "（到全部跑完）" : ""}</span></div>
     <div role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.percent}" style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;margin-top:4px">
       <div style="height:100%;width:${p.percent}%;background:#15803d;transition:width .3s"></div></div>
     ${cur ? `<div class="small" style="margin-top:6px">目前：${esc(cur.label)}${cur.total > 1 ? ` ${cur.done}／${cur.total}` : ""}，這一步${dur(cur.eta_s)}</div>` : ""}
@@ -68,10 +68,10 @@ function jobsHTML(st, ready){
       ${job.result && !running ? `<h3>Claude Code 的回報</h3><div class="card" style="white-space:pre-wrap">${esc(job.result)}</div>` : ""}
       <details ${running ? "open" : ""}><summary class="small" style="cursor:pointer;min-height:44px;display:flex;align-items:center">過程紀錄（${(job.log || []).length} 行）</summary>
         <div class="log" aria-live="polite" data-job-log="${id}">${esc((job.log || []).join("\n"))}</div></details>
-      ${!running && job.session ? `<label for="reply-${id}">回覆 Claude Code（例：停 1 的決定、要它修什麼）</label>
-        <textarea id="reply-${id}" data-reply-box="${id}" placeholder="例：身分確認是這位；外部候選兩篇都加入；其他照你的建議，繼續跑到停 2。"></textarea>
+      ${!running && job.session ? `<label for="reply-${id}">回覆 Claude Code（例：要它改什麼、再找哪篇）</label>
+        <textarea id="reply-${id}" data-reply-box="${id}" placeholder="例：W123 不是他的文章，拿掉；或：重新找 W456 的全文。"></textarea>
         <div class="row" style="margin-top:8px"><button class="btn btn-green" data-reply-send="${id}" ${!ready ? "disabled" : ""}>送出並繼續</button>
-        <span class="small muted">會接著同一個對話跑；停 1 確認後它會一路跑到停 2。</span></div>` : ""}`);
+        <span class="small muted">會接著同一個對話跑。</span></div>` : ""}`);
   }).join("");
 }
 
@@ -143,8 +143,8 @@ function renderPipeline(st){
     setRow("row-profs", "各教授進度", `<span class="small muted">${profs.length} 位${profs.some(p => WAITING.has(p.stage)) ? "｜有等你確認的" : ""}</span>`,
       profs.length ? `<ul>${profs.map(p => `<li class="row" style="margin:6px 0"><strong>${esc(p.name || p.slug)}</strong>
         <span class="pill ${WAITING.has(p.stage) ? "y" : p.stage === "stop2" ? "g" : ""}">${esc(STAGE_ZH[p.stage] || p.stage)}</span>
-        ${p.report ? `<a class="btn btn-green btn-sm" href="../runs/${esc(p.slug)}/${esc(p.report)}" target="_blank" rel="noopener">看${p.stage === "stop1" ? "停 1" : "停 2"}報告</a>` : ""}
-        ${p.stage !== "stop2" ? `<button class="btn btn-green btn-sm" data-continue="${esc(p.slug)}" ${!ready || busy.has(p.slug) ? "disabled" : ""}>${WAITING.has(p.stage) ? "我確認了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
+        ${p.report ? `<a class="btn btn-green btn-sm" href="../runs/${esc(p.slug)}/${esc(p.report)}" target="_blank" rel="noopener">看${p.stage === "stop1" ? "停 1" : ""}報告</a>` : ""}
+        ${p.stage !== "stop2" ? `<button class="btn btn-green btn-sm" data-continue="${esc(p.slug)}" ${!ready || busy.has(p.slug) ? "disabled" : ""}>${p.stage === "halted" ? "我看過了，繼續跑" : "繼續跑"}</button>` : ""}</li>`).join("")}</ul>`
         : `<div class="empty">還沒有教授。到「目標教授」按「＋ 新增教授」。</div>`) +
     setRow("row-tools", "這台電腦的工具", tools === 3 ? '<span class="pill g">✓ 齊全</span>' : `<span class="pill y">${3 - tools} 項沒裝</span>`, `<ul class="checks">
       ${check(st.claude, `Claude Code：${esc(st.claude)}`, `找不到 Claude Code。請先安裝並登入：<a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a>，裝好後重開這個程式。`)}

@@ -176,3 +176,14 @@ def test_jobs_run_in_parallel_up_to_three_one_per_professor(tmp_path):
             break
         time.sleep(0.05)
     assert not j.running()
+
+
+def test_no_stop1_decisions_become_buttons():
+    """不停在停 1：原本要本人決定的事記成例外，事後在教授頁按按鈕。"""
+    from pipeline.exceptions import INFO_KINDS
+    from pipeline.jobs import exception_actions, prompt_exception, prompt_new
+    for kind, act in (("external_candidates", "add_external"), ("possible_duplicate", "dup_merge"), ("affiliation_mismatch", "drop_work")):
+        assert kind in INFO_KINDS and [a for a, _ in exception_actions(kind)] == [act]
+        assert "build_site" in prompt_exception("x", {"id": "W1", "kind": kind, "detail": "d"}, act)
+    p = prompt_new("Jane Doe", "Uni", slug="doe-jane")
+    assert "不要停" in p and "prof-verify" in p

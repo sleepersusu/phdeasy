@@ -457,7 +457,7 @@ function renderProfs(ps){
           <button class="btn btn-green" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ ${T("新增教授", "Add")}</button>` : ""}</span></div>
       ${window.APP_REMATCH ? `<div class="card" id="disc-panel" hidden style="margin-bottom:12px"></div>` : ""}
       ${window.APP_REMATCH ? `<form class="card" id="add-prof-form" hidden style="margin-bottom:12px">
-        <p class="small muted" style="margin-top:0">按「開始建檔」後，Claude Code 會在背景找身分、列文章、找全文，跑到停 1 停下來請你確認（通常 10–30 分鐘，進度在右上角「工作進度」）。</p>
+        <p class="small muted" style="margin-top:0">按「開始建檔」後，Claude Code 會在背景一路跑完：找身分、列文章、挑跟你最相關的必讀前五篇並完整解析、合作網絡、研究計畫、總覽（進度與預估時間在右上角「工作進度」）。有問題的地方事後在教授頁按按鈕處理，不用中途確認。</p>
         <label for="np-name">教授姓名（必填）</label><input type="text" id="np-name" placeholder="例：Liliana Laranjo" required>
         <label for="np-inst">學校／機構（必填）</label><input type="text" id="np-inst" placeholder="例：The University of Sydney（Westmead Applied Research Centre）" required>
         <label for="np-orcid">ORCID（選填）</label><input type="text" id="np-orcid" placeholder="0000-0000-0000-0000">
@@ -531,7 +531,7 @@ document.addEventListener("click", async ev => {
   if (!b) return;
   const r = ((H.apps || {}).rows || []).find(x => x.page_id === b.dataset.notionBuild);
   if (!r.institution){ alert("Notion 那一列還沒填「學校」，填好再匯入。"); return; }
-  if (!confirm(`幫 ${r.name}（${r.institution}）建教授檔案？Claude Code 會在背景跑到停 1。`)) return;
+  if (!confirm(`幫 ${r.name}（${r.institution}）建教授檔案？Claude Code 會在背景一路跑完。`)) return;
   b.disabled = true;
   try { await API("new", {name: r.name, institution: r.institution, orcid: r.orcid || ""}); location.href = "settings.html"; } catch (e) { alert(e.message); b.disabled = false; }
 });

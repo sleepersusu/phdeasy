@@ -1,11 +1,11 @@
 ---
 name: prof-setup
-description: 教授研究檔案流水線的停 1。當本人說「幫我建教授檔案／查這位教授／分析某教授近五年文章」並給出姓名（可附學校、ORCID），或某批次 state.json 的 stage 為 setup 或 stop1 時使用。鎖定作者身分、列出 2022–2026 文章、去重、跨 ORCID／PubMed／Europe PMC／Semantic Scholar／arXiv 比對、跑全文找尋鏈並把 PDF 歸位，最後寫 protocol.md 與停 1 報告給本人確認。
+description: 教授研究檔案流水線的第一段（身分與文章）。當本人說「幫我建教授檔案／查這位教授／分析某教授近五年文章」並給出姓名（可附學校、ORCID），或某批次 state.json 的 stage 為 setup 或 stop1 時使用。鎖定作者身分、列出 2022–2026 文章、去重、跨來源比對、挑必讀前五篇、找全文，寫 protocol.md 與報告；不停下等本人（本人 2026-10-26），要本人決定的事照預設做並記成例外，接著直接執行 prof-ingest。
 ---
 
-# prof-setup（停 1）
+# prof-setup（身分與文章；不停下）
 
-主控只跑腳本、看結果、跟本人確認；這一段不派 subagent。所有指令在專案根目錄執行。
+本人 2026-10-26：不要停 1。一路跑完，原本要本人決定的事照第 3 節的預設做、記成例外（教授頁有按鈕可以事後改）。主控只跑腳本、看結果；這一段只派必讀挑選者。所有指令在專案根目錄執行。
 
 ## 0. 開工檢查
 
@@ -71,26 +71,29 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
    uv run python scripts/setup_report.py runs/<slug>
    ```
 5. **寫規格**：複製 `protocol-template.md` 到 `runs/<slug>/protocol.md`，照實填入身分、年份、文章數、全文狀態、模型、預算；驗收判準、判斷規則、熔斷照範本，不要改寬。
-6. **進停 1**
+6. **記錄並接著跑**
    ```bash
-   uv run python scripts/state_cli.py stage runs/<slug> stop1 --set works_total=<N> --set fulltext_ok=<n> --set author_id='"<A id>"'
-   uv run python scripts/state_cli.py progress runs/<slug> setup "<N> 篇（完整 x、短 y），全文 n/x，候選 c，待確認預印本 p"
-   uv run python scripts/drive_sync.py runs --release
+   uv run python scripts/state_cli.py stage runs/<slug> ingest --set works_total=<N> --set fulltext_ok=<n> --set author_id='"<A id>"'
+   uv run python scripts/state_cli.py progress runs/<slug> setup "<N> 篇，必讀 5（全文 n），候選 c，預設決定 d 件（見例外）"
    ```
+   然後直接執行 `prof-ingest`。
 
-## 3. 給本人看（停 1 呈現順序）
+## 3. 不停下時的預設（每件都記成例外，本人事後按按鈕）
 
-1. 熔斷或例外（有的話）
-2. **必讀前五篇**（`work/focus.json`）：每篇標題、年份、挑選理由；告訴本人想換哪篇可以直接說（例：「W123 換成 W456」）
-3. 身分：作者 id、ORCID、機構；與本人描述不符之處
-4. 需要決定的事：外部候選要不要加入、未合併的預印本是否同一篇、機構不符或疑似重複的文章
-5. 數字：篇數、必讀幾篇找到全文、各來源各幾篇
-6. 必讀裡找不到免費全文的（`missing.md`），請本人下載後丟進 `runs/<slug>/inbox/`，檔名隨意
-7. 檔案位置：`stop1-report.md`、`pdfs/<年>/`、`out/zotero/<slug>.ris`（Zotero「檔案 → 匯入」即可連同 PDF 一起進文獻庫）
+用 `uv run python scripts/state_cli.py exception runs/<slug> <文章 id 或 -> setup <kind> "<說明>"` 記；同時寫進 `protocol.md` 的「例外」。
 
-不要替本人做 4 的決定。
+| 原本要本人決定的 | 預設 | 例外 kind（教授頁的按鈕） |
+|---|---|---|
+| 身分有多位候選、或機構跟本人描述不同 | 用機構、主題、ORCID 最吻合的那位 | `identity_check`（註記；本人有疑問再說） |
+| 外部候選（ORCID／PubMed 有、OpenAlex 沒有的文章） | 先不加 | `external_candidates`，id 用 `-`，說明寫篇數（按鈕：把這些文章加進來） |
+| 疑似重複、未合併的預印本 | 先不合併 | `possible_duplicate`，每組一筆（按鈕：是同一篇，合併） |
+| 機構不符的文章 | 先保留 | `affiliation_mismatch`，每篇一筆（按鈕：不是他的，拿掉） |
+| 必讀前五篇 | 用挑選者挑的 | 不用記（教授頁可以勾選更多篇完全解析） |
+| 必讀裡找不到免費全文 | 用摘要做 | ingest 會自動記 `abstract_only`（按鈕：讓 AI 再找一次全文；也可以上傳 PDF） |
 
-## 4. 本人確認之後
+身分完全找不到（零位候選，換寫法也找不到）才真的停下：`BLOCKED`，請本人給 ORCID。
+
+## 4. 本人事後要改（例外按鈕或回覆）
 
 - 加入外部候選：
   ```bash
@@ -103,7 +106,7 @@ curl -s -m 5 -o /dev/null -w "%{http_code}\n" https://api.openalex.org/works?per
 - 本人說要移除的文章：從 `works.json` 移到 `work/dropped.json`，`reason: "removed_by_owner"`。
 - 本人補了 inbox → `uv run python scripts/setup_fulltext.py runs/<slug> --retry-missing`，再重跑 `setup_report.py`。
 - 把本人的決定逐條追加到 `protocol.md` 的「例外」與 `progress.md`。
-- 設 `stage=ingest`，執行 `prof-ingest`。
+- 還沒進 ingest 的批次：設 `stage=ingest`，執行 `prof-ingest`。
 
 ## 規則
 

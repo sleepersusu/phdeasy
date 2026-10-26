@@ -6,16 +6,16 @@
 
 | 階段 | `stage` 值 | skill | 停點 |
 |---|---|---|---|
-| 停 1：確認身分與文章 | `setup` → `stop1` | `prof-setup` | ⏸ 本人 |
+| 身分與文章、挑必讀前五篇 | `setup` | `prof-setup` | 自動（本人 2026-10-26：不停 1；要決定的事照預設做並記成例外，事後按鈕改） |
 | 標準化 | `ingest` | `prof-ingest` | 自動 |
 | 合作與領域 | `network` | `prof-network` | 自動 |
 | 研究計畫 | `grants` | `prof-grants` | 自動 |
 | 解析卡 | `cards` | `prof-cards` | 自動 |
 | 總覽 | `profile` | `prof-profile` | 自動 |
 | 比對推薦 | （`verify` 之前） | `prof-match` | 自動；本人改興趣後可單獨重跑 |
-| 驗收 | `verify` → `stop2` | `prof-verify` | ⏸ 本人 |
+| 驗收 | `verify` → `stop2`（＝完成） | `prof-verify` | 自動；完成後本人在教授頁看例外按鈕 |
 
-每位教授一個批次資料夾 `runs/<slug>/`。開工先跑 `uv run python scripts/drive_sync.py runs`，把別台電腦在 Google 雲端硬碟上的更新拉下來（回 `BLOCKED` 表示另一台電腦還在用：先加 `--wait 180` 再試一次（剛關掉的那台，「已釋放」要等雲端硬碟同步過來），仍然 BLOCKED 就停下告訴本人，本人確認那台已關掉才加 `--force`；回 `SKIP` 表示這台沒裝或沒登入 Google Drive：告訴本人先裝好登入，再跑 `--setup` 選帳號），再讀該批次的 `state.json`，從 `stage` 接續；自動段的 skill 結尾直接執行下一個 skill，直到 `stop2` 或熔斷。
+每位教授一個批次資料夾 `runs/<slug>/`。開工先跑 `uv run python scripts/drive_sync.py runs`，把別台電腦在 Google 雲端硬碟上的更新拉下來（回 `BLOCKED` 表示另一台電腦還在用：先加 `--wait 180` 再試一次（剛關掉的那台，「已釋放」要等雲端硬碟同步過來），仍然 BLOCKED 就停下告訴本人，本人確認那台已關掉才加 `--force`；回 `SKIP` 表示這台沒裝或沒登入 Google Drive：告訴本人先裝好登入，再跑 `--setup` 選帳號），再讀該批次的 `state.json`，從 `stage` 接續；每段的 skill 結尾直接執行下一個 skill，一路跑到 `stop2`（完成）或熔斷；舊批次停在 `stop1` 的，繼續跑時照預設決定後接著跑。
 
 ## 開工檢查
 
@@ -33,7 +33,7 @@
 
 - `runs/<slug>/state.json`：只寫現況，每次覆寫。由 `scripts/state_cli.py` 寫，不手改。
 - `runs/<slug>/progress.md`：只追加，每完成一項追加一行數字摘要。
-- `runs/<slug>/protocol.md`：該批次的規格，停 1 定案後自動段只照它做。
+- `runs/<slug>/protocol.md`：該批次的規格，第一段寫好後之後各段只照它做。
 - `CONTEXT.md`：名詞表，跨批次累積。
 - `docs/adr/`：難回頭的決定。
 
@@ -65,7 +65,7 @@
 | 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |
 | 應用程式 | `app.py`（Windows 安裝版／雙擊 `開啟教授檔案.command`）：伺服 `web/`（做好的 HTML／JS）與 `runs/` 的 JSON；首頁可建新教授、停點回覆、繼續，由 `pipeline/jobs.py` 在背景叫 Claude Code（dontAsk＋限定工具；設定可改用 Codex 當備用引擎；最多同時 3 個、每位教授一次一個，工作進度有進度條與預估時間）；打開、每 3 分鐘、關掉時同步雲端；打開時匯入 Notion「博士申請追蹤」（`pipeline/notion.py` → `runs/_me/applications.json`）與 Google 日曆會議（`pipeline/gcal.py` → `runs/_me/calendar.json`） |
 | 前端 | `web/index.html`、`web/professor.html`、`web/site_match.js`、`web/app.js` 是正本；`build_site.py`／`build_home.py` 只產生資料（`data.json`、`professors.json`）與離線單檔版 |
-| 雲端 | `drive_sync.py runs`：`runs/` 與 `<我的雲端硬碟>/phdeasy教授檔案/` 雙向同步（帳號設定在 `runs/_me/drive.json`，只在這台）；同一台電腦上同時只跑一個（本機鎖 `runs/.drive_sync.lock`）；每段收尾跑一次；停點（停 1、停 2）與本人說收工時加 `--release` 釋放「使用中」 |
+| 雲端 | `drive_sync.py runs`：`runs/` 與 `<我的雲端硬碟>/phdeasy教授檔案/` 雙向同步（帳號設定在 `runs/_me/drive.json`，只在這台）；同一台電腦上同時只跑一個（本機鎖 `runs/.drive_sync.lock`）；每段收尾跑一次；跑完（stop2）與本人說收工時加 `--release` 釋放「使用中」 |
 
 ## 腳本與測試
 

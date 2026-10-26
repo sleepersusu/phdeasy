@@ -96,7 +96,8 @@ def prompt_new(name, institution, orcid=None, slug=None):
         p += f"（ORCID {orcid.strip()}）"
     if slug:
         p += f"。批次資料夾用 runs/{slug}"
-    return p + "。照 CLAUDE.md 與 prof-setup 跑到停 1，把停 1 要我決定的事列清楚後停下。" + UNATTENDED
+    return p + ("。照 CLAUDE.md 從 prof-setup 一路跑到 prof-verify 完成，中間不要停下來等我（本人 2026-10-26：不要停 1）；"
+                "原本停 1 要我決定的事照 prof-setup「不停下時的預設」做，並記成例外，我之後在教授頁按按鈕處理。最後用幾句話回報結果。") + UNATTENDED
 
 
 def prompt_continue(slug):
@@ -168,6 +169,12 @@ def exception_actions(kind):
         return [("split_merge", "是同一人，合併"), ("split_keep", "不同人，分開")]
     if kind in REJUDGE_KINDS:
         return [("rejudge", "請 AI 重新判")]
+    if kind == "external_candidates":
+        return [("add_external", "把這些文章加進來")]
+    if kind == "possible_duplicate":
+        return [("dup_merge", "是同一篇，合併")]
+    if kind == "affiliation_mismatch":
+        return [("drop_work", "不是他的，拿掉")]
     return []
 
 
@@ -188,6 +195,15 @@ def prompt_exception(slug, exc, action, note=""):
     if action in ("split_merge", "split_keep"):
         verdict = "這幾個作者 id 是同一人，請合併（寫進 work/owner_decisions.json 的 author_aliases）" if action == "split_merge" else "這幾個作者 id 是不同人，請維持分開（寫進 keep_separate）"
         return (head + extra + f"本人決定：{verdict}。照 prof-network 重跑 build 與 Haiku 計數 check，總覽受影響的句子照 prof-profile 修正一輪。" + tail)
+    if action == "add_external":
+        return (head + extra + f"本人要把外部候選加進來：先跑 drive_sync，照 prof-setup「本人確認之後 → 加入外部候選」把 work/candidates.json 裡有 DOI 的加入"
+                f"（add_works.py、fill_abstracts.py；新加的只列標題，focus.py 不用動），再跑 network.py build／check 與 build_site.py。" + tail)
+    if action == "dup_merge":
+        return (head + extra + "本人確認這兩篇是同一篇：保留正式版、另一篇移到 work/dropped.json（reason: merged_by_owner），記進 work/owner_decisions.json，"
+                "重跑 network.py build／check 與 build_site.py。" + tail)
+    if action == "drop_work":
+        return (head + extra + "本人確認這篇不是這位教授的：從 works.json 移到 work/dropped.json（reason: removed_by_owner），記進 work/owner_decisions.json，"
+                "重跑 network.py build／check 與 build_site.py；如果它在必讀裡，從 work/focus.json 拿掉。" + tail)
     if action == "rejudge":
         return (head + extra + "請照 prof-cards 的規則，只針對這一篇重新做會出這個例外的那一步（雙軌裁決或重新寫卡），再組裝。" + tail)
     return head + extra + "照本人的補充處理這筆例外，遵守 CLAUDE.md 與對應 skill 的規則。" + tail

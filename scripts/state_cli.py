@@ -34,6 +34,12 @@ def main():
     c.add_argument("run")
     c.add_argument("stage")
     c.add_argument("text")
+    e = sub.add_parser("exception", help="記一筆例外（不停下時，本人事後在教授頁按按鈕處理）")
+    e.add_argument("run")
+    e.add_argument("id")
+    e.add_argument("stage")
+    e.add_argument("kind")
+    e.add_argument("detail")
     d = sub.add_parser("show")
     d.add_argument("run")
     args = ap.parse_args()
@@ -47,6 +53,10 @@ def main():
         print(f"OK stage={s['stage']}")
     elif args.cmd == "progress":
         append_progress(args.run, args.stage, args.text)
+        print("OK")
+    elif args.cmd == "exception":
+        from pipeline.exceptions import add_exception
+        add_exception(args.run, args.id, args.stage, args.kind, args.detail)
         print("OK")
     else:
         print(json.dumps(load_state(args.run), ensure_ascii=False, indent=2))

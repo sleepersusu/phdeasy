@@ -36,10 +36,10 @@ def test_cards_and_digest_counts(tmp_path):
     assert s["digest"]["total"] == 5  # 有全文或摘要的才整理重點（none 不算）
 
 
-def test_estimate_span_stops_at_stop1_for_new_jobs(tmp_path):
+def test_estimate_new_job_runs_to_the_end(tmp_path):
     r = mk(tmp_path, "setup", n=10, fulltext=5)
     e = estimate(r, "new")
-    assert [x["key"] for x in e["steps"]] == ["list", "fulltext"]  # 新建檔只跑到停 1
+    assert e["steps"][0]["key"] == "list" and e["steps"][-1]["key"] == "verify"  # 不停 1：一路估到完成
     assert e["current"] == "fulltext" and 0 < e["percent"] < 100
     assert e["eta_s"] > 0
 

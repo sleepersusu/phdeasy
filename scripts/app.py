@@ -218,7 +218,7 @@ class App:
                 "uv": find_uv(), "drive": str(dst) if dst and dst.parent.exists() else None,
                 "blocked": self.blocked or (other or {}).get("device"), "running": self.jobs.running(), "job": job,
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
-                "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split"})},
+                "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split", "external_candidates", "possible_duplicate", "affiliation_mismatch"})},
                 "settings": self.settings(), "update": self.update_info, "version": self.version,
                 "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job), "jobs": self.job_list()}
 

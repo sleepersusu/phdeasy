@@ -11,7 +11,6 @@ from pathlib import Path
 STEPS = [("list", "列文章與比對", 180), ("fulltext", "找全文", 15), ("ingest", "轉成文字", 3), ("network", "合作與領域", 60),
          ("grants", "研究計畫", 900), ("cards", "文章解析卡", 45), ("digest", "重點、圖表與研究方法", 60),
          ("profile", "總覽撰寫", 900), ("match", "與你的研究比對", 600), ("verify", "獨立驗收", 900)]
-SETUP_ONLY = ("list", "fulltext")  # 新建檔、停 1 前的回覆：只跑到停 1
 DONE_STAGES = {"stop2"}
 
 
@@ -75,11 +74,7 @@ def steps_of(run):
 def estimate(run, kind, samples=None, now=None):
     """samples：{步驟: (第一次看到的時間, 當時做完幾項)}，由應用程式在輪詢時記下，用來量實際速度。"""
     now = time.time() if now is None else now
-    stage = (_j(Path(run) / "state.json", {}) or {}).get("stage")
     steps = steps_of(run)
-    if kind in ("new", "reply") and stage in (None, "setup", "stop1", "halted") and not any(
-            s["done"] for s in steps if s["key"] not in SETUP_ONLY):
-        steps = [s for s in steps if s["key"] in SETUP_ONLY]
     if kind == "deep":  # 教授頁勾選完全解析：只跑全文、轉文字、解析卡、重點
         steps = [s for s in steps if s["key"] in ("fulltext", "ingest", "cards", "digest")]
     current = next((s["key"] for s in steps if s["total"] and s["done"] < s["total"]), None)

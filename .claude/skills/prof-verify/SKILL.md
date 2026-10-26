@@ -1,9 +1,11 @@
 ---
 name: prof-verify
-description: 教授研究檔案流水線的驗收階段與停 2。當某批次 runs/<slug>/state.json 的 stage 為 verify 或 stop2，或 prof-profile 交棒時使用。跑 E2E 總檢查腳本（測試、雜湊、卡片覆蓋與引句、計畫證據、總覽出處、全文找尋紀錄、RIS、state 一致性），派一個沒參與過的獨立驗收者只看驗收判準與產出逐條判定，寫驗收報告，設 stop2，照停 2 呈現順序給本人看。
+description: 教授研究檔案流水線的驗收階段（最後一段；stage 設 stop2＝完成，不等本人）。當某批次 runs/<slug>/state.json 的 stage 為 verify 或 stop2，或 prof-profile 交棒時使用。跑 E2E 總檢查腳本（測試、雜湊、卡片覆蓋與引句、計畫證據、總覽出處、全文找尋紀錄、RIS、state 一致性），派一個沒參與過的獨立驗收者只看驗收判準與產出逐條判定，寫驗收報告，設 stop2，照停 2 呈現順序給本人看。
 ---
 
-# prof-verify（驗收 → 停 2）
+# prof-verify（驗收 → 完成）
+
+本人 2026-10-26：不要停下來等本人。`stop2` 就是「完成」：寫好報告、設 stop2，用幾句話回報；有問題的都在例外紀錄，本人在教授頁按按鈕處理。
 
 所有指令在專案根目錄執行。
 
