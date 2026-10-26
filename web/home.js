@@ -52,15 +52,24 @@ function renderCard(m){
     </ul>`;
 }
 
-function renderMe(m){
-  body("me").innerHTML = `
-    <div class="card">${bi(m.summary_zh, m.summary, "div")}<div class="src">出處：${esc(m.summary_src || "CV")}</div></div>
-    <h3 class="label">研究興趣｜Research interests</h3><div class="chips">${(m.interests || []).map(i => `<span class="pill">${bi(i.zh, i.en)}</span>`).join("")}</div>
-    <div class="grid" style="margin-top:16px">
-      <div class="card"><h3 class="label" style="margin-top:0">發表｜Publications</h3><ul>${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul></div>
-      <div class="card"><h3 class="label" style="margin-top:0">專案｜Projects</h3><ul>${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul></div>
-    </div>`;
+function splitSentences(t, zh){
+  return (t || "").split(zh ? /(?<=。)/ : /(?<=\.)\s+(?=[A-Z])/).map(x => x.trim()).filter(Boolean);
 }
+function renderMe(m){
+  /* 簡介：條列式；學歷在左邊個人卡，這裡不重複 */
+  const en = splitSentences(m.summary), zh = splitSentences(m.summary_zh, true);
+  const bio = en.length === zh.length ? en.map((e, i) => [zh[i], e]) : [[m.summary_zh, m.summary]];
+  body("me").innerHTML = `
+    <ul class="bullets">${bio.map(([z, e]) => `<li>${bi(z, e, "div")}</li>`).join("")}</ul>
+    <h3 class="label">研究興趣｜Research interests</h3>
+    <ul class="bullets cols2">${(m.interests || []).map(i => `<li>${bi(i.zh, i.en, "div")}</li>`).join("")}</ul>
+    <h3 class="label">發表｜Publications</h3>
+    <ul class="bullets">${(m.publications || []).map(p => `<li class="small">${esc(p.text)} ${p.doi ? `<a href="https://doi.org/${esc(p.doi)}" target="_blank" rel="noopener">DOI</a>` : ""}</li>`).join("")}</ul>
+    <h3 class="label">專案｜Projects</h3>
+    <ul class="bullets">${(m.projects || []).map(p => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener"><strong>${esc(p.name)}</strong></a><div class="small">${esc(p.zh || "")}</div></li>`).join("")}</ul>
+    <div class="src">內容出處：${esc([...new Set([m.summary_src, m.interests_src, "CV"].filter(Boolean))].join("；"))}</div>`;
+}
+
 
 const CONF = {high: ["g", "信心 高"], medium: ["y", "信心 中"], low: ["r", "信心 低"]};
 function renderProposal(){
@@ -96,9 +105,15 @@ function renderStatement(kind){
 }
 
 function renderCaps(cs){
-  body("capabilities").innerHTML = `<p class="muted small">整理自你的 CV，每一區都附出處，方便你面談時直接對應到具體經驗。</p>
-    <div class="grid">${(cs || []).map(c => `<div class="card"><h3 style="margin-top:0">${bi(c.area_zh, c.area, "div")}</h3>
-      <ul>${c.items.map((it, i) => `<li>${bi((c.items_zh || [])[i], it, "div")}</li>`).join("")}</ul><div class="src">出處：${esc(c.src)}</div></div>`).join("")}</div>`;
+  /* 我能做到的事：條列式；跟發表、專案、學歷重複的項目不再列（那些在上面或左邊個人卡） */
+  const m = H.me || {};
+  const dupKeys = [...(m.projects || []).map(p => (p.name || "").split(/\s+[—-]\s+/)[0]), ...(m.education || []).map(e => e.school)].filter(Boolean);
+  const isDup = it => (/^first-author publication/i.test(it) && (m.publications || []).length) || dupKeys.some(k => it.includes(k));
+  body("capabilities").innerHTML = (cs || []).map(c => {
+    const items = c.items.map((it, i) => [it, (c.items_zh || [])[i]]).filter(([it]) => !isDup(it));
+    return items.length ? `<h3 class="label">${esc(c.area_zh || c.area)}｜${esc(c.area)}</h3>
+      <ul class="bullets">${items.map(([it, z]) => `<li>${bi(z, it, "div")}</li>`).join("")}</ul>` : "";
+  }).join("") || `<div class="empty">還沒有資料。</div>`;
 }
 
 const FIT = {strong: ["g", "強相關"], partial: ["y", "部分相關"], none: ["", "沒有相關"]};
@@ -148,14 +163,35 @@ function renderProfs(ps){
   const el = body("professors");
   const head = document.querySelector("#professors h2");
   if (head && !document.getElementById("prof-tools")){
-    head.insertAdjacentHTML("afterend", `<div class="row" id="prof-tools" style="justify-content:space-between;margin:-4px 0 12px">
-      <span class="small muted">星星＝你的興趣與 CV 項目裡，她有多少強相關、部分相關的研究。</span>
-      <span class="row"><label class="small" for="prof-sort">排序</label><select id="prof-sort">
+    head.insertAdjacentHTML("afterend", `<div class="row" id="prof-tools" style="justify-content:space-between;align-items:flex-end;margin:-4px 0 12px;flex-wrap:nowrap">
+      <span class="small muted">星星＝你的興趣與 CV 項目裡，<br>她有多少強相關、部分相關的研究。</span>
+      <span class="row" style="flex:none"><label class="small" for="prof-sort">排序</label><select id="prof-sort">
         <option value="stars">星星多→少</option><option value="stars-asc">星星少→多</option><option value="name">姓名</option></select>
-        ${window.APP_REMATCH ? `<a class="btn btn-green" href="pipeline.html#new">＋ 新增教授</a>` : ""}</span></div>`);
+        ${window.APP_REMATCH ? `<button class="btn btn-green" id="add-prof-btn" aria-expanded="false" aria-controls="add-prof-form">＋ 新增教授</button>` : ""}</span></div>
+      ${window.APP_REMATCH ? `<form class="card" id="add-prof-form" hidden style="margin-bottom:12px">
+        <p class="small muted" style="margin-top:0">按「開始建檔」後，Claude Code 會在背景找身分、列文章、找全文，跑到停 1 停下來請你確認（通常 10–30 分鐘，進度在右上角「工作進度」）。</p>
+        <label for="np-name">教授姓名（必填）</label><input type="text" id="np-name" placeholder="例：Liliana Laranjo" required>
+        <label for="np-inst">學校／機構（必填）</label><input type="text" id="np-inst" placeholder="例：The University of Sydney（Westmead Applied Research Centre）" required>
+        <label for="np-orcid">ORCID（選填）</label><input type="text" id="np-orcid" placeholder="0000-0000-0000-0000">
+        <div class="row" style="margin-top:12px"><button class="btn btn-green" type="submit">開始建檔</button><button class="btn" type="button" id="np-cancel">取消</button></div>
+      </form>` : ""}`);
     document.getElementById("prof-sort").onchange = ev => { PROF_SORT = ev.target.value; renderProfs(ps); };
+    const form = document.getElementById("add-prof-form"), btn = document.getElementById("add-prof-btn");
+    if (form){  // 點「＋ 新增教授」才打開填寫欄位
+      const toggle = open => { form.hidden = !open; btn.setAttribute("aria-expanded", String(open)); if (open) form.querySelector("#np-name").focus(); };
+      btn.onclick = () => toggle(form.hidden);
+      form.querySelector("#np-cancel").onclick = () => toggle(false);
+      form.onsubmit = async ev => {
+        ev.preventDefault();
+        const sub = form.querySelector('[type="submit"]'); sub.disabled = true;
+        try { await API("new", {name: form.querySelector("#np-name").value.trim(), institution: form.querySelector("#np-inst").value.trim(),
+                                orcid: form.querySelector("#np-orcid").value.trim()}); location.href = "pipeline.html"; }
+        catch (e) { alert(e.message); sub.disabled = false; }
+      };
+      if (location.hash === "#new") toggle(true);
+    }
   }
-  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按右上角「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
+  if (!ps.length){ el.innerHTML = `<div class="empty">還沒有目標教授。按上面的「＋ 新增教授」，或跟 Claude 說「幫我建教授檔案：姓名，學校」。</div>`; return; }
   const score = p => (matchStars(p.recommend) || {score: -1}).score;
   const list = [...ps].sort(PROF_SORT === "name" ? (a, b) => (a.name || "").localeCompare(b.name || "")
     : PROF_SORT === "stars-asc" ? (a, b) => score(a) - score(b) : (a, b) => score(b) - score(a));

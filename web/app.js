@@ -75,8 +75,7 @@ function renderPipeline(st){
     return;
   }
   lastShape = shape;
-  const keep = {name: el.querySelector("#np-name")?.value, inst: el.querySelector("#np-inst")?.value,
-                orcid: el.querySelector("#np-orcid")?.value, reply: el.querySelector("#reply")?.value,
+  const keep = {reply: el.querySelector("#reply")?.value,
                 logTop: el.querySelector(".log")?.scrollTop, focus: document.activeElement?.id};
   const ready = st.claude && st.uv;
   const job = st.job, running = st.running;
@@ -88,15 +87,6 @@ function renderPipeline(st){
       ${check(st.drive, `Google 雲端硬碟：${esc(st.drive)}`, "找不到 Google 雲端硬碟：請安裝 Google Drive 電腦版並登入。沒有也能跑，但結果不會同步到別台。")}
       ${st.blocked ? `<li><span class="pill y">!</span> 另一台電腦（${esc(st.blocked)}）正在用：這台先不同步，那台關掉後重開這個程式。</li>` : ""}
     </ul></div>
-
-    <div class="card" style="margin-top:12px" id="new"><h3 style="margin-top:0">新增教授</h3>
-      <p class="small muted">按下開始後，Claude Code 會在背景找身分、列文章、找全文，跑到停 1 停下來，請你確認。這段通常要 10–30 分鐘；看資料時保持程式開著。</p>
-      <label for="np-name">教授姓名（必填）</label><input type="text" id="np-name" placeholder="例：Liliana Laranjo">
-      <label for="np-inst">學校／機構（必填）</label><input type="text" id="np-inst" placeholder="例：The University of Sydney（Westmead Applied Research Centre）">
-      <label for="np-orcid">ORCID（選填）</label><input type="text" id="np-orcid" placeholder="0000-0000-0000-0000">
-      <div class="row" style="margin-top:12px"><button class="btn btn-green" id="np-start" ${!ready || running ? "disabled" : ""}>開始建檔</button>
-        <span class="small muted">${!ready ? "先裝好上面打 ✗ 的項目" : running ? "已經有一個工作在跑" : ""}</span></div>
-    </div>
 
     <div class="card" style="margin-top:12px"><h3 style="margin-top:0">各教授進度</h3>
       ${profs.length ? `<ul>${profs.map(p => `<li class="row" style="margin:6px 0"><strong>${esc(p.name || p.slug)}</strong>
@@ -119,21 +109,11 @@ function renderPipeline(st){
         <span class="small muted">會接著同一個對話跑；停 1 確認後它會一路跑到停 2。</span></div>` : ""}
     </div>` : ""}`;
 
-  if (keep.name) el.querySelector("#np-name").value = keep.name;
-  if (keep.inst) el.querySelector("#np-inst").value = keep.inst;
-  if (keep.orcid) el.querySelector("#np-orcid").value = keep.orcid;
   if (keep.reply && el.querySelector("#reply")) el.querySelector("#reply").value = keep.reply;
   const log = el.querySelector(".log"); if (log) log.scrollTop = running ? log.scrollHeight : (keep.logTop || 0);
-  if (location.hash === "#new" && !keep.focus){ el.querySelector("#np-name")?.focus(); el.querySelector("#np-name")?.scrollIntoView({block: "center"}); history.replaceState(null, "", location.pathname); }
   if (keep.focus && document.getElementById(keep.focus)) document.getElementById(keep.focus).focus();
 
   const act = (fn) => async (ev) => { ev.target.disabled = true; try { await fn(); renderPipeline(await API("status")); } catch (e) { alert(e.message); ev.target.disabled = false; } };
-  el.querySelector("#np-start")?.addEventListener("click", act(async () => {
-    const name = el.querySelector("#np-name").value.trim(), institution = el.querySelector("#np-inst").value.trim();
-    if (!name || !institution) throw new Error("姓名和學校都要填");
-    await API("new", {name, institution, orcid: el.querySelector("#np-orcid").value.trim()});
-    ["#np-name", "#np-inst", "#np-orcid"].forEach(s => el.querySelector(s).value = "");
-  }));
   el.querySelectorAll("[data-continue]").forEach(b => b.addEventListener("click", act(() => API("continue", {slug: b.dataset.continue}))));
   el.querySelector("#reply-send")?.addEventListener("click", act(async () => {
     const text = el.querySelector("#reply").value.trim();

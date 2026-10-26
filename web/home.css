@@ -172,3 +172,10 @@ main.layout{grid-template-columns:250px minmax(0,1fr)}
 .profcard:hover{border-color:#c3c7cc}
 .top5{margin:0;padding-left:1.4em}.top5 li{margin:6px 0}
 .profcard .stars{font-size:1.2rem}
+/* 條列式 */
+ul.bullets{margin:0 0 4px;padding-left:1.2em}
+ul.bullets li{margin:6px 0}
+ul.bullets.cols2{columns:2;column-gap:28px}
+ul.bullets.cols2 li{break-inside:avoid}
+#capabilities h3.label:first-of-type{margin-top:0}
+@media (max-width:860px){ul.bullets.cols2{columns:1}}
