@@ -828,13 +828,13 @@ document.addEventListener("click", async ev => {
   try { await APIX("programs", {slug: SLUG}); location.href = "settings.html"; } catch (e) { alert(e.message); b.disabled = false; }
 });
 
-let HOME_HREF = "index.html";
+let HOME_HREF = "professors.html", HOME_LABEL = "申請目標";  // 從申請目標點進來，返回回到申請目標
 function crumbs(v){
-  /* 我的首頁 › 教授 › 目前這一塊（返回都在最上面，不另外放按鈕） */
+  /* 申請目標 › 教授 › 目前這一塊（返回都在最上面，不另外放按鈕） */
   const el = document.getElementById("crumbs");
   if (!el) return;
   const name = esc(D.professor.name || ""), cur = (VIEWS.find(x => x[0] === v) || [])[1];
-  el.innerHTML = `<a href="${HOME_HREF}">← 我的首頁</a><span class="sep">›</span>` +
+  el.innerHTML = `<a href="${HOME_HREF}">← ${HOME_LABEL}</a><span class="sep">›</span>` +
     (v && cur ? `<a href="${viewHref("")}">${name}</a><span class="sep">›</span><span aria-current="page">${esc(cur)}</span>` : `<span aria-current="page">${name}</span>`);
 }
 
@@ -1140,7 +1140,7 @@ async function loadData(){
   try { D = await loadData(); }
   catch (e) { document.querySelector("main").innerHTML = `<div class="empty" role="alert">${esc(e.message)}</div>`; return; }
   OFFLINE = document.getElementById("inline-data").textContent.trim() !== "__INLINE__";
-  if (OFFLINE) HOME_HREF = "../../../index.html";
+  if (OFFLINE){ HOME_HREF = "../../../index.html"; HOME_LABEL = "我的首頁"; }
   document.title = (D.professor.name || "") + " 研究檔案";
   setLang(store.get("lang") || "both");
   initLangMenu(setLang);
