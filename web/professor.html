@@ -148,7 +148,12 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 .iconbtn:hover,.iconbtn[aria-expanded="true"]{background:var(--soft)}
 .langmenu .menu{position:absolute;right:0;top:46px;z-index:30;min-width:150px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.10)}
 .langmenu .menu button{display:flex;align-items:center;gap:8px;width:100%;min-height:40px;padding:0 10px;border:0;border-radius:6px;background:none;font:inherit;color:var(--fg);text-align:left;cursor:pointer}
-.langmenu .menu button:hover{background:var(--soft)}
+.langmenu .menu button:hover,.langmenu .menu a:hover{background:var(--soft)}
+.topicons{display:flex;align-items:center;gap:8px}
+#report-menu{min-width:220px}
+#report-menu a span{white-space:nowrap}
+.langmenu .menu a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;padding:0 10px;border-radius:6px;color:var(--fg);text-decoration:none}
+.langmenu .menu a[aria-current="true"]{font-weight:600;color:#14532d}
 .langmenu .menu button::before{content:"";display:inline-block;width:1em}
 .langmenu .menu button[aria-checked="true"]{font-weight:600;color:#14532d}
 .langmenu .menu button[aria-checked="true"]::before{content:"✓"}
@@ -185,6 +190,16 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
 <body>
 <a class="sr" href="#papers">跳到文章解析</a>
 <header class="top"><div class="wrap"><div><nav class="crumbs" id="crumbs" aria-label="目前位置"></nav><h1 id="title"></h1><div class="meta" id="meta"></div></div>
+  <div class="topicons">
+  <div class="langmenu" id="report-wrap" hidden>
+    <button type="button" class="iconbtn" id="report-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="report-menu" aria-label="報告" title="報告：數字總覽、待你決定、例外紀錄、檔案">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg>
+    </button>
+    <div class="menu" id="report-menu" role="menu" aria-label="報告" hidden></div>
+  </div>
+  <a class="iconbtn" id="gear-link" href="settings.html" aria-label="設定與工作進度" title="設定與工作進度" hidden>
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+  </a>
   <div class="langmenu">
     <button type="button" class="iconbtn" id="lang-btn" aria-haspopup="menu" aria-expanded="false" aria-controls="lang-menu" aria-label="切換內容語言" title="內容語言">
       <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>
@@ -194,7 +209,7 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
       <button type="button" role="menuitemradio" data-lang="en" aria-checked="false">English</button>
       <button type="button" role="menuitemradio" data-lang="both" aria-checked="true">雙語對照</button>
     </div>
-  </div></div></header>
+  </div></div></div></header>
 <nav class="sections" aria-label="區段"><div class="wrap"><a href="#match">與我的研究比對</a><a href="#overview">總覽</a><a href="#profile">教授總覽</a><a href="#decisions">待你決定</a><a href="#coauthors">合作者</a><a href="#topics">研究領域</a><a href="#grants">研究計畫</a><a href="#papers">文章解析</a><a href="#exceptions">例外紀錄</a><a href="#files">檔案</a></div></nav>
 <main class="wrap"><section id="meeting" aria-labelledby="h-meeting"><h2 id="h-meeting">會議準備</h2><div class="body"></div></section><section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">研究計畫書</h2><div class="body"></div></section><section id="library" aria-labelledby="h-library"><h2 id="h-library">討論文獻</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
 <footer class="wrap" id="foot"></footer>
@@ -810,11 +825,25 @@ function crumbs(v){
     (v && cur ? `<a href="${viewHref("")}">${name}</a><span class="sep">›</span><span aria-current="page">${esc(cur)}</span>` : `<span aria-current="page">${name}</span>`);
 }
 
+const REPORT_IDS = ["overview", "decisions", "exceptions", "files"];  // 放在右上角「報告」選單，不在分頁列
+function reportMenu(v){
+  const wrap = document.getElementById("report-wrap"), btn = document.getElementById("report-btn"), menu = document.getElementById("report-menu");
+  if (!wrap) return;
+  wrap.hidden = false;
+  menu.innerHTML = VIEWS.filter(x => REPORT_IDS.includes(x[0])).map(([id, label, , n]) =>
+    `<a role="menuitem" href="${viewHref(id)}" ${v === id ? 'aria-current="true"' : ""}><span>${label}</span><span class="small muted">${esc(n(D) || "")}</span></a>`).join("");
+  const close = () => { menu.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+  btn.onclick = ev => { ev.stopPropagation(); const open = menu.hidden; menu.hidden = !open; btn.setAttribute("aria-expanded", String(open)); if (open) menu.querySelector("a")?.focus(); };
+  document.addEventListener("click", ev => { if (!menu.hidden && !menu.contains(ev.target)) close(); });
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape" && !menu.hidden){ close(); btn.focus(); } });
+}
 function setupViews(){
   const v = VIEW(), main = document.querySelector("main");
   const nav = document.querySelector("nav.sections .wrap");
   nav.innerHTML = `<a href="${viewHref("")}" ${!v ? 'aria-current="true"' : ""}>教授首頁</a>` +
-    VIEWS.map(([id, label]) => `<a href="${viewHref(id)}" ${v === id ? 'aria-current="true"' : ""}>${label}</a>`).join("");
+    VIEWS.filter(([id]) => !REPORT_IDS.includes(id)).map(([id, label]) => `<a href="${viewHref(id)}" ${v === id ? 'aria-current="true"' : ""}>${label}</a>`).join("");
+  reportMenu(v);
+  const gl = document.getElementById("gear-link"); if (gl) gl.hidden = false;
   document.querySelectorAll("main > section").forEach(sec => { sec.hidden = !!v ? sec.id !== v : true; });
   document.getElementById("hub")?.remove();
   if (!v){
