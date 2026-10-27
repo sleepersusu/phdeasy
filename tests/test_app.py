@@ -450,3 +450,12 @@ def test_halted_build_shows_unfinished_and_queue_survives_restart(tmp_path):
     assert app.post("continue", {"slug": "doe-jane"})["queued"]
     app2 = appmod.App(tmp_path)
     assert [q["title"] for q in app2.queue] == ["繼續：doe-jane"]
+
+
+def test_child_python_runs_in_utf8_mode():
+    """Windows 中文版預設 cp950：子程序（腳本、Claude Code 跑的腳本）讀寫 JSON 要一律用 UTF-8。"""
+    import subprocess
+    import sys
+    import app  # noqa: F401  匯入就要設好
+    r = subprocess.run([sys.executable, "-c", "import sys; print(sys.flags.utf8_mode)"], capture_output=True, text=True)
+    assert r.stdout.strip() == "1"

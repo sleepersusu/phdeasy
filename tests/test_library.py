@@ -66,3 +66,21 @@ def test_draft_needs_sources_on_every_claim_section():
     v = draft("L1")
     v["contribution"]["refs"] = []
     assert "needs_source" in {f["why"] for f in check_lib_draft(v, selected={"L1"}, prof_ids={"W1"}, active=ACT)}
+
+
+def test_pdf_without_text_or_with_short_title_never_takes_an_openalex_guess():
+    """掃描檔（第一頁沒字）或候選標題太短（例如只叫「osf」）都核對不了，不能採用，寧可只記 PDF 的標題。"""
+    from pipeline.library import pick_title_hit
+    osf = {"doi": "https://doi.org/10.31219/osf.io/k3prh", "title": "osf"}
+    assert pick_title_hit("", [osf]) is None
+    assert pick_title_hit("OSF RAISE recommendations for responsible AI in evidence synthesis " * 20, [osf]) is None
+    real = {"doi": "https://doi.org/10.1/x", "title": "Responsible AI in evidence synthesis: RAISE recommendations"}
+    assert pick_title_hit("", [real]) is None
+    assert pick_title_hit("Responsible AI in evidence synthesis (RAISE): recommendations and guidance " * 5, [real]) is real
+
+
+def test_pdf_title_guess_drops_filename_look():
+    from pipeline.library import title_guess
+    assert title_guess("OSF | RAISE 1 - recommendations v.4.pdf", "", "_upload_1") == "OSF | RAISE 1 - recommendations v.4"
+    assert title_guess(None, "short\nA long enough first line that is the title\n", "x") == "A long enough first line that is the title"
+    assert title_guess("", "", "RAISE guidance") == "RAISE guidance"

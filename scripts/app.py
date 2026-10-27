@@ -32,6 +32,10 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
+# Windows 中文版預設編碼是 cp950：腳本裡沒寫 encoding 的讀寫會讀壞 UTF-8 的 JSON、印不出某些字。
+# 應用程式叫的每個子程序（腳本、Claude Code 再叫的腳本）都繼承這個設定，一律用 UTF-8。
+os.environ["PYTHONUTF8"] = "1"
+
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser
@@ -654,7 +658,10 @@ class App:
         r = subprocess.run([uv, "run", "python", "scripts/library.py", *args], cwd=str(self.workspace), capture_output=True, text=True,
                            encoding="utf-8", errors="replace", timeout=300)
         if r.returncode:
-            raise ValueError((r.stdout + r.stderr).strip()[-400:] or "加入失敗")
+            out = (r.stdout + r.stderr).strip()
+            print(f"library.py {' '.join(args)} 失敗：\n{out}")  # 完整訊息進 app.log
+            last = next((l for l in reversed(out.splitlines()) if l.strip()), "")
+            raise ValueError(f"{last}（完整訊息在 app.log）" if last else "加入失敗")
         return r.stdout.strip()
 
     def _lib_slug(self, slug):

@@ -86,3 +86,22 @@ def check_lib_draft(v, selected, prof_ids, active):
     if not cited & set(selected):
         fails.append({"path": "refs", "why": "must_cite_selected"})
     return fails
+
+
+def title_guess(meta_title, head, stem):
+    """PDF 的標題：檔案資訊裡的標題（去掉檔名樣子的 .pdf）→ 第一頁第一行夠長的字 → 檔名。"""
+    t = re.sub(r"\.pdf\s*$", "", (meta_title or "").strip(), flags=re.I).strip()
+    return t or next((l.strip() for l in (head or "").splitlines() if len(l.strip()) > 20), "") or stem
+
+
+def pick_title_hit(head, hits, min_head=200, min_words=3):
+    """沒有 DOI 時用標題查到的 OpenAlex 候選：第一頁要有字、候選標題要有至少 3 個實詞，且八成對得上第一頁，才採用。
+    掃描檔（沒字）或標題太短的候選核對不了，一律不採用。"""
+    from pipeline.textify import normalize_for_match, title_matches
+    if len((head or "").strip()) < min_head:
+        return None
+    for h in hits or []:
+        words = [w for w in re.findall(r"\w+", normalize_for_match(h.get("title") or "")) if len(w) > 3]
+        if h.get("doi") and len(words) >= min_words and title_matches(head, h["title"], threshold=0.8):
+            return h
+    return None

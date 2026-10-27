@@ -22,7 +22,7 @@ from urllib.parse import quote
 
 from pipeline.export import paper_dir_name
 from pipeline.http import get_json, openalex_params
-from pipeline.library import check_lib_draft, doi_from_text, parse_zotero_items, ris_export, tag_item
+from pipeline.library import check_lib_draft, doi_from_text, parse_zotero_items, pick_title_hit, ris_export, tag_item, title_guess
 from pipeline.propose import active_grants
 from pipeline.state import append_progress, init_run, load_state
 from pipeline.works import normalize_work
@@ -85,14 +85,13 @@ def add_pdf(lib, pdf, **meta):
             w = add_doi(lib, doi, "pdf", **meta)
         except RuntimeError as e:
             print(f"WARN OpenAlex 查不到 {doi}（{e}），改用 PDF 本身的標題")
-    if w is None and not doi:  # 沒有 DOI：用 PDF 的標題查 OpenAlex，標題字詞對得上第一頁才採用
-        from pipeline.textify import title_matches
-        guess = (doc.metadata or {}).get("title") or next((l.strip() for l in head.splitlines() if len(l.strip()) > 20), "")
+    guess = title_guess((doc.metadata or {}).get("title"), head, pdf.stem)
+    if w is None and not doi and len(head.strip()) >= 200:  # 沒有 DOI：用 PDF 的標題查 OpenAlex，標題字詞對得上第一頁才採用；掃描檔沒字就不查
         try:
             hits = get_json(f"https://api.openalex.org/works?search={quote(guess[:200])}&per-page=3{openalex_params()}").get("results") or []
         except RuntimeError:
             hits = []
-        hit = next((h for h in hits if h.get("doi") and title_matches(head, h.get("title") or "", threshold=0.8)), None)
+        hit = pick_title_hit(head, hits)
         if hit:
             w = add_doi(lib, hit["doi"], "pdf", **meta)
     if w is None:
@@ -100,7 +99,7 @@ def add_pdf(lib, pdf, **meta):
         if doi and any(x.get("doi") == doi for x in works):
             w = next(x for x in works if x.get("doi") == doi)
         else:
-            title = (doc.metadata or {}).get("title") or next((l.strip() for l in head.splitlines() if len(l.strip()) > 20), pdf.stem)
+            title = guess
             h = hashlib.sha256(pdf.read_bytes()).hexdigest()[:8]
             w = tag_item({"id": f"L{h}", "title": title, "year": None, "type": "article", "doi": doi, "authors": [], "abstract": None,
                           "venue": None}, source="pdf", **meta)
