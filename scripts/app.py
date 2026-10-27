@@ -36,6 +36,22 @@ from urllib.parse import unquote, urlparse
 # 應用程式叫的每個子程序（腳本、Claude Code 再叫的腳本）都繼承這個設定，一律用 UTF-8。
 os.environ["PYTHONUTF8"] = "1"
 
+
+def hide_console_windows(sp):
+    """照 ieltsgod：Windows 上背景跑的指令（測試 AI、換模型、跑腳本、Claude Code）不要每次都跳出黑色終端機視窗。
+    只加 CREATE_NO_WINDOW（只影響終端機程式）；已經指定 creationflags 的（登入要開看得到的新視窗、自動更新）不動。"""
+    init = sp.Popen.__init__
+
+    def hidden(self, *a, **k):
+        if "creationflags" not in k:
+            k["creationflags"] = 0x08000000
+        init(self, *a, **k)
+    sp.Popen.__init__ = hidden
+
+
+if os.name == "nt":
+    hide_console_windows(subprocess)
+
 from drive_sync import run as drive_sync, target
 from pipeline.drive_sync import busy_elsewhere, device_id, find_drives, release
 from pipeline.window import AppWindow, find_app_browser

@@ -459,3 +459,18 @@ def test_child_python_runs_in_utf8_mode():
     import app  # noqa: F401  匯入就要設好
     r = subprocess.run([sys.executable, "-c", "import sys; print(sys.flags.utf8_mode)"], capture_output=True, text=True)
     assert r.stdout.strip() == "1"
+
+
+def test_windows_background_commands_get_no_console_window():
+    """照 ieltsgod：Windows 上背景跑的指令（測試 AI、換模型、腳本）不要跳黑色終端機；指定了 creationflags 的（登入要開新視窗）不動。"""
+    import app
+
+    class FakePopen:
+        def __init__(self, *a, **k):
+            self.k = k
+
+    class FakeSP:
+        Popen = FakePopen
+    app.hide_console_windows(FakeSP)
+    assert FakeSP.Popen(["claude"]).k["creationflags"] == 0x08000000
+    assert FakeSP.Popen(["cmd"], creationflags=0x10).k["creationflags"] == 0x10
