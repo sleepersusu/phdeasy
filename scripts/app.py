@@ -192,6 +192,7 @@ class App:
         self.queue = self._load_queue()  # 同時已有 3 個工作在跑時先排隊，有空位就自動開始；存成檔，重開程式還在
         self._prog_samples = {}  # {工作 id: {步驟: (第一次看到的時間, 當時做完幾項)}}
         self.gcal_pending = None
+        self.zh_jobs = {}  # 全文翻中文的背景工作：{(教授, 文章, 討論文獻?): {status, done, total, error}}
         self.jobs.on_done = self.after_job
         self.blocked = None
         self.closer = None
@@ -679,6 +680,91 @@ class App:
                 out += [flag, v[:200]]
         return out
 
+    # ---------- 全文閱讀：螢光筆、筆記、問 AI、翻譯、收藏素材（學 ieltsgod 的閱讀題） ----------
+    def paper_text(self, body):
+        from pipeline.reader import paper_paths, text_blocks
+        t, a = paper_paths(self.runs, body.get("slug"), body.get("id"), lib=bool(body.get("lib")))
+        blocks = text_blocks(t.read_text(encoding="utf-8")) if t.exists() else []
+        head = t.read_text(encoding="utf-8").split("\n", 1)[0] if t.exists() else ""
+        src = next((k for k in ("pdf", "xml", "abstract") if f"| {k} |" in head), None)
+        z = a.with_name(a.stem + ".zh.json")
+        job = self.zh_jobs.get((body.get("slug"), body.get("id"), bool(body.get("lib"))))
+        return {"blocks": blocks, "source": src, "store": json.loads(a.read_text(encoding="utf-8")) if a.exists() else {},
+                "zh": json.loads(z.read_text(encoding="utf-8")) if z.exists() else {}, "zh_job": job}
+
+    def paper_translate(self, body):
+        """整篇翻成中文（學 ieltsgod 閱讀題的右邊）：背景一批一批翻，翻好的存 annotations/<id>.zh.json，畫面輪詢進度。"""
+        from pipeline.reader import merge_zh, paper_paths, text_blocks, todo_chunks, zh_chunk_prompt
+        t, a = paper_paths(self.runs, body.get("slug"), body.get("id"), lib=bool(body.get("lib")))
+        if not t.exists():
+            raise ValueError("這篇沒有轉好的全文")
+        k = (body.get("slug"), body.get("id"), bool(body.get("lib")))
+        if (self.zh_jobs.get(k) or {}).get("status") == "running":
+            return self.zh_jobs[k]
+        z = a.with_name(a.stem + ".zh.json")
+        blocks = text_blocks(t.read_text(encoding="utf-8"))
+        chunks = todo_chunks(blocks, json.loads(z.read_text(encoding="utf-8")) if z.exists() else {})
+        job = self.zh_jobs[k] = {"status": "running", "done": 0, "total": sum(len(c) for c in chunks), "error": ""}
+
+        def run():
+            try:
+                for c in chunks:
+                    job["done"] += merge_zh(z, self.ai_once(zh_chunk_prompt(c, body.get("title")), level="easy"), c)
+                job["status"] = "done"
+            except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as e:
+                job.update(status="error", error=str(e)[:300])
+        threading.Thread(target=run, daemon=True).start()
+        return job
+
+    def annot_save(self, body):
+        from pipeline.reader import clean_store, paper_paths
+        _, a = paper_paths(self.runs, body.get("slug"), body.get("id"), lib=bool(body.get("lib")))
+        store = clean_store(body.get("store") or {})
+        a.parent.mkdir(parents=True, exist_ok=True)
+        a.write_text(json.dumps(store, ensure_ascii=False, indent=1), encoding="utf-8")
+        return {"ok": True}
+
+    def clip_add(self, body):
+        from pipeline.reader import add_clip
+        return add_clip(self.runs / "_me" / "clips.json", body)
+
+    def ask_ai(self, body, translate=False):
+        """選取文字問 AI／翻譯：一次性的小問題，不碰任何檔案。"""
+        from pipeline.reader import ask_prompt, translate_prompt
+        prompt = translate_prompt(body.get("sel")) if translate else ask_prompt(body.get("sel"), body.get("ctx"), body.get("title"), body.get("q"), body.get("history"))
+        return {"a": self.ai_once(prompt, level="easy" if translate else "hard")}
+
+    def ai_once(self, prompt, level="hard"):
+        engine = self.engine()
+        if engine == "codex":
+            exe = find_codex()
+            if not exe:
+                raise ValueError("找不到 Codex CLI：到設定安裝，或把 AI 改回 Claude")
+            import tempfile
+            with tempfile.TemporaryDirectory() as d:
+                outf = os.path.join(d, "out.txt")
+                r = subprocess.run([exe, "exec", "--skip-git-repo-check", "-s", "read-only", "--color", "never", "-o", outf, "-"], input=prompt,
+                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=d)
+                txt = open(outf, encoding="utf-8").read().strip() if os.path.exists(outf) else ""
+            if not txt:
+                raise ValueError(("Codex 沒有回答：" + (r.stderr or r.stdout).strip()[-200:]) or "Codex 沒有回答")
+            return txt
+        exe = find_claude()
+        if not exe:
+            raise ValueError("找不到 Claude Code：到設定安裝並登入")
+        model = "claude-haiku-5-5" if level == "easy" else "claude-sonnet-5-5"
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:  # 空資料夾：不讀專案的 CLAUDE.md，也沒有檔案可碰
+            r = subprocess.run([exe, "-p", "--output-format", "json", "--model", model, "--permission-mode", "dontAsk"],
+                               input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=d)
+        try:
+            out = json.loads(r.stdout or "{}")
+        except ValueError:
+            out = {}
+        if r.returncode or out.get("is_error") or not out.get("result"):
+            raise ValueError("AI 沒有回答：" + str(out.get("result") or r.stderr or r.stdout).strip()[-200:])
+        return out["result"].strip()
+
     def library_upload(self, slug, data, meta, limit=200 * 1024 * 1024):
         """討論文獻：本人上傳教授給的 PDF。存進 runs/<slug>/library/inbox/（只新增），再查 DOI／OpenAlex 建檔。"""
         slug = self._lib_slug(slug)
@@ -833,6 +919,19 @@ class App:
             return self.test_codex()
         if path == "login-codex":
             return self.login_codex()
+        if path == "paper-text":
+            return self.paper_text(body)
+        if path == "paper-translate":
+            return self.paper_translate(body)
+        if path == "annot-save":
+            return self.annot_save(body)
+        if path == "clip-add":
+            return self.clip_add(body)
+        if path == "clip-del":
+            from pipeline.reader import remove_clip
+            return {"ok": remove_clip(self.runs / "_me" / "clips.json", str(body.get("id") or ""))}
+        if path in ("ask", "translate"):
+            return self.ask_ai(body, translate=path == "translate")
         if path == "doc-change":
             return self.doc_change(body)
         if path == "prof-update":

@@ -118,7 +118,7 @@ function renderProposal(){
     const key = `proposal--${p.slug}`, has = !!(H.docs || {})[key], pr = p.proposal || {};
     const drafts = (pr.versions || []).length ? `<ul class="vlist">${pr.versions.map(v => { const c = CONF[v.level] || ["", "?"];
         return `<li><span class="pill ${c[0]}">${c[1]}</span> <strong>${esc(v.id)}</strong>｜${bi(v.direction_zh, v.direction_en)}</li>`; }).join("")}</ul>` : "";
-    return `<details class="profcard" ${has ? "open" : ""}><summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc((p.owner || {}).institution || p.institution || "")}</div>
+    return `<details class="profcard" data-slug="${esc(p.slug)}" ${has ? "open" : ""}><summary><div class="pc-head"><div><strong class="pc-name">${esc(p.name)}</strong><div class="small muted">${esc((p.owner || {}).institution || p.institution || "")}</div>
           ${(p.owner || {}).note ? `<div class="small" style="margin-top:2px">📝 ${esc(p.owner.note)}</div>` : ""}
           ${(() => { const now = new Date().toISOString(), up = ((H.cal || {}).events || []).filter(e => e.slug === p.slug && (e.end || e.start) >= now).sort((a, b) => a.start < b.start ? -1 : 1)[0];
             return up ? `<div class="small" style="margin-top:4px">📅 ${esc(up.summary)} <span class="pill g">${esc(new Date(up.start).toLocaleString([], {dateStyle: "medium", timeStyle: "short"}))}</span>${up.meet ? ` <a href="${esc(up.meet)}" target="_blank" rel="noopener">Meet</a>` : ""}</div>` : ""; })()}
@@ -127,6 +127,28 @@ function renderProposal(){
       <div class="pc-body" data-doc-root>${has ? "" : drafts ? `<div class="small muted">AI 依她的方向與經費擬的草稿（<a href="professor.html?p=${encodeURIComponent(p.slug)}&v=proposal">到她的頁面看全文</a>）：</div>${drafts}` : ""}<div data-doc-slot="${esc(key)}"></div></div></details>`;
   }).join("");
   el.querySelectorAll("[data-doc-slot]").forEach(slot => renderDoc(slot.dataset.docSlot, slot));
+  renderClips(el);
+}
+
+/* 計畫書素材：在文章全文或 AI 解析選取文字按「收藏素材」存的原文句子，依教授列在她的計畫書卡片裡，附出處 */
+async function renderClips(el){
+  let C = [];
+  try { C = (await fetch(ME_ROOT() + "clips.json", {cache: "no-store"}).then(r => r.ok ? r.json() : {clips: []})).clips || []; } catch (e) { return; }
+  el.querySelectorAll("details.profcard").forEach(card => {
+    const mine = C.filter(c => c.slug === card.dataset.slug);
+    if (!mine.length) return;
+    const box = document.createElement("div"); box.className = "clips";
+    box.innerHTML = `<h4 style="margin:14px 0 6px">${icon("bookmark", 15)} 計畫書素材（${mine.length}）</h4>` + mine.map(c => `<div class="clip" style="margin:8px 0">
+      <blockquote lang="en" style="margin:0;padding:4px 10px;border-left:3px solid #fde68a">${esc(c.text)}</blockquote>
+      <div class="small muted row" style="margin-top:4px">${esc(c.loc ? c.loc + "｜" : "")}<a href="paper.html?p=${encodeURIComponent(c.slug)}&id=${encodeURIComponent(c.paper)}${c.lib ? "&lib=1" : ""}&tab=full">${esc((c.title || c.paper).slice(0, 90))}</a>
+      ${window.APP_REMATCH ? ibtn("trash", "移除這則素材", `data-clip-del="${esc(c.id)}"`) : ""}</div></div>`).join("");
+    card.querySelector(".pc-body").appendChild(box);
+  });
+  el.querySelectorAll("[data-clip-del]").forEach(b => b.onclick = async () => {
+    if (!confirm("移除這則素材？")) return;
+    await fetch("/api/clip-del", {method: "POST", headers: {"Content-Type": "application/json", "X-Phdeasy-App": "1"}, body: JSON.stringify({id: b.dataset.clipDel})});
+    b.closest(".clip").remove();
+  });
 }
 
 /* ===== 本人的文件：上傳就顯示、每段 AI 編修、版本 ===== */

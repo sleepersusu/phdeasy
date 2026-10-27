@@ -92,6 +92,49 @@ header.top{border-bottom:1px solid var(--line)}
 .steps .steps-head{border-top:1px solid var(--line);border-radius:8px 8px 0 0;background:var(--soft)}
 .steps .step:last-child{border-radius:0 0 8px 8px}
 .steps .step>div{padding:8px 14px}
+
+/* 全文閱讀：分頁、螢光筆、筆記、問 AI（學 ieltsgod 的閱讀題） */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 0;overflow-x:auto}
+.tabs button{font:inherit;font-weight:600;background:none;border:none;border-bottom:3px solid transparent;padding:10px 14px;min-height:44px;cursor:pointer;color:var(--muted);white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--green)}
+.tabtip{font-size:.85rem;color:var(--muted);margin:10px 0 0}
+mark.rd-hl{background:#fde68a;color:inherit;padding:0 1px;border-radius:2px}
+.rd-note{border-bottom:2px dashed #15803d;cursor:pointer}
+.rd-nmark{color:#15803d;cursor:pointer;font-size:.75em;margin-left:1px}
+.rd-pop{position:fixed;z-index:300;display:flex;flex-wrap:wrap;gap:4px;background:#fff;border:1px solid #d5d8dc;border-radius:10px;padding:5px;box-shadow:0 6px 20px rgba(0,0,0,.14);max-width:calc(100vw - 16px)}
+.rd-btn{display:inline-flex;align-items:center;gap:5px;font:inherit;font-size:.85rem;font-weight:600;min-height:36px;padding:0 10px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;color:var(--fg);cursor:pointer}
+.rd-btn:hover{background:var(--soft)}.rd-btn.primary{background:var(--green);border-color:var(--green);color:#fff}.rd-btn[disabled]{opacity:.45;cursor:not-allowed}
+.rd-box{position:fixed;z-index:310;width:min(380px,calc(100vw - 16px));background:#fff;border:1px solid #d5d8dc;border-radius:12px;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:8px}
+.rd-ask{width:min(420px,calc(100vw - 16px))}
+.rd-bar{display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:move;user-select:none}
+.rd-bar b{display:inline-flex;align-items:center;gap:6px;font-size:.9rem}
+.rd-x{border:none;background:none;cursor:pointer;min-width:36px;min-height:36px;border-radius:8px}.rd-x:hover{background:var(--soft)}
+.rd-box textarea{width:100%;resize:vertical;font-size:.92rem}
+.rd-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rd-hint{font-size:.78rem;color:var(--muted)}.rd-err{color:#9f1d1d}
+.rd-quote{font-size:.82rem;color:var(--muted);border-left:3px solid #fde68a;padding:2px 8px;max-height:72px;overflow:auto}
+.rd-log{max-height:300px;overflow:auto;font-size:.9rem}
+.rd-q{font-weight:600;margin-top:8px}.rd-a{margin-top:2px;line-height:1.55}
+.rd-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:400;background:#111;color:#fff;padding:9px 14px;border-radius:10px;font-size:.88rem;max-width:90vw}
+/* 全文閱讀：左英右中兩欄，各自捲動（學 ieltsgod 閱讀題） */
+#main.wide{max-width:none;padding:0}
+.panes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-top:1px solid var(--line);min-height:420px}
+.pane{overflow:auto;padding:18px 26px 80px;min-width:0}
+.pane+.pane{border-left:1px solid var(--line);background:#fcfcfb}
+#paneEn{font-family:Georgia,"Times New Roman",serif;font-size:17px;line-height:1.75}
+#paneZh{font-size:15.5px;line-height:1.85}
+.ft .pg{font-family:var(--mono);font-size:.78rem;color:var(--muted);margin:22px 0 6px;border-top:1px dashed var(--line);padding-top:6px}
+.ft .para{margin:0 0 1em;border-radius:6px;transition:background .3s}
+.ft h2.para{font-size:1.3em;margin:0 0 .6em}.ft h3.para{font-size:1.05em;margin:1.2em 0 .4em}
+.ft .para.flash{background:#e8f5ec}
+.zhbar{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:.9rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ptabs{display:none;gap:4px;padding:8px 16px}
+.ptabs button{font:inherit;font-weight:600;min-height:40px;padding:0 16px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;cursor:pointer}
+.ptabs button[aria-selected="true"]{background:var(--green);border-color:var(--green);color:#fff}
+@media (max-width:900px){.panes{grid-template-columns:minmax(0,1fr)}.pane+.pane{border-left:0}.ptabs{display:flex}.panes[data-show="en"] #paneZh,.panes[data-show="zh"] #paneEn{display:none}.pane{padding:14px 16px 60px}}
+.nlist .item{margin:10px 0}
+.nlist .q{font-size:.85rem;color:var(--muted);border-left:3px solid #fde68a;padding-left:8px;margin-bottom:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
@@ -101,7 +144,9 @@ header.top{border-bottom:1px solid var(--line)}
   <div class="small muted" id="meta" style="margin-top:6px"></div>
   <div class="row" id="links" style="margin-top:8px"></div>
 </div></header>
+<div class="wrap"><div class="tabs" role="tablist" id="tabs" hidden></div><p class="tabtip" id="tabtip" hidden>選取任何一段文字，可以畫螢光筆、寫筆記、問 AI、翻成中文、收藏到計畫書素材。</p></div>
 <main class="wrap" id="main"><div class="empty" style="margin-top:16px">載入中…</div></main>
+<script src="icons.js"></script><script src="reader.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -111,14 +156,17 @@ const none = `<span class="muted">來源未提及</span>`;
 const noneEn = `<span class="muted" lang="en">Not reported in the source</span>`;
 
 const cites = cs => (cs && cs.length) ? `<details class="src"><summary>原文出處（${cs.length}）</summary>${cs.map(c => `<blockquote lang="en">"${esc(c.quote)}" <span class="loc">[${esc(c.loc)}]</span></blockquote>`).join("")}</details>` : "";
-const pair = (en, zh, labEn, labZh, extra = "") => `<div class="bi"><div class="en" lang="en">${labEn ? `<div class="lab">${labEn}</div>` : ""}${en ? esc(en) : noneEn}</div><div>${labZh ? `<div class="lab">${labZh}</div>` : ""}${zh ? esc(zh) : none}${extra}</div></div>`;
-const pairList = (items, ordered) => {
+// 每段文字給一個固定的 key（螢光筆、筆記記在這個 key 上）；沒給 key 的就是一般文字
+const T = (key, text) => key ? Reader.hl(key, text, "AI 解析") : esc(text);
+const pair = (en, zh, labEn, labZh, extra = "", key) => `<div class="bi"><div class="en" lang="en">${labEn ? `<div class="lab">${labEn}</div>` : ""}${en ? T(key && key + ":en", en) : noneEn}</div><div>${labZh ? `<div class="lab">${labZh}</div>` : ""}${zh ? T(key && key + ":zh", zh) : none}${extra}</div></div>`;
+const pairList = (items, ordered, key) => {
   if (!items || !items.length) return pair(null, null);
   const tag = ordered ? "ol" : "ul";
-  return `<div class="bi"><div class="en" lang="en"><${tag}>${items.map(x => `<li>${x.en ? esc(x.en) : noneEn}${cites(x.citations)}</li>`).join("")}</${tag}></div><div><${tag}>${items.map(x => `<li>${x.zh ? esc(x.zh) : none}</li>`).join("")}</${tag}></div></div>`;
+  return `<div class="bi"><div class="en" lang="en"><${tag}>${items.map((x, i) => `<li>${x.en ? T(key && `${key}:${i}:en`, x.en) : noneEn}${cites(x.citations)}</li>`).join("")}</${tag}></div><div><${tag}>${items.map((x, i) => `<li>${x.zh ? T(key && `${key}:${i}:zh`, x.zh) : none}</li>`).join("")}</${tag}></div></div>`;
 };
 
-function render(d, w){
+function render(d, w, quiet){
+  LAST = [d, w];
   document.title = w.title;
   const lib = w.library;  // 討論文獻：教授給的，不是她的文章
   const prof = `professor.html?p=${encodeURIComponent(SLUG)}`;
@@ -140,18 +188,18 @@ function render(d, w){
   // 1. AI 重點（中英）
   h += `<h2>AI 重點整理</h2>`;
   if (g && g.key_points && g.key_points.length){
-    h += `<div class="bihead"><div>English</div><div>中文</div></div>` + pairList(g.key_points, true);
+    h += `<div class="bihead"><div>English</div><div>中文</div></div>` + pairList(g.key_points, true, "kp");
   } else {
     h += `<div class="empty">這篇還沒有 AI 重點整理${w.text_source === "none" ? "（沒有全文也沒有摘要，只有標題）" : "（由「單篇重點」階段產生）"}。下面是解析卡的大意。</div>`;
-    if (F.summary) h += `<div style="margin-top:8px">${pair(F.summary.text_en, F.summary.text)}</div>`;
+    if (F.summary) h += `<div style="margin-top:8px">${pair(F.summary.text_en, F.summary.text, "", "", "", "sum")}</div>`;
   }
   // 1b. 研究發現（白話）：一句話結論＋每一項結果（原文數字與白話說明）
   if (g && (g.bottom_line || (g.findings || []).length)){
     h += `<h2>研究發現（白話）</h2>`;
-    if (g.bottom_line) h += `<div class="card" style="margin:8px 0;border-left:4px solid #15803d"><div class="small muted">一句話結論</div>${pair(g.bottom_line.en, g.bottom_line.zh)}${cites(g.bottom_line.citations)}</div>`;
+    if (g.bottom_line) h += `<div class="card" style="margin:8px 0;border-left:4px solid #15803d"><div class="small muted">一句話結論</div>${pair(g.bottom_line.en, g.bottom_line.zh, "", "", "", "bl")}${cites(g.bottom_line.citations)}</div>`;
     (g.findings || []).forEach((f, i) => {
-      h += `<div class="field"><div class="name">發現 ${i + 1}</div>${pair(f.plain_en, f.plain_zh)}
-        <div class="small muted" style="margin-top:4px">原文結果：</div>${pair(f.en, f.zh)}${cites(f.citations)}</div>`;
+      h += `<div class="field"><div class="name">發現 ${i + 1}</div>${pair(f.plain_en, f.plain_zh, "", "", "", `f${i}p`)}
+        <div class="small muted" style="margin-top:4px">原文結果：</div>${pair(f.en, f.zh, "", "", "", `f${i}o`)}${cites(f.citations)}</div>`;
     });
   } else if (g){
     h += `<h2>研究發現（白話）</h2><div class="empty">這篇還沒有白話的研究發現（舊的整理沒有這一段）。在教授頁「工作進度」回覆「補研究發現」就會補上。</div>`;
@@ -159,52 +207,125 @@ function render(d, w){
   // 2. 研究方法（詳細）：設計、場域、對象、樣本、介入、變項、測量、分析、限制
   if (g && g.method && g.method.length){
     h += `<h2>研究方法（詳細）</h2>`;
-    g.method.forEach(m => {
-      h += `<div class="field"><div class="name">${esc(m.label_zh)} <span class="small muted" lang="en">${esc(m.label_en)}</span></div>${m.not_reported ? `<div class="small muted">原文未提及 · Not reported</div>` : pair(m.en, m.zh) + cites(m.citations)}</div>`;
+    g.method.forEach((m, i) => {
+      h += `<div class="field"><div class="name">${esc(m.label_zh)} <span class="small muted" lang="en">${esc(m.label_en)}</span></div>${m.not_reported ? `<div class="small muted">原文未提及 · Not reported</div>` : pair(m.en, m.zh, "", "", "", `m${i}`) + cites(m.citations)}</div>`;
     });
   }
   // 3. 研究設計（解析卡）
   h += `<h2>${g && g.method && g.method.length ? "設計與樣本摘要" : "研究設計"}</h2>`;
   const facts = F.design && F.design.facts ? Object.entries(F.design.facts).map(([k, v]) => `${esc(k)}：${esc(v)}`).join("｜") : "";
   const sfacts = F.sample && F.sample.facts ? Object.entries(F.sample.facts).map(([k, v]) => `${esc(k)}：${esc(v)}`).join("｜") : "";
-  if (g && g.design) h += pair(g.design.en, g.design.zh, "", "", "") + cites(g.design.citations);
+  if (g && g.design) h += pair(g.design.en, g.design.zh, "", "", "", "dz") + cites(g.design.citations);
   if (facts || sfacts) h += `<div class="facts">${facts}${facts && sfacts ? "<br>" : ""}${sfacts}</div>`;
-  if (F.design && (F.design.text || F.design.text_en)) h += `<div class="field"><div class="name">設計（解析卡）</div>${pair(F.design.text_en, F.design.text)}${cites(F.design.citations)}</div>`;
-  if (F.sample && (F.sample.text || F.sample.text_en)) h += `<div class="field"><div class="name">樣本</div>${pair(F.sample.text_en, F.sample.text)}${cites(F.sample.citations)}</div>`;
+  if (F.design && (F.design.text || F.design.text_en)) h += `<div class="field"><div class="name">設計（解析卡）</div>${pair(F.design.text_en, F.design.text, "", "", "", "cd")}${cites(F.design.citations)}</div>`;
+  if (F.sample && (F.sample.text || F.sample.text_en)) h += `<div class="field"><div class="name">樣本</div>${pair(F.sample.text_en, F.sample.text, "", "", "", "cs")}${cites(F.sample.citations)}</div>`;
   // 3. 圖與表（一張都不漏）
   const figs = w.figures || [];
   h += `<h2>圖與表（${figs.length}）</h2>`;
   if (!figs.length) h += `<div class="empty">${w.text_source === "pdf" || w.text_source === "xml" ? "全文裡沒有找到圖或表的標題。" : "沒有全文，看不到圖表；有 PDF 的話可以在教授頁的例外紀錄上傳。"}</div>`;
-  figs.forEach(f => {
+  figs.forEach((f, fi) => {
     h += `<div class="fig"><div class="row" style="justify-content:space-between"><strong>${esc(f.label)}</strong><span class="loc">${esc(f.loc || "")}</span></div>
       <div class="small" lang="en" style="margin-top:4px">${esc(f.caption || "")}</div>
-      ${f.en || f.zh ? `<div style="margin-top:8px">${pair(f.en, f.zh, "What it shows", "這張在講什麼")}</div>${cites(f.citations)}` : `<div class="small muted" style="margin-top:6px">（還沒有 AI 說明）</div>`}
+      ${f.en || f.zh ? `<div style="margin-top:8px">${pair(f.en, f.zh, "What it shows", "這張在講什麼", "", `fig${fi}`)}</div>${cites(f.citations)}` : `<div class="small muted" style="margin-top:6px">（還沒有 AI 說明）</div>`}
       ${f.table_html ? `<div class="tbl">${f.table_html}</div>` : ""}
       ${f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)}（${esc(f.loc || "原文")}）">` : (f.table_html ? "" : `<div class="small muted" style="margin-top:6px">這張圖沒有拿到圖檔。</div>`)}
       ${(f.detail || []).length ? `<div class="steps"><div class="bi steps-head"><div class="en lab" lang="en">Step by step</div><div class="lab">逐步解讀</div></div>
-        ${f.detail.map((st, i) => `<div class="bi step"><div class="en" lang="en"><b>${i + 1}.</b> ${esc(st.en)}</div><div><b>${i + 1}.</b> ${esc(st.zh)}</div></div>`).join("")}</div>` : ""}</div>`;
+        ${f.detail.map((st, i) => `<div class="bi step"><div class="en" lang="en"><b>${i + 1}.</b> ${T(`fig${fi}s${i}:en`, st.en)}</div><div><b>${i + 1}.</b> ${T(`fig${fi}s${i}:zh`, st.zh)}</div></div>`).join("")}</div>` : ""}</div>`;
   });
   // 4. 解析卡其他欄位（左英右中）
   if ((w.card.fields || []).length) h += `<h2>完整解析</h2>`;  // 討論文獻沒有解析卡：不放空標題
   const claimField = (key, ordered) => {
     const f = F[key]; if (!f) return "";
     const items = (f.claims || []).map(c => ({en: c.text_en, zh: c.text, citations: c.citations}));
-    return `<div class="field"><div class="name">${esc(f.label)}</div>${f.state === "not_applicable" ? `<div class="small muted">短卡不寫這一欄</div>` : pairList(items, ordered)}</div>`;
+    return `<div class="field"><div class="name">${esc(f.label)}</div>${f.state === "not_applicable" ? `<div class="small muted">短卡不寫這一欄</div>` : pairList(items, ordered, "c:" + key)}</div>`;
   };
-  if (F.summary && g) h += `<div class="field"><div class="name">大意</div>${pair(F.summary.text_en, F.summary.text)}${cites(F.summary.citations)}</div>`;
+  if (F.summary && g) h += `<div class="field"><div class="name">大意</div>${pair(F.summary.text_en, F.summary.text, "", "", "", "sum")}${cites(F.summary.citations)}</div>`;
   h += claimField("gap") + claimField("solves") + claimField("findings", true);
   if (F.limitations){
     const L = F.limitations;
     const a = (L.author_stated || []).map(c => ({en: c.text_en, zh: c.text, citations: c.citations}));
     const i = (L.inferred || []).map(c => ({en: c.text_en, zh: c.text, citations: c.citations}));
     h += `<div class="field"><div class="name">研究限制</div>${L.state === "not_applicable" ? `<div class="small muted">短卡不寫這一欄</div>` :
-      `<div class="small"><strong>作者自己寫的</strong></div>${pairList(a)}<div class="small" style="margin-top:8px"><strong>解析者推論（標明非作者原話）</strong></div>${pairList(i)}`}</div>`;
+      `<div class="small"><strong>作者自己寫的</strong></div>${pairList(a, false, "la")}<div class="small" style="margin-top:8px"><strong>解析者推論（標明非作者原話）</strong></div>${pairList(i, false, "li")}`}</div>`;
   }
   if ((w.keywords_en || []).length) h += `<h2>關鍵詞</h2>${pair((w.keywords_en || []).join(", "), (w.keywords_zh || []).join("、"))}`;
-  if (w.abstract) h += `<h2>摘要原文</h2><div lang="en" class="small">${esc(w.abstract)}</div>`;
-  $("#main").innerHTML = h;
-  document.querySelectorAll(".fig img").forEach(img => img.onclick = () => img.classList.toggle("big"));
+  if (w.abstract) h += `<h2>摘要原文</h2><div lang="en" class="small">${T("abs", w.abstract)}</div>`;
+  VIEWS.ai = h;
+  VIEWS.full = fullHTML(w);
+  if (!quiet) showTab(new URLSearchParams(location.search).get("tab") || "ai");
 }
+
+// ---------- 分頁：AI 解析／全文閱讀／我的筆記 ----------
+const VIEWS = {ai: "", full: ""};
+function fullHTML(w){
+  const R = Reader.state, B = R.blocks || [];
+  if (!R.ok) return `<div class="empty" style="margin-top:16px">${esc(R.err || "要用 phdeasy 應用程式打開，才能看全文與標記。")}</div>`;
+  if (!B.length) return `<div class="empty" style="margin-top:16px">這篇沒有轉好的全文${w.pdf_href ? "（可以按上面「開啟全文 PDF」看原檔）" : ""}。</div>`;
+  // 左右兩欄（學 ieltsgod 閱讀題）：左邊英文原文，右邊中文；同一段左右對齊、一起捲動
+  const lab = b => /^(p\.|abs)/.test(b.page || "") ? (b.page === "abs" ? "摘要" : `第 ${b.page.slice(2)} 頁`) : "";
+  const tagOf = b => b.kind === "h1" ? "h2" : /^h/.test(b.kind || "") ? "h3" : "p";
+  let en = R.source === "abstract" ? `<div class="empty">這篇沒有免費全文，只有摘要。</div>` : "", zh = "", pg = null;
+  const need = B.filter(b => /[A-Za-z]{2}/.test(b.text) && !R.zh[b.key]).length, job = R.zhJob || {};
+  B.forEach(b => {
+    if (b.page !== pg && lab(b)){ en += `<div class="pg">${lab(b)}</div>`; zh += `<div class="pg">${lab(b)}</div>`; }
+    pg = b.page;
+    const t = tagOf(b);
+    en += `<${t} class="para" data-k="${esc(b.key)}" lang="en">${Reader.hl("t:" + b.key, b.text, b.page)}</${t}>`;
+    zh += `<${t} class="para" data-k="${esc(b.key)}">${R.zh[b.key] ? Reader.hl("z:" + b.key, R.zh[b.key], b.page) : /[A-Za-z]{2}/.test(b.text) ? `<span class="muted small">（還沒翻）</span>` : esc(b.text)}</${t}>`;
+  });
+  const bar = job.status === "running" ? `<div class="zhbar" role="status">AI 翻譯中… ${job.done}/${job.total} 段（可以先讀，翻好的會自動出現）</div>`
+    : need ? `<div class="zhbar">${job.status === "error" ? `<span class="rd-err">翻譯沒有完成：${esc(job.error)}</span><br>` : ""}還有 ${need} 段沒翻成中文。<button type="button" class="rd-btn primary" id="zhGo">${icon("translate", 15)} 整篇翻成中文</button><span class="small muted">（用便宜的模型，背景翻，約幾分鐘）</span></div>` : "";
+  return `<div class="ptabs" role="tablist" aria-label="手機上切換"><button type="button" data-show="en" aria-selected="true">English</button><button type="button" data-show="zh" aria-selected="false">中文</button></div>
+    <div class="panes" data-show="en"><div class="pane ft" id="paneEn">${en}</div><div class="pane ft" id="paneZh">${bar}${zh}</div></div>`;
+}
+let zhTimer = null;
+function wirePanes(){
+  const L = $("#paneEn"), Z = $("#paneZh"); if (!L || !Z) return;
+  const fit = () => { const top = $(".panes").getBoundingClientRect().top; $(".panes").style.height = Math.max(420, innerHeight - Math.max(top, 0) - 8) + "px"; };
+  fit(); addEventListener("resize", fit);
+  // 一邊捲動，另一邊跟到同一段
+  let lock = null;
+  const follow = (from, to) => () => { if (lock && lock !== from) return; lock = from; clearTimeout(follow.t); follow.t = setTimeout(() => lock = null, 150);
+    const top = from.getBoundingClientRect().top; const p = [...from.querySelectorAll(".para")].find(x => x.getBoundingClientRect().bottom > top + 8); if (!p) return;
+    const q = to.querySelector(`.para[data-k="${CSS.escape(p.dataset.k)}"]`); if (q) to.scrollTop += (q.getBoundingClientRect().top - to.getBoundingClientRect().top) - (p.getBoundingClientRect().top - top); };
+  L.addEventListener("scroll", follow(L, Z)); Z.addEventListener("scroll", follow(Z, L));
+  // 點一段：另一邊同一段閃一下
+  const flash = (e, other) => { const p = e.target.closest(".para"); if (!p || getSelection().toString()) return; const q = other.querySelector(`.para[data-k="${CSS.escape(p.dataset.k)}"]`); if (q){ q.classList.add("flash"); setTimeout(() => q.classList.remove("flash"), 900); } };
+  L.addEventListener("click", e => flash(e, Z)); Z.addEventListener("click", e => flash(e, L));
+  document.querySelectorAll(".ptabs [data-show]").forEach(b => b.onclick = () => { $(".panes").dataset.show = b.dataset.show; document.querySelectorAll(".ptabs [data-show]").forEach(x => x.setAttribute("aria-selected", x === b)); });
+  const go = $("#zhGo"); if (go) go.onclick = async () => { go.disabled = true; try { await Reader.translateAll(); } catch (e){ Reader.toast((e && e.error) || "沒辦法開始翻譯"); } redrawFull(); };
+  clearTimeout(zhTimer);
+  if ((Reader.state.zhJob || {}).status === "running") zhTimer = setTimeout(async () => { await Reader.refreshZh().catch(() => {}); if (new URLSearchParams(location.search).get("tab") === "full") redrawFull(); }, 5000);
+}
+function redrawFull(){  // 翻譯進度更新：重畫右邊，左邊捲到哪不動
+  const L = $("#paneEn"), y = L ? L.scrollTop : 0; rebuild(); $("#main").innerHTML = VIEWS.full; wirePanes(); const L2 = $("#paneEn"); if (L2){ L2.scrollTop = y; L2.dispatchEvent(new Event("scroll")); }
+}
+function notesHTML(){
+  const N = Reader.notes();
+  if (!N.length) return `<div class="empty" style="margin-top:16px">這篇還沒有筆記。在「AI 解析」或「全文閱讀」選取文字，按「筆記」或問 AI 後「存成筆記」。</div>`;
+  return `<div class="nlist">${N.map(n => `<div class="item"><div class="q" lang="en">${esc(n.quote || "")}</div><div>${esc(n.text).replace(/\n/g, "<br>")}</div>
+    <div class="row small muted" style="margin-top:6px">${new Date(n.t).toLocaleString("zh-TW")}${n.key ? `<button type="button" class="rd-btn" data-goto="${esc(n.key)}">${icon("arrow", 14)} 跳到原文</button>` : ""}</div></div>`).join("")}</div>`;
+}
+function showTab(t){
+  if (!["ai", "full", "notes"].includes(t)) t = "ai";
+  const n = Reader.notes().length;
+  $("#tabs").hidden = false; $("#tabtip").hidden = t === "notes";
+  $("#tabs").innerHTML = [["ai", "AI 解析"], ["full", "全文閱讀"], ["notes", `我的筆記${n ? `（${n}）` : ""}`]]
+    .map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === t}">${l}</button>`).join("");
+  $("#main").innerHTML = t === "notes" ? notesHTML() : VIEWS[t];
+  $("#main").classList.toggle("wide", t === "full");
+  if (t === "full") wirePanes();
+  document.querySelectorAll(".fig img").forEach(img => img.onclick = () => img.classList.toggle("big"));
+  const u = new URL(location.href); if (t === "ai") u.searchParams.delete("tab"); else u.searchParams.set("tab", t); history.replaceState(null, "", u);
+}
+$("#tabs").addEventListener("click", e => { const b = e.target.closest("[data-tab]"); if (b){ rebuild(); showTab(b.dataset.tab); } });
+$("#main").addEventListener("click", e => {
+  const b = e.target.closest("[data-goto]"); if (!b) return;
+  const k = b.dataset.goto; rebuild(); showTab(k.startsWith("t:") ? "full" : "ai");
+  const el = document.querySelector(`[data-hlk="${CSS.escape(k)}"]`); if (el){ el.scrollIntoView({block: "center"}); el.style.outline = "3px solid #15803d"; setTimeout(() => el.style.outline = "", 1600); }
+});
+let LAST = null;
+function rebuild(){ if (LAST) render(LAST[0], LAST[1], true); }  // 切分頁時用最新的標記重畫
 
 (async function init(){
   try {
@@ -219,6 +340,8 @@ function render(d, w){
     const fix = h => h && !/^(https?:|#|mailto:)/.test(h) ? new URL(h, base).href : h;
     w.pdf_href = fix(w.pdf_href);
     (w.figures || []).forEach(f => { f.image = fix(f.image); });
+    await Reader.load({slug: SLUG, id: ID, lib: LIB, title: w.title});
+    Reader.bind($("#main"));
     render(d, w);
   } catch (e) { $("#main").innerHTML = `<div class="empty" role="alert" style="margin-top:16px">${esc(e.message)}</div>`; }
 })();
