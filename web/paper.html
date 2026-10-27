@@ -171,7 +171,7 @@ function render(d, w, quiet){
   const lib = w.library;  // 討論文獻：教授給的，不是她的文章
   const prof = `professor.html?p=${encodeURIComponent(SLUG)}`;
   $("#crumbs").innerHTML = `<a href="professors.html">← 申請目標</a><span class="sep">›</span><a href="${prof}">${esc(d.professor.name)}</a><span class="sep">›</span>` +
-    `<a href="${prof}&v=${lib ? "library" : "papers"}">${lib ? "討論文獻" : "文章解析"}</a><span class="sep">›</span><span aria-current="page">這一篇</span>`;
+    `<a href="${prof}&v=${lib ? "library" : "papers"}">${lib ? "Meeting" : "文章解析"}</a><span class="sep">›</span><span aria-current="page">這一篇</span>`;
   $("#t-en").textContent = w.title; $("#t-zh").textContent = w.title_zh || (lib ? "" : "（還沒有中文標題）");
   $("#meta").innerHTML = (lib ? [w.year, esc(w.venue || ""), (w.authors || []).slice(0, 3).map(a => esc(a.name)).join(", "),
       lib.discussion && `${esc(lib.discussion)} 討論`,
@@ -336,7 +336,7 @@ function rebuild(){ if (LAST) render(LAST[0], LAST[1], true); }  // 切分頁時
     const d = await r.json();
     const LIB = new URLSearchParams(location.search).get("lib") === "1";  // 討論文獻（教授給的文獻）
     const w = (LIB ? d.library || [] : d.works).find(x => x.id === ID);
-    if (!w) throw new Error(LIB ? `討論文獻裡沒有 ${ID} 這篇` : `這位教授沒有 ${ID} 這篇`);
+    if (!w) throw new Error(LIB ? `Meeting 文獻裡沒有 ${ID} 這篇` : `這位教授沒有 ${ID} 這篇`);
     const fix = h => h && !/^(https?:|#|mailto:)/.test(h) ? new URL(h, base).href : h;
     w.pdf_href = fix(w.pdf_href);
     (w.figures || []).forEach(f => { f.image = fix(f.image); });

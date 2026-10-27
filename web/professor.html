@@ -39,6 +39,22 @@ h3{font-size:1.05rem;margin:20px 0 8px}
 .btn.btn-icon.btn-green{background:var(--green);color:var(--on-green);border-color:transparent}
 .btn.btn-icon.btn-sm{width:34px;min-width:34px;min-height:34px}
 .btn.btn-icon svg{display:block}
+/* Meeting 文獻的資料夾樹（學 ieltsgod 閱讀題） */
+.libtree{margin-top:10px}
+.tree{margin:2px 0}
+.fold-row{display:flex;align-items:center;gap:4px}
+.fold{display:flex;align-items:center;gap:8px;flex:1;min-height:44px;padding:4px 8px;border:none;background:none;font:inherit;font-weight:600;cursor:pointer;border-radius:8px;text-align:left;color:var(--fg)}
+.fold:hover{background:var(--soft)}
+.fold .chev{transition:transform .15s;color:var(--muted)}.fold[aria-expanded="true"] .chev{transform:rotate(90deg)}
+.fold .fname{flex:1}.fold .fcnt{font-size:.8rem;color:var(--muted);font-weight:500}
+.fbody{padding-left:22px;border-left:1px solid var(--line);margin-left:14px}
+.fbody .lib-it{margin:6px 0}
+.tpill{display:inline-block;font-size:.75rem;font-weight:600;padding:1px 8px;border-radius:999px;background:#e8eefc;color:#1e3a8a}
+.tpill.pending{background:#f1f1f1;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid #d5d8dc;border-radius:8px;overflow:hidden}
+.seg button{font:inherit;font-size:.88rem;font-weight:600;min-height:36px;padding:0 12px;border:none;background:#fff;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--green);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent}
 .btn-green{background:var(--green);color:var(--on-green)}
 .btn-yellow{background:var(--yellow);color:var(--on-yellow)}
 .btn-red{background:var(--red);color:var(--on-red)}
@@ -211,7 +227,7 @@ header.top .wrap>div:first-child{flex:1;min-width:0}
     </div>
   </div></div></div></header>
 <nav class="sections" aria-label="區段"><div class="wrap"><a href="#match">與我的研究比對</a><a href="#overview">總覽</a><a href="#profile">教授總覽</a><a href="#decisions">待你決定</a><a href="#coauthors">合作者</a><a href="#topics">研究領域</a><a href="#grants">研究計畫</a><a href="#papers">文章解析</a><a href="#exceptions">例外紀錄</a><a href="#files">檔案</a></div></nav>
-<main class="wrap"><section id="meeting" aria-labelledby="h-meeting"><h2 id="h-meeting">會議準備</h2><div class="body"></div></section><section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">研究計畫書</h2><div class="body"></div></section><section id="library" aria-labelledby="h-library"><h2 id="h-library">討論文獻</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
+<main class="wrap"><section id="meeting" aria-labelledby="h-meeting"><h2 id="h-meeting">會議準備</h2><div class="body"></div></section><section id="proposal" aria-labelledby="h-proposal"><h2 id="h-proposal">研究計畫書</h2><div class="body"></div></section><section id="library" aria-labelledby="h-library"><h2 id="h-library">Meeting</h2><div class="body"></div></section><section id="match" aria-labelledby="h-match"><h2 id="h-match">與我的研究比對</h2><div class="body"></div></section><section id="overview" aria-labelledby="h-overview"><h2 id="h-overview">總覽</h2><div class="body"></div></section><section id="profile" aria-labelledby="h-profile"><h2 id="h-profile">教授總覽</h2><div class="body"></div></section><section id="decisions" aria-labelledby="h-decisions"><h2 id="h-decisions">待你決定</h2><div class="body"></div></section><section id="coauthors" aria-labelledby="h-coauthors"><h2 id="h-coauthors">合作者</h2><div class="body"></div></section><section id="topics" aria-labelledby="h-topics"><h2 id="h-topics">研究領域</h2><div class="body"></div></section><section id="grants" aria-labelledby="h-grants"><h2 id="h-grants">研究計畫</h2><div class="body"></div></section><section id="papers" aria-labelledby="h-papers"><h2 id="h-papers">文章解析</h2><div class="body"></div></section><section id="exceptions" aria-labelledby="h-exceptions"><h2 id="h-exceptions">例外紀錄</h2><div class="body"></div></section><section id="files" aria-labelledby="h-files"><h2 id="h-files">檔案</h2><div class="body"></div></section></main>
 <footer class="wrap" id="foot"></footer>
 <!-- 大意 --><!-- 研究設計 --><!-- 研究樣本 --><!-- 研究缺口 --><!-- 解決什麼 --><!-- 發現 --><!-- 研究限制 -->
 <script id="inline-data" type="application/json">__INLINE__</script>
@@ -687,7 +703,7 @@ const VIEWS = [
    d => d.meeting ? (d.meeting.when || {}).local || "已準備" : "還沒有"],
   ["proposal", "研究計畫書", "定案的計畫書，或 AI 依她的方向擬的幾個版本",
    d => [d.joint_proposal ? "已定案" : "", draftVersions(d).length ? `草稿 ${draftVersions(d).length} 版${d.proposal_draft.stale ? "（過期）" : ""}` : ""].filter(Boolean).join("＋") || "還沒有"],
-  ["library", "討論文獻", "她給你的文獻：中英重點、研究方法、圖表；勾選幾篇擬初稿",
+  ["library", "Meeting", "她給你的文獻，依資料夾與研究類型歸類：中英重點、研究方法、圖表；勾選幾篇擬初稿",
    d => (d.library || []).length ? `${d.library.length} 篇${(d.drafts || []).length ? `｜初稿 ${d.drafts.length}` : ""}` : "還沒有"],
   ["match", "與我的研究比對", "依你的興趣推薦先看哪幾篇、哪個計畫", d => d.recommend ? `${d.recommend.read_first.length} 篇先看` : "還沒比對"],
   ["profile", "教授總覽", "研究主線、演變、合作、可以問的問題", d => `${(d.profile || []).length} 章`],
@@ -1022,7 +1038,8 @@ function proposalView(){
   el.innerHTML = html;
 }
 
-/* 討論文獻：教授給的文獻（上傳 PDF、貼 DOI、從 Zotero 選），跟她的文章走同一套處理；勾選幾篇擬初稿 */
+/* Meeting（原「討論文獻」）：教授給的文獻（上傳 PDF、貼 DOI、從 Zotero 選），跟她的文章走同一套處理；勾選幾篇擬初稿。
+   列表學 ieltsgod 閱讀題的資料夾樹：按資料夾（預設「<日期> Meeting」，可新增、改名、移動）或按研究類型（加入時自動判斷） */
 const LIBSEL = new Set();
 const libPage = id => paperPage(id) + "&lib=1";
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };  // 本地日期
@@ -1031,7 +1048,7 @@ function libAddHTML(){
   if (!APP) return `<p class="small muted">在應用程式裡打開才能加入文獻。</p>`;
   return `<details class="item"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>＋ 加入文獻</strong></summary>
     <div class="match-form" style="margin-top:8px">
-      <div><label for="lb-when">哪次討論</label> <input id="lb-when" type="date" value="${today()}"></div>
+      <div><label for="lb-when">哪次 Meeting</label> <input id="lb-when" type="date" value="${today()}"> <span class="small muted">預設放進「<日期> Meeting」資料夾</span></div>
       <div><label for="lb-doi">DOI（一行一個）</label><textarea id="lb-doi" rows="2" placeholder="10.2196/12345"></textarea>
         <button class="btn btn-green" data-lib-doi style="margin-top:6px">加入</button></div>
       <div><button class="btn" data-lib-zotero>從 Zotero 選</button> <span class="small muted">讀這台電腦的 Zotero（只讀不改；Zotero 要開著）</span>
@@ -1043,30 +1060,87 @@ function libAddHTML(){
 function libMeta(){ return {given_by: D.professor.name || "", discussion: $("#lb-when").value}; }
 async function libAfterAdd(msg){ $("#lb-msg").textContent = msg + " 重新整理就會看到；按「開始處理」讓 AI 整理重點與圖表。"; }
 
+const PTYPES = {meta: "統合分析", sr: "系統性回顧", scoping: "範圍回顧", review: "文獻回顧", rct: "隨機對照試驗", protocol: "研究計畫書", cohort: "世代研究", cross: "橫斷研究",
+  casecontrol: "病例對照", case: "個案研究", qual: "質性研究", mixed: "混合方法", guideline: "指引／建議", tool: "方法／工具", commentary: "評論／觀點", other: "其他"};
+let LIBMETA = {folders: [], items: {}}, LIBGROUP = (() => { try { return localStorage.getItem("phd.libGroup") || "folder"; } catch (e) { return "folder"; } })();
+const libOpen = () => { try { return JSON.parse(localStorage.getItem("phd.libOpen") || "{}"); } catch (e) { return {}; } };
+async function loadLibMeta(){
+  if (OFFLINE) return;
+  try { const r = await fetch(`../runs/${encodeURIComponent(SLUG)}/library/meta.json`, {cache: "no-store"}); LIBMETA = r.ok ? await r.json() : {folders: [], items: {}}; } catch (e) {}
+  LIBMETA.folders = LIBMETA.folders || []; LIBMETA.items = LIBMETA.items || {};
+}
+const libFolder = w => (LIBMETA.items[w.id] || {}).folder || ((w.library || {}).discussion ? `${w.library.discussion} Meeting` : "未分類");
+const libType = w => (LIBMETA.items[w.id] || {}).ptype;
+const FOLDER_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2.2h8.4A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>';
+const FOLDER_OPEN_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M3 18.5V6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2.2h7.4A1.5 1.5 0 0 1 20 8.7V10"/><path d="M3 18.5l2.6-7.3A1.5 1.5 0 0 1 7 10.2h13.4a1 1 0 0 1 .95 1.3l-2.3 7.2a1.5 1.5 0 0 1-1.4 1H4.5A1.5 1.5 0 0 1 3 18.5z"/></svg>';
+const CHEV_SVG = '<svg class="chev" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M4 2.5L7.5 6 4 9.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
 function libraryView(){
   const el = body("library"), L = D.library || [], drafts = D.drafts || [];
   const pending = L.filter(w => !w.digest).length;
+  const typePill = w => { const t = libType(w), by = (LIBMETA.items[w.id] || {}).ptype_by;
+    return t ? `<span class="tpill" title="${by === "me" ? "你改的" : by === "ai" ? "AI 判斷" : "依標題與摘要判斷"}（可以改）">${esc(PTYPES[t] || t)}</span>` : `<span class="tpill pending" title="正在判斷研究類型">分類中</span>`; };
+  const folders = [...new Set([...LIBMETA.folders, ...L.map(libFolder)])];
   const item = w => { const l = w.library || {}, g = w.digest;
-    return `<details class="item"><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    return `<details class="item lib-it"><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="checkbox" data-libsel="${esc(w.id)}" ${LIBSEL.has(w.id) ? "checked" : ""} aria-label="勾選這篇擬初稿" onclick="event.stopPropagation()">
-        <strong>${esc(w.title || w.id)}</strong> <span class="small muted">${esc(w.year || "")}</span>
-        ${l.discussion ? pill("", `${l.discussion} 討論`) : ""}
+        <strong>${esc(w.title || w.id)}</strong> <span class="small muted">${esc(w.year || "")}</span> ${typePill(w)}
         ${g ? pill("g", "已整理") : pill("y", w.fulltext === "no_free_fulltext" ? "只找到摘要／待處理" : "待處理")}</summary>
       <div style="margin-top:8px">${l.note ? `<div class="small">備註：${esc(l.note)}</div>` : ""}
         ${g && (g.key_points || []).length ? `<ul>${g.key_points.map(k => `<li>${bi(k.zh, k.en, "div")}</li>`).join("")}</ul>` : `<div class="small muted">還沒整理。</div>`}
         ${g && g.design ? `<div class="small"><strong>研究設計</strong>${bi(g.design.zh, g.design.en, "div")}</div>` : ""}
-        <div class="row" style="margin-top:8px"><a class="btn btn-green" href="${OFFLINE ? "#" : libPage(w.id)}">看完整單篇頁（中英對照、研究方法、全部圖表）→</a>
+        ${APP ? `<div class="row small" style="margin-top:8px"><label>資料夾 <select data-lib-move="${esc(w.id)}">${folders.map(f => `<option ${f === libFolder(w) ? "selected" : ""}>${esc(f)}</option>`).join("")}<option value="__new">＋ 新資料夾…</option></select></label>
+          <label>研究類型 <select data-lib-type="${esc(w.id)}">${libType(w) ? "" : `<option value="">分類中</option>`}${Object.entries(PTYPES).map(([k, v]) => `<option value="${k}" ${k === libType(w) ? "selected" : ""}>${v}</option>`).join("")}</select></label></div>` : ""}
+        <div class="row" style="margin-top:8px"><a class="btn btn-green" href="${OFFLINE ? "#" : libPage(w.id)}">看完整單篇頁（全文閱讀、中英對照、圖表）→</a>
           ${w.pdf_href ? `<a class="btn" href="../runs/${encodeURIComponent(SLUG)}/out/site/${esc(w.pdf_href)}" target="_blank" rel="noopener">開啟 PDF</a>` : ""}</div></div></details>`; };
+  // 資料夾樹（學 ieltsgod）：可以收折，記住開關；按資料夾或按研究類型
+  const OPEN = libOpen(), byType = LIBGROUP === "type";
+  const groups = {};
+  L.forEach(w => { const k = byType ? (libType(w) ? PTYPES[libType(w)] || libType(w) : "分類中") : libFolder(w); (groups[k] = groups[k] || []).push(w); });
+  if (!byType) LIBMETA.folders.forEach(f => { groups[f] = groups[f] || []; });
+  const keys = Object.keys(groups).sort((a, b) => byType ? ((a === "分類中") - (b === "分類中") || groups[b].length - groups[a].length || a.localeCompare(b, "zh-Hant"))
+    : ((a === "未分類") - (b === "未分類") || b.localeCompare(a, "zh-Hant", {numeric: true})));
+  const folder = (k, xs) => { const key = (byType ? "t:" : "f:") + k, op = OPEN[key] != null ? OPEN[key] : true, done = xs.filter(w => w.digest).length;
+    return `<div class="tree"><div class="fold-row"><button type="button" class="fold" data-fold="${esc(key)}" aria-expanded="${op}">${CHEV_SVG}${op ? FOLDER_OPEN_SVG : FOLDER_SVG}<span class="fname">${esc(k)}</span>
+      <span class="fcnt" title="已整理 ${done} 篇，共 ${xs.length} 篇">${done}/${xs.length}</span></button>
+      ${!byType && APP && k !== "未分類" ? `<button type="button" class="btn btn-icon btn-sm ghost" data-lib-rename="${esc(k)}" title="資料夾改名" aria-label="資料夾改名">${icon("edit", 15)}</button>` : ""}</div>
+      <div class="fbody"${op ? "" : " hidden"}>${xs.length ? [...xs].reverse().map(item).join("") : `<div class="small muted" style="padding:6px 0 6px 30px">空的資料夾：在文獻的「資料夾」選這個就會移進來。</div>`}</div></div>`; };
   el.innerHTML = libAddHTML() +
     (pending && APP ? `<div class="item attn" style="margin-top:10px">${pill("y", `${pending} 篇待處理`)} <button class="btn btn-green" data-lib-process>開始處理（AI 整理中英重點、研究方法、圖表）</button> <span class="small muted">每篇約 3–5 分鐘</span></div>` : "") +
-    (L.length ? `<div class="row" style="margin-top:14px;justify-content:space-between"><span class="small muted">共 ${L.length} 篇，新加入的在前。勾選幾篇可以擬初稿。</span>
+    (L.length ? `<div class="row" style="margin-top:14px;justify-content:space-between">
+        <span class="row"><span class="seg" role="group" aria-label="歸類方式"><button type="button" data-lib-group="folder" aria-pressed="${!byType}">按資料夾</button><button type="button" data-lib-group="type" aria-pressed="${byType}">按研究類型</button></span>
+          ${!byType && APP ? `<button type="button" class="btn btn-icon btn-sm ghost" data-lib-newfolder title="新增資料夾" aria-label="新增資料夾">${icon("plus", 16)}</button>` : ""}
+          <span class="small muted">共 ${L.length} 篇。勾選幾篇可以擬初稿。</span></span>
         <span class="row">${APP ? `<button class="btn btn-green" data-lib-draft>用勾選的 <span id="lb-n">${LIBSEL.size}</span> 篇擬初稿</button>` : ""}
         <a class="btn" href="../runs/${encodeURIComponent(SLUG)}/library/out/zotero/library.ris" download>匯出到 Zotero（RIS）</a></span></div>
-      ${L.map(item).join("")}` : `<div class="empty" style="margin-top:10px">還沒有討論文獻。她給你文獻時，從上面加進來。</div>`) +
+      <div class="libtree">${keys.map(k => folder(k, groups[k])).join("")}</div>` : `<div class="empty" style="margin-top:10px">還沒有 Meeting 文獻。她給你文獻時，從上面加進來。</div>`) +
     (drafts.length ? `<h3 style="margin-top:24px">初稿</h3>${drafts.map((d, i) => `<details class="item" ${i ? "" : "open"}><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${pill("y", "初稿")}<strong>${bi((d.title || {}).zh, (d.title || {}).en)}</strong><span class="small muted">${esc((d.built || "").slice(0, 10))}｜用了 ${(d.selected_ids || []).length} 篇</span></summary>
         <div class="small muted" style="margin-top:6px">這是 AI 依你勾選的文獻與她的文章擬的素材，寄給教授前請自己改寫。</div>${versionHTML(d, {noTitle: true})}</details>`).join("")}` : "");
+  // 還有「分類中」的：在背景判斷，過一下重新讀
+  if (APP && L.some(w => !libType(w)) && !libraryView.asked){ libraryView.asked = true; APIX("lib-classify", {slug: SLUG}).catch(() => {}); }
+  clearTimeout(libraryView.t);
+  if (APP && L.some(w => !libType(w))) libraryView.t = setTimeout(async () => { await loadLibMeta(); libraryView(); }, 8000);
 }
+async function libMetaDo(body){ await APIX("lib-meta", {slug: SLUG, ...body}); await loadLibMeta(); libraryView(); }
+document.addEventListener("click", async ev => {
+  const f = ev.target.closest("[data-fold]");
+  if (f && f.closest("#library")){ const o = libOpen(); o[f.dataset.fold] = f.getAttribute("aria-expanded") !== "true"; try { localStorage.setItem("phd.libOpen", JSON.stringify(o)); } catch (e) {} libraryView(); return; }
+  const g = ev.target.closest("[data-lib-group]");
+  if (g){ LIBGROUP = g.dataset.libGroup; try { localStorage.setItem("phd.libGroup", LIBGROUP); } catch (e) {} libraryView(); return; }
+  try {
+    if (ev.target.closest("[data-lib-newfolder]")){ const n = prompt("新資料夾名稱（例：Study 1 系統性回顧、2026-11-04 Meeting）"); if (n) await libMetaDo({act: "new-folder", name: n}); }
+    const r = ev.target.closest("[data-lib-rename]");
+    if (r){ const n = prompt("資料夾新名稱", r.dataset.libRename); if (n && n !== r.dataset.libRename) await libMetaDo({act: "rename-folder", old: r.dataset.libRename, name: n}); }
+  } catch (e) { alert(e.message); }
+});
+document.addEventListener("change", async ev => {
+  const m = ev.target.closest("[data-lib-move]"), t = ev.target.closest("[data-lib-type]");
+  try {
+    if (m){ let f = m.value; if (f === "__new"){ f = prompt("新資料夾名稱"); if (!f) return libraryView(); } await libMetaDo({act: "move", id: m.dataset.libMove, folder: f}); }
+    if (t && t.value) await libMetaDo({act: "type", id: t.dataset.libType, ptype: t.value});
+  } catch (e) { alert(e.message); libraryView(); }
+});
 document.addEventListener("change", async ev => {
   const c = ev.target.closest("[data-libsel]");
   if (c){ c.checked ? LIBSEL.add(c.dataset.libsel) : LIBSEL.delete(c.dataset.libsel); const n = $("#lb-n"); if (n) n.textContent = LIBSEL.size; return; }
@@ -1163,6 +1237,7 @@ async function loadData(){
   document.title = (D.professor.name || "") + " 研究檔案";
   setLang(store.get("lang") || "both");
   initLangMenu(setLang);
+  await loadLibMeta();
   header(); meetingView(); proposalView(); libraryView(); match(); overview(); profile(); decisions(); coauthors(); topics(); grants(); papers(); exceptions(); files();
   if (OFFLINE){ navHighlight(); }   // 離線單檔版：全部放在一頁
   else { setupViews(); }            // 應用程式：教授首頁是按鈕，一個按鈕進一個區塊

@@ -777,7 +777,54 @@ class App:
         out = self.lib_script("add-pdf", f"runs/{slug}", "--pdf", str(dst.relative_to(self.workspace)) if dst.is_relative_to(self.workspace) else str(dst),
                               *self._lib_meta(meta))
         self._rebuild_site(slug)
+        self.lib_classify(slug)
         return {"ok": True, "result": out}
+
+    # ---------- Meeting 文獻：資料夾與類型標籤 ----------
+    def _lib_works(self, slug):
+        p = self.runs / slug / "library" / "work" / "works.json"
+        return json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
+
+    def lib_classify(self, slug, wait=False):
+        """還沒有類型的文獻：腳本先判，判不出來在背景問 AI（便宜的模型）。"""
+        from pipeline.libmeta import ai_type, load_meta, rule_type, set_type, type_prompt
+        lib = self.runs / slug / "library"
+        items = load_meta(lib)["items"]
+        todo = [w for w in self._lib_works(slug) if not (items.get(w["id"]) or {}).get("ptype")]
+        ask = []
+        for w in todo:
+            t = rule_type(w.get("title"), w.get("abstract"), w.get("type"))
+            if t:
+                set_type(lib, w["id"], t, by="rule")
+            else:
+                ask.append(w)
+
+        def run():
+            for w in ask:
+                try:
+                    set_type(lib, w["id"], ai_type(self.ai_once(type_prompt(w.get("title"), w.get("abstract")), level="easy")), by="ai")
+                except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as e:
+                    print(f"文獻類型判斷失敗 {slug}/{w['id']}：{e}")
+        if ask:
+            run() if wait else threading.Thread(target=run, daemon=True).start()
+        return {"rule": len(todo) - len(ask), "ai": len(ask)}
+
+    def lib_meta(self, body):
+        from pipeline.libmeta import move, new_folder, rename_folder, set_type
+        slug = self._lib_slug(body.get("slug"))
+        lib, act = self.runs / slug / "library", body.get("act")
+        if act == "new-folder":
+            return new_folder(lib, body.get("name"))
+        if act == "rename-folder":
+            return rename_folder(lib, body.get("old") or "", body.get("name"), items=self._lib_works(slug))
+        wid = str(body.get("id") or "")
+        if wid not in {w["id"] for w in self._lib_works(slug)}:
+            raise ValueError(f"沒有這篇：{wid}")
+        if act == "move":
+            return move(lib, wid, body.get("folder"))
+        if act == "type":
+            return set_type(lib, wid, body.get("ptype"), by="me")
+        raise ValueError("不知道要做什麼")
 
     def _rebuild_site(self, slug):
         """加了文獻：重建這位教授的 data.json，清單馬上看得到（「待處理」）。"""
@@ -967,6 +1014,10 @@ class App:
             if not isinstance(b, int) or b < 0:
                 raise ValueError("段落不對")
             return self.jobs.start("doc-edit", prompt_doc_edit(key, v, b, (body.get("instruction") or "")[:300]), f"AI 編修：{key} 第 {v} 版第 {b + 1} 段", key=f"doc:{key}")
+        if path == "lib-meta":
+            return self.lib_meta(body)
+        if path == "lib-classify":
+            return self.lib_classify(self._lib_slug(body.get("slug")))
         if path in ("library-add", "zotero"):
             slug = self._lib_slug(body.get("slug"))
             if path == "zotero":
@@ -980,13 +1031,14 @@ class App:
             src = "zotero" if body.get("source") == "zotero" else "doi"
             res = [self.lib_script("add-doi", f"runs/{slug}", "--doi", d, "--source", src, *self._lib_meta(body)) for d in dois]
             self._rebuild_site(slug)
+            self.lib_classify(slug)
             return {"ok": True, "result": res}
         if path in ("library-process", "library-draft"):
             if self.blocked:
                 raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
             slug = self._lib_slug(body.get("slug"))
             if path == "library-process":
-                return self.jobs.start("library", prompt_library_process(slug), f"討論文獻：{slug}", slug=slug)
+                return self.jobs.start("library", prompt_library_process(slug), f"Meeting 文獻：{slug}", slug=slug)
             import re as _re
             ids = [i for i in body.get("ids") or [] if i]
             if not ids or not all(_re.fullmatch(r"[WL][0-9a-f]+", i) for i in ids):
