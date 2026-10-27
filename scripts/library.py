@@ -12,10 +12,13 @@
 runs/<slug>/library/ 的結構跟教授批次一樣，所以 setup_fulltext.py、ingest.py、figures.py、digest.py 都直接對它跑。
 """
 import argparse
+import contextlib
 import hashlib
 import json
+import os
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
@@ -50,6 +53,54 @@ def lib_dir(run):
     return lib
 
 
+@contextlib.contextmanager
+def _works_lock(lib, timeout=120):
+    """寫 works.json 時的跨程序鎖：很多篇同時加（各一個程序）時，查資料一起跑、寫清單輪流，一篇都不會被蓋掉。"""
+    p = lib / "work" / ".works.lock"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    f = open(p, "a+")
+    deadline = time.monotonic() + timeout
+    try:
+        while True:
+            try:
+                if os.name == "nt":
+                    import msvcrt
+                    f.seek(0)
+                    msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError:
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("清單一直被別的加入佔著") from None
+                time.sleep(0.05)
+        yield
+    finally:
+        try:
+            if os.name == "nt":
+                import msvcrt
+                f.seek(0)
+                msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            pass
+        f.close()
+
+
+def _append(lib, w):
+    """鎖住、重新讀清單、沒有同一篇（同 id 或同 DOI）才加；回傳清單裡那一篇。"""
+    with _works_lock(lib):
+        works = _load(lib)
+        old = next((x for x in works if x["id"] == w["id"] or (w.get("doi") and x.get("doi") == w.get("doi"))), None)
+        if old:
+            return old
+        _save(lib, works + [w])
+        return w
+
+
 def _load(lib):
     return json.loads((lib / "work" / "works.json").read_text())
 
@@ -60,7 +111,10 @@ def _save(lib, works):
         if w["id"] not in seen:
             seen.add(w["id"])
             out.append(w)
-    (lib / "work" / "works.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    p = lib / "work" / "works.json"
+    tmp = p.with_name(f".works.{os.getpid()}.{time.monotonic_ns()}.tmp")
+    tmp.write_text(json.dumps(out, ensure_ascii=False, indent=2))
+    os.replace(tmp, p)  # 一次換掉：別人同時讀不會讀到寫一半的檔
 
 
 def _meta(a):
@@ -75,9 +129,7 @@ def add_doi(lib, doi, source, **meta):
         print(f"SKIP {doi} 已在討論文獻")
         return None
     raw = get_json(f"https://api.openalex.org/works/doi:{quote(doi)}?select={SELECT}{openalex_params()}")
-    w = tag_item(normalize_work(raw, load_state(lib).get("author_id")), source=source, **meta)
-    works.append(w)
-    _save(lib, works)
+    w = _append(lib, tag_item(normalize_work(raw, load_state(lib).get("author_id")), source=source, **meta))
     print(f"ADD {w['id']} {w.get('year')} {w['title'][:70]}")
     return w
 
@@ -135,10 +187,8 @@ def add_pdf(lib, pdf, **meta):
             w = next(x for x in works if x.get("doi") == doi)
         else:
             title = guess
-            w = tag_item({"id": f"L{h}", "title": title, "year": None, "type": "article", "doi": doi, "authors": [], "abstract": None,
-                          "venue": None}, source="pdf", **meta)
-            works.append(w)
-            _save(lib, works)
+            w = _append(lib, tag_item({"id": f"L{h}", "title": title, "year": None, "type": "article", "doi": doi, "authors": [], "abstract": None,
+                                       "venue": None}, source="pdf", **meta))
             print(f"ADD {w['id']}（沒有 DOI，標題取自 PDF）{title[:70]}")
     _move_to(pdf, lib / "inbox" / f"{w['id']}_{pdf.name}")  # 檔名帶文章 id，找全文時 inbox 一定對得上
     return w
@@ -154,8 +204,11 @@ def relink_uploads(lib):
             continue
         w = _find(works, doi_from_text(head), hashlib.sha256(pdf.read_bytes()).hexdigest()[:8])
         if w and not any((lib / "inbox").glob(f"{w['id']}_*{pdf.name}")):
-            _move_to(pdf, lib / "inbox" / f"{w['id']}_{pdf.name}")
-            n += 1
+            try:
+                _move_to(pdf, lib / "inbox" / f"{w['id']}_{pdf.name}")
+                n += 1
+            except OSError:  # 同時加的另一篇已經把它搬走
+                pass
     if n:
         print(f"DONE 對回 {n} 個之前沒改到檔名的上傳檔")
     return n
@@ -169,7 +222,8 @@ def run_step(*args):
 
 def process(lib):
     relink_uploads(lib)
-    _save(lib, _load(lib))  # 清掉舊版留下的重複
+    with _works_lock(lib):
+        _save(lib, _load(lib))  # 清掉舊版留下的重複
     run_step(SCRIPTS / "setup_fulltext.py", lib)
     run_step(SCRIPTS / "ingest.py", lib)
     run_step(SCRIPTS / "figures.py", "extract", lib)
@@ -270,7 +324,6 @@ def main():
     elif a.cmd == "add-pdf":
         add_pdf(lib, a.pdf, **_meta(a))
         relink_uploads(lib)
-        _save(lib, _load(lib))
     elif a.cmd == "process":
         process(lib)
     elif a.cmd == "zotero":

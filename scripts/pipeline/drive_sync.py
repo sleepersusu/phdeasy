@@ -94,7 +94,7 @@ def scan(root):
     for dp, dns, fns in os.walk(root, onerror=_raise):
         dns[:] = [d for d in dns if d not in SKIP_DIRS and not d.startswith(".")]
         for f in fns:
-            if f in SKIP_FILES or f.startswith("~$") or f.endswith(".tmp"):
+            if f in SKIP_FILES or f.startswith("~$") or f.endswith((".tmp", ".works.lock")):
                 continue
             p = Path(dp) / f
             st = p.stat()

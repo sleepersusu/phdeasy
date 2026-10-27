@@ -74,3 +74,20 @@ def test_relink_old_uploads_that_were_never_renamed(lib):
     stranger = _pdf(lib / "inbox" / "_upload_8.pdf", text="a different file never added")
     assert library.relink_uploads(lib) == 1
     assert (lib / "inbox" / f"{w['id']}__upload_9.pdf").exists() and stranger.exists()
+
+
+def test_many_uploads_at_once_all_get_added(lib):
+    """同一位教授一次丟很多篇（各自一個程序同時跑）：查資料可以同時，寫清單時輪流，一篇都不能少。"""
+    import threading
+    pdfs = [_pdf(lib / "inbox" / f"_upload_{i}.pdf", text=f"different paper number {i}") for i in range(8)]
+    errs = []
+
+    def add(p):
+        try:
+            library.add_pdf(lib, p, given_by="L", discussion=None, note=None, today="2026-10-27")
+        except Exception as e:
+            errs.append(e)
+    ts = [threading.Thread(target=add, args=(p,)) for p in pdfs]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert not errs and len(json.loads((lib / "work" / "works.json").read_text())) == 8

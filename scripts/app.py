@@ -212,7 +212,7 @@ class App:
         from pipeline import ai as AI
         AI.configure(self.runs)  # AI 小幫手（照 ieltsgod）：設定存在 runs/_app/ai.json，只在這台
         self._lib_again = set()
-        self._lib_state, self._lib_locks = {}, {}  # Meeting 文獻在背景加入中：{教授: {adding, errors}}  # 文獻處理在跑時又加了文獻的教授：跑完再接著跑一次
+        self._lib_state = {}  # Meeting 文獻在背景加入中：{教授: {adding, errors}}  # 文獻處理在跑時又加了文獻的教授：跑完再接著跑一次
         self.zh_jobs = {}  # 全文翻中文的背景工作：{(教授, 文章, 討論文獻?): {status, done, total, error}}
         self.jobs.on_done = self.after_job
         self.blocked = None
@@ -860,15 +860,13 @@ class App:
 
     def _lib_add_bg(self, slug, fn):
         """加入文獻在背景做（照 ieltsgod：按了就回應，查 OpenAlex、建檔、重建、分類都在背景）。
-        同一位教授一次加一篇（works.json 才不會互相蓋掉）；最後一篇加完才重建、分類、開始處理。"""
+        很多篇可以同時加（查 DOI、讀 PDF 一起跑；寫清單時 library.py 自己鎖住輪流）；最後一篇加完才重建、分類、開始處理。"""
         st = self._lib_state.setdefault(slug, {"adding": 0, "errors": []})
         st["adding"] += 1
-        lock = self._lib_locks.setdefault(slug, threading.Lock())
 
         def run():
             try:
-                with lock:
-                    fn()
+                fn()
             except Exception as e:
                 st["errors"] = (st["errors"] + [f"{datetime.now().strftime('%H:%M')} 加入失敗：{str(e)[:300]}"])[-5:]
             finally:
