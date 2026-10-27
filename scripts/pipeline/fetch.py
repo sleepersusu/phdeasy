@@ -71,8 +71,9 @@ def match_inbox(files_text, works):
     """files_text: {路徑: 前兩頁文字}。先比檔名裡的文章 id，再比文字裡的 DOI（DOI 後面不能接數字或字母）。"""
     out = {}
     for path, text in files_text.items():
-        name = path.rsplit("/", 1)[-1]
-        hit = next((w["id"] for w in works if re.search(rf"\b{w['id']}\b", name)), None)
+        name = re.split(r"[\\/]", path)[-1]  # Windows 路徑是反斜線
+        # 上傳的檔名是「<id>__upload_…」：id 後面接底線也要對得上（\b 會把底線當成字的一部分而漏掉）
+        hit = next((w["id"] for w in works if re.search(rf"(?<![A-Za-z0-9]){re.escape(w['id'])}(?![A-Za-z0-9])", name)), None)
         if hit is None:
             low = (text or "").lower()
             hit = next(

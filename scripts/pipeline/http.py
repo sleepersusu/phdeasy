@@ -1,13 +1,14 @@
 """最小的 HTTP 包裝：回傳 (bytes|None, 狀態字串)，狀態格式給 fulltext 判斷要不要重試。"""
 import json
 import os
+import re
 import socket
 import ssl
 import subprocess
 import time
 import urllib.error
 import urllib.request
-from urllib.parse import unquote, urlparse
+from urllib.parse import unquote, urlparse, quote
 
 UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) phdeasy/0.1 (academic literature pipeline)"
 LOCAL_UA = "phdeasy/0.1"
@@ -21,9 +22,19 @@ def user_agent(url):
 _last = [0.0]
 
 
+def file_url(path):
+    """本機檔案 → file:// 網址：路徑一律用 /（Windows 的 C:\\… 也一樣），只跳脫空白與特殊字元，磁碟代號的冒號保留。"""
+    return "file://" + quote(str(path).replace("\\", "/"), safe="/:")
+
+
+def path_of_file_url(url):
+    p = unquote(url[len("file://"):])
+    return p[1:] if re.match(r"^/[A-Za-z]:/", p) else p  # file:///C:/… → C:/…
+
+
 def get(url, accept="*/*", headers=None, timeout=30, min_interval=0.3):
     if url.startswith("file://"):
-        p = unquote(urlparse(url).path)
+        p = path_of_file_url(url)
         if os.path.exists(p):
             with open(p, "rb") as f:
                 return f.read(), "ok"

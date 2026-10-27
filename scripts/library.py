@@ -224,7 +224,7 @@ def process(lib):
     relink_uploads(lib)
     with _works_lock(lib):
         _save(lib, _load(lib))  # 清掉舊版留下的重複
-    run_step(SCRIPTS / "setup_fulltext.py", lib)
+    run_step(SCRIPTS / "setup_fulltext.py", lib, "--retry-missing")  # 先前找不到全文、後來本人上傳了 PDF 的，要再找一次（會找到 inbox 的檔）
     run_step(SCRIPTS / "ingest.py", lib, "--library")
     todo = ocr_todo(lib)
     if todo:  # 掃描檔：交給轉錄者（skill A 段）

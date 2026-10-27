@@ -129,3 +129,36 @@ def test_uploaded_pdf_counts_as_fulltext_before_processing(tmp_path):
     (lib / "inbox" / "Lx1__upload_1.pdf").write_bytes(b"%PDF-1.4")
     w = _library(run)[0]
     assert w["fulltext"] == "ok" and w["pdf_href"] == "../../library/inbox/Lx1__upload_1.pdf"
+
+
+# ---------- 上傳的檔案轉不成可讀資料（2026-10-27 本人回報）：一次把整條路修好 ----------
+def test_inbox_upload_names_match_on_any_os():
+    from pipeline.fetch import match_inbox
+    works = [{"id": "Le8f1a128"}, {"id": "W4379966791", "doi": "10.1/x"}]
+    m = match_inbox({r"C:\Users\su\phdeasy\runs\x\library\inbox\Le8f1a128__upload_20261027.pdf": "",
+                     "/Users/u/runs/x/library/inbox/W4379966791__upload_2.pdf": ""}, works)
+    assert set(m) == {"Le8f1a128", "W4379966791"}  # id 後面接 _ 也要對得上；Windows 路徑也一樣
+    assert match_inbox({"/x/inbox/W43799667911_other.pdf": ""}, works) == {}  # 多一個數字就不是同一篇
+
+
+def test_file_urls_survive_windows_paths_and_spaces(tmp_path):
+    from pipeline.http import file_url, path_of_file_url, get
+    assert path_of_file_url(file_url(r"C:\Users\蘇\phd easy\inbox\a.pdf")) == "C:/Users/蘇/phd easy/inbox/a.pdf"
+    p = tmp_path / "有 空白.pdf"
+    p.write_bytes(b"%PDF-1.4 x")
+    assert get(file_url(str(p))) == (b"%PDF-1.4 x", "ok")
+
+
+def test_hash_check_tolerates_deleted_uploads_and_windows_keys(tmp_path):
+    import ingest
+    run = tmp_path / "library"
+    (run / "inbox").mkdir(parents=True)
+    keep = run / "inbox" / "W1__upload_1.pdf"
+    keep.write_bytes(b"%PDF a")
+    h = {"inbox\\W1__upload_1.pdf": ingest.sha256_file(keep), "inbox\\W9__upload_9.pdf": "deadbeef"}  # W9 本人刪了（移到 _已刪除）
+    assert ingest.verify_hashes(run, h, library=True) == []
+    assert set(h) == {"inbox/W1__upload_1.pdf"}  # 反斜線改成 /，刪掉的不再檢查
+    keep.write_bytes(b"%PDF changed")
+    assert ingest.verify_hashes(run, h, library=True) == ["inbox/W1__upload_1.pdf"]  # 內容真的被改：照樣擋
+    h2 = {"inbox/W9__upload_9.pdf": "deadbeef"}
+    assert ingest.verify_hashes(run, h2) == ["inbox/W9__upload_9.pdf"]  # 教授批次照舊嚴格

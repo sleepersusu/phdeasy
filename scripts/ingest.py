@@ -29,20 +29,28 @@ def needs_redo(prev, src_hash, text_exists):
     return not (prev and prev.get("source_sha256") == src_hash and prev.get("rules") == RULES_VERSION and text_exists)
 
 
-def verify_hashes(run, hashes):
+def verify_hashes(run, hashes, library=False):
+    """原始檔沒有被改。紀錄的路徑一律用 /（Windows 寫的反斜線也改掉，Mac、Windows 輪流用才對得上）。
+    library＝Meeting：本人刪掉的文獻（PDF 移到 _已刪除／）不算被改，直接不再檢查；內容真的變了照樣擋。"""
+    for rel in [k for k in hashes if "\\" in k]:
+        hashes.setdefault(rel.replace("\\", "/"), hashes[rel])
+        del hashes[rel]
     changed = []
     for rel, h in list(hashes.items()):
         p = run / rel
+        if library and not p.exists():
+            del hashes[rel]
+            continue
         moved = run / "pdfs" / "_rejected" / p.name
         if not p.exists() and moved.exists() and sha256_file(moved) == h:  # setup_fulltext.py --reject 移走的：跟著改路徑
             del hashes[rel]
-            hashes[str(moved.relative_to(run))] = h
+            hashes[moved.relative_to(run).as_posix()] = h
             continue
         if not p.exists() or sha256_file(p) != h:
             changed.append(rel)
     for p in sorted((run / "inbox").glob("**/*")):
         if p.is_file():
-            rel = str(p.relative_to(run))
+            rel = p.relative_to(run).as_posix()
             hashes.setdefault(rel, sha256_file(p))
     return changed
 
@@ -98,13 +106,17 @@ def main():
     hashes_p = wd / "hashes.json"
     hashes = json.loads(hashes_p.read_text()) if hashes_p.exists() else {}
 
-    changed = verify_hashes(run, hashes)
+    changed = verify_hashes(run, hashes, library=args.library)
     hashes_p.write_text(json.dumps(hashes, ensure_ascii=False, indent=2))
     if changed:
         reason = f"原始檔雜湊改變：{', '.join(changed)}"
         set_stage(run, "halted", circuit={"tripped": True, "reason": reason})
         print(f"HALT {reason}")
         return
+    st = load_state(run)
+    if args.library and st.get("stage") == "halted" and str((st.get("circuit") or {}).get("reason") or "").startswith("原始檔雜湊改變"):
+        st.update(stage="library", circuit={"tripped": False, "reason": None})  # 舊版因為刪檔誤停的：這次檢查過了，接著跑（library 不在流水線階段表）
+        (run / "state.json").write_text(json.dumps(st, ensure_ascii=False, indent=2))
 
     ing_p = wd / "ingest.json"
     ing = json.loads(ing_p.read_text()) if ing_p.exists() else {}

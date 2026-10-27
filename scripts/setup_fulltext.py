@@ -16,7 +16,7 @@ from urllib.parse import quote
 from pipeline.fetch import citation_pdf_urls, match_inbox, needs_fulltext, osf_guid, osf_pdfs, missing_report, pdf_relpath, sha256_file, zotero_pdf_paths
 from pipeline.fulltext import SkipSource, run_chain
 from pipeline.index import find_existing, load_index, save_index
-from pipeline.http import get, get_json, s2_headers
+from pipeline.http import get, get_json, s2_headers, file_url
 from pipeline.works import _similar
 
 ZOTERO = "http://127.0.0.1:23119/api/users/0"
@@ -30,7 +30,7 @@ def r_zotero(w):
         return []
     items = get_json(f"{ZOTERO}/items?q={quote(w['doi'])}&qmode=everything&itemType=-attachment&limit=25", min_interval=0)
     children = {it["key"]: get_json(f"{ZOTERO}/items/{it['key']}/children", min_interval=0) for it in items}
-    return ["file://" + quote(p) for p in zotero_pdf_paths(items, children, w["doi"])]
+    return [file_url(p) for p in zotero_pdf_paths(items, children, w["doi"])]
 
 
 def r_openalex(w):
@@ -181,7 +181,7 @@ def make_inbox_resolver(run, works):
     matched = match_inbox(files, works)
 
     def r_inbox(w):
-        return ["file://" + quote(matched[w["id"]])] if w["id"] in matched else []
+        return [file_url(matched[w["id"]])] if w["id"] in matched else []
 
     return r_inbox
 

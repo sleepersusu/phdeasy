@@ -1532,6 +1532,8 @@ def make_handler(app):
                 return self._json(404, {"error": "沒有這個功能"})
             except (ValueError, RuntimeError) as e:
                 return self._json(400, {"error": str(e)})
+            except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+                return  # 畫面在回應前就關掉或換頁了：不是錯誤
             except Exception as e:  # 沒想到的錯：完整訊息寫進 _logs，畫面看得到一句
                 import traceback
                 app.log_error(f"POST {self.path}", traceback.format_exc())
