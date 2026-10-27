@@ -249,7 +249,7 @@ body.lang-both .facts .ll .t-en{display:none}
 .seg .seg-n{font-size:.8rem;font-weight:600;color:var(--muted,#555);background:rgba(0,0,0,.06);border-radius:999px;padding:0 7px;min-width:20px;text-align:center}
 
 /* 通關式進度（工作進度）：橫的一排；窄的畫面改直的 */
-.stepper{list-style:none;margin:12px 0 4px;padding:0;display:flex;overflow-x:auto;gap:0}
+.stepper{list-style:none;margin:6px 0 0;padding:14px 8px 8px;display:flex;overflow-x:auto;overflow-y:visible;gap:0}  /* 上下留空間：發光的圈圈不會被切掉 */
 .stp{position:relative;flex:1 0 92px;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 4px}
 .stp::before{content:"";position:absolute;top:13px;right:50%;width:100%;height:3px;background:#d7dbe0;z-index:0}
 .stp:first-child::before{display:none}
@@ -268,8 +268,22 @@ body.lang-both .facts .ll .t-en{display:none}
 @keyframes stpglow{50%{box-shadow:0 0 0 7px rgba(21,128,61,.12),0 0 20px rgba(21,128,61,.55)}}
 @media (prefers-reduced-motion:reduce){.stp.now .stp-dot,.stp-spin{animation:none}}
 @media (max-width:640px){
-  .stepper{flex-direction:column;overflow:visible}
+  .stepper{flex-direction:column;overflow:visible;padding:8px 8px 0 10px}
   .stp{flex:none;flex-direction:row;align-items:flex-start;text-align:left;gap:10px;padding:0 0 14px}
   .stp::before{top:auto;bottom:calc(100% - 14px);right:auto;left:12px;width:3px;height:100%}
   .stp-txt{margin-top:2px}
 }
+
+/* Meeting（首頁）：一層一層點進去，像超連結 */
+.mcrumbs{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:.92rem;margin:0 0 10px}
+.mcrumbs a{color:#15803d;text-decoration:underline;text-underline-offset:3px}
+.mcrumbs [aria-current]{font-weight:700}
+.mtree{list-style:none;margin:0;padding:0;border-top:1px solid #e3e5e8}
+.mtree li{border-bottom:1px solid #e3e5e8}
+.mlink{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:48px;padding:8px 6px;color:inherit;text-decoration:none}
+a.mlink:hover{background:#f6f7f8}
+a.mlink .mname{color:#15803d;text-decoration:underline;text-underline-offset:3px;font-weight:600}
+.mlink.off{color:#8a8f96;cursor:default}
+.mname{flex:1;min-width:0}
+.mmeta{font-size:.82rem;color:#5b5f66}
+.mcnt{font-size:.82rem;color:#5b5f66;white-space:nowrap}

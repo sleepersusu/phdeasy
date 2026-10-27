@@ -31,8 +31,16 @@
   .aigrid select{min-height:36px;width:100%}
   @media (max-width:640px){.aigrid{grid-template-columns:1fr}}
   .fl-lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;align-items:start}
-  .fl-lane{border:2px dashed #9aa0a6;border-radius:18px;padding:12px;display:flex;flex-direction:column;align-items:stretch}
-  .fl-head{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .fl-lane{border:2px dashed #9aa0a6;border-radius:18px;padding:12px}
+  .fl-body{display:flex;flex-direction:column;align-items:stretch}
+  .fl-head{display:flex;flex-direction:column;gap:2px;cursor:pointer;min-height:44px;justify-content:center;list-style:none}
+  .fl-lane[open] .fl-head{margin-bottom:8px}
+  .fl-head::-webkit-details-marker,.fl-sum::-webkit-details-marker{display:none}
+  .fl-head b::before,.fl-sum b::before{content:"›";display:inline-block;width:1em;transition:transform .15s}
+  .fl-lane[open] .fl-head b::before,.fl-wrap[open] > .fl-sum b::before{transform:rotate(90deg)}
+  .fl-wrap{margin-top:16px}
+  .fl-sum{display:flex;gap:10px;align-items:center;cursor:pointer;min-height:44px;list-style:none}
+  .fl-wrap > .small{margin:4px 0 8px}
   .fl-head b{font-size:.95rem}.fl-head select{min-height:36px}
   .fl-row{display:flex;gap:8px}.fl-row>.fl-node{flex:1}
   .fl-node{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;font-size:.85rem;padding:8px 10px;border-radius:8px;border:2px solid #111;background:#fff;color:#111}
@@ -85,6 +93,10 @@
   let AI = {}, PV = null, CFG = {}, aiBusy = "", aiTimer = null, AGYS = null, agyTimer = 0, AGYCODE = "", AINOTE = {}, ROOT = null;
   const ORDER3 = ["claude", "gemini", "codex", "stepfun"];
   let TASKS = {}, JOBS = null, SFKEY = null, KEYEDIT = false;
+  // 流程圖預設收起來（本人 2026-10-27）；打開過的記在這台瀏覽器
+  const FLOPEN = new Set((() => { try { return JSON.parse(localStorage.getItem("phd.flowOpen") || "[]"); } catch (e) { return []; } })());
+  document.addEventListener("toggle", e => { const d = e.target; if (!d.dataset || !d.dataset.flkey) return;
+    d.open ? FLOPEN.add(d.dataset.flkey) : FLOPEN.delete(d.dataset.flkey); try { localStorage.setItem("phd.flowOpen", JSON.stringify([...FLOPEN])); } catch (err) {} }, true);
   const aiReady = pv => { const s = AI[pv]; return !!(s && s.installed && s.loggedIn !== false && s.tested && s.tested.ok); };
   const defAI = () => [CFG.provider, ...ORDER3].find(k => k && aiReady(k));
   function aiState(s){
@@ -271,15 +283,17 @@
         `<option value="${v}" ${engOf(L.group) === v ? "selected" : ""}>${esc(l)}${v === "stepfun" && !SFKEY ? "（先貼 key）" : ""}</option>`).join("")}</select>` : "";
       const main = L.group && engOf(L.group) !== "codex" ? `<button type="button" class="fl-node fl-ai fl-main" data-flow-main="${L.group}"><span class="fl-tag">主控</span><span>照流程派工、跑腳本</span>
         <span class="fl-model">${esc(modelName(engOf(L.group), JOBS.tiers[engOf(L.group)].main))}</span></button>${arrow}` : "";
-      return `<section class="fl-lane"><div class="fl-head"><b>${esc(L.title)}</b>${head}</div>${main}${L.nodes.map(node).join(arrow)}</section>`;
+      const key = "fl:" + (L.group || "tasks"), op = FLOPEN.has(key), nAi = L.nodes.filter(n => !n.s).length;
+      return `<details class="fl-lane" data-flkey="${key}" ${op ? "open" : ""}><summary class="fl-head"><b>${esc(L.title)}</b><span class="small muted">${nAi} 個 AI 步驟・點開看流程</span></summary>
+        <div class="fl-body">${head ? `<div style="margin:0 0 10px">${head}</div>` : ""}${main}${L.nodes.map(node).join(arrow)}</div></details>`;
     }).join("");
-    return `<h4 style="margin:18px 0 4px">流程圖：哪一步用哪個模型</h4>
+    return `<details class="fl-wrap" data-flkey="fl:all" ${FLOPEN.has("fl:all") ? "open" : ""}><summary class="fl-sum"><b>流程圖：哪一步用哪個模型</b><span class="small muted">點開</span></summary>
       <div class="small muted" style="margin-bottom:8px">灰色是腳本做的，不用 AI；綠色會用 AI，點一下換模型（框的標題列選這一類用 Claude、StepFun 或 Codex）。改了之後，新開始的工作才會用新設定。</div>
       <div class="fl-lanes">${lanes}</div>
       <details style="margin-top:10px"><summary class="small" style="cursor:pointer;min-height:36px">沒有特別選的步驟：各角色預設用哪個模型</summary>
         ${["claude", "stepfun"].map(e => `<div class="small" style="margin:8px 0 4px"><b>${esc(JOBS.engines[e])}</b></div><div class="aigrid">${Object.entries(JOBS.roles).map(([r, lab]) =>
           `<span>${esc(lab)}</span><select data-tier="${e}" data-role="${r}">${JOBS.models[e].map(m => `<option value="${esc(m.v)}" ${m.v === (JOBS.tiers[e][r] || "") ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>`).join("")}
-          ${e === "stepfun" ? `<span>StepFun 方案</span><select data-sfbase="1">${Object.entries(JOBS.bases).map(([v, l]) => `<option value="${v}" ${v === JOBS.stepfunBase ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : ""}</div>`).join("")}</details>`;
+          ${e === "stepfun" ? `<span>StepFun 方案</span><select data-sfbase="1">${Object.entries(JOBS.bases).map(([v, l]) => `<option value="${v}" ${v === JOBS.stepfunBase ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : ""}</div>`).join("")}</details></details>`;
   }
   // 點流程圖上的 AI 步驟：跳出小框選模型
   let popEl = null;

@@ -151,6 +151,51 @@ async function renderClips(el){
   });
 }
 
+/* ===== Meeting：首頁一層一層點進去（像超連結）：教授 → 主題資料夾 → 文章 ===== */
+const M_FOLDER = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2.2h8.4A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>';
+const M_PAPER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h8l4 4v14H6Z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>';
+const M_PTYPES = {meta: "統合分析", sr: "系統性回顧", scoping: "範圍回顧", review: "文獻回顧", rct: "隨機對照試驗", protocol: "研究計畫書", cohort: "世代研究", cross: "橫斷研究",
+  casecontrol: "病例對照", case: "個案研究", qual: "質性研究", mixed: "混合方法", guideline: "指引／建議", tool: "方法／工具", commentary: "評論／觀點", other: "其他"};
+async function meetingData(slug){
+  const get = async u => { try { const r = await fetch(u, {cache: "no-store"}); return r.ok ? r.json() : null; } catch (e) { return null; } };
+  const [d, m] = await Promise.all([get(`../runs/${encodeURIComponent(slug)}/out/site/data.json`), get(`../runs/${encodeURIComponent(slug)}/library/meta.json`)]);
+  const items = (m && m.items) || {};
+  return (d && d.library || []).map(w => ({...w, topic: (items[w.id] || {}).topic || "分類中", ptype: (items[w.id] || {}).ptype}));
+}
+async function renderMeetings(){
+  const el = document.querySelector("#meetings:not([hidden]) .body");
+  if (!el) return;
+  if (OFFLINE_HOME){ el.innerHTML = `<div class="empty">Meeting 要在應用程式裡打開才看得到。</div>`; return; }
+  const q = new URLSearchParams(location.search), slug = q.get("p"), topic = q.get("t");
+  const profs = (H.professors || []).filter(p => !(p.owner || {}).archived), prof = profs.find(p => p.slug === slug);
+  const link = (p, t) => `meetings.html${p ? `?p=${encodeURIComponent(p)}${t ? `&t=${encodeURIComponent(t)}` : ""}` : ""}`;
+  const crumbs = (...xs) => `<nav class="mcrumbs" aria-label="目前位置">${xs.map((x, i) => i < xs.length - 1 ? `<a href="${x[1]}">${esc(x[0])}</a><span aria-hidden="true">›</span>` : `<span aria-current="page">${esc(x[0])}</span>`).join("")}</nav>`;
+  el.innerHTML = `<div class="small muted">讀取中…</div>`;
+  if (!prof){  // 第一層：教授
+    const lists = await Promise.all(profs.map(p => meetingData(p.slug)));
+    const rows = profs.map((p, i) => ({p, n: lists[i].length, ready: lists[i].filter(w => w.digest).length})).sort((a, b) => b.n - a.n);
+    el.innerHTML = crumbs(["Meeting", link()]) + (rows.length ? `<ul class="mtree">${rows.map(({p, n, ready}) => `<li><a class="mlink" href="${link(p.slug)}">${M_FOLDER}<span class="mname">${esc(p.name)}</span>
+        <span class="mmeta">${esc((p.owner || {}).institution || p.institution || "")}</span><span class="mcnt">${n ? `${n} 篇${ready < n ? `（整理好 ${ready}）` : ""}` : "還沒有"}</span></a></li>`).join("")}</ul>`
+      : `<div class="empty">還沒有申請目標。</div>`);
+    return;
+  }
+  const L = await meetingData(prof.slug), base = [["Meeting", link()], [prof.name, link(prof.slug)]];
+  const manage = `<a class="small" href="professor.html?p=${encodeURIComponent(prof.slug)}&v=library">到 ${esc(prof.name)} 的頁面上傳或刪除 →</a>`;
+  if (!topic){  // 第二層：主題資料夾
+    const g = {}; L.forEach(w => { (g[w.topic] = g[w.topic] || []).push(w); });
+    const keys = Object.keys(g).sort((a, b) => (a === "分類中") - (b === "分類中") || g[b].length - g[a].length || a.localeCompare(b, "zh-Hant"));
+    el.innerHTML = crumbs(...base) + (keys.length ? `<ul class="mtree">${keys.map(k => `<li><a class="mlink" href="${link(prof.slug, k)}">${M_FOLDER}<span class="mname">${esc(k)}</span>
+        <span class="mcnt">${g[k].length} 篇</span></a></li>`).join("")}</ul>` : `<div class="empty">${esc(prof.name)} 還沒有 Meeting 文獻。</div>`) + `<div style="margin-top:10px">${manage}</div>`;
+    return;
+  }
+  // 第三層：文章（整理好的才能點進去）
+  const xs = L.filter(w => w.topic === topic).reverse();
+  el.innerHTML = crumbs(...base, [topic, link(prof.slug, topic)]) + (xs.length ? `<ul class="mtree">${xs.map(w => {
+      const inner = `${M_PAPER}<span class="mname">${esc(w.title || w.id)}</span><span class="mmeta">${esc([w.year, M_PTYPES[w.ptype]].filter(Boolean).join("・"))}</span>`;
+      return `<li>${w.digest ? `<a class="mlink" href="paper.html?p=${encodeURIComponent(prof.slug)}&id=${encodeURIComponent(w.id)}&lib=1">${inner}</a>`
+        : `<span class="mlink off" title="還在處理，好了才能點進去">${inner}<span class="mcnt">處理中</span></span>`}</li>`; }).join("")}</ul>` : `<div class="empty">這個資料夾是空的。</div>`) + `<div style="margin-top:10px">${manage}</div>`;
+}
+
 /* ===== 本人的文件：上傳就顯示、每段 AI 編修、版本 ===== */
 const DOC_NAMES = {proposal: ["Research Proposal", "研究計畫書"], ps: ["Personal Statement", "個人陳述"], sop: ["Statement of Purpose", "研究目的陳述"]};
 const ME_ROOT = () => OFFLINE_HOME ? "_me/" : "../runs/_me/";
@@ -787,9 +832,9 @@ async function loadHome(){
 }
 
 let OFFLINE_HOME = false;
-const PAGES = [["index.html", T("簡介", "Profile")], ["professors.html", T("申請目標", "Applications")], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
+const PAGES = [["index.html", T("簡介", "Profile")], ["professors.html", T("申請目標", "Applications")], ["meetings.html", "Meeting"], ["proposals.html", "Research Proposal"], ["ps.html", "Personal Statement"], ["sop.html", "Statement of Purpose"]];
 const MORE = [["settings.html", "設定與工作進度"]];
-const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "proposals.html": ["proposal"],
+const PAGE_SECTIONS = {"index.html": ["me", "capabilities"], "me.html": ["me", "capabilities"], "professors.html": ["professors"], "meetings.html": ["meetings"], "proposals.html": ["proposal"],
                        "ps.html": ["ps"], "sop.html": ["sop"], "pipeline.html": ["pipeline", "settings"], "settings.html": ["pipeline", "settings"]};
 function setupHomeViews(){
   /* 頁籤（參考 USyd 教授個人頁）：簡介｜申請目標｜Research Proposal｜Personal Statement｜Statement of Purpose；設定與工作進度在右上角齒輪。
@@ -823,5 +868,6 @@ function setupHomeViews(){
   }
   renderProposal(); renderStatement("ps"); renderStatement("sop");
   renderProfs(H.professors);
+  renderMeetings();
   if (typeof pipelinePanel === "function") pipelinePanel();
 })();

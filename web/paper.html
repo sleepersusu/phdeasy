@@ -15,9 +15,13 @@
 body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);font-size:16px;line-height:1.6}
 a{color:var(--fg);text-underline-offset:3px}
 :focus-visible{outline:3px solid var(--fg);outline-offset:2px}
-.wrap{max-width:1200px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-left,0px))}
-header{border-bottom:2px solid var(--fg);padding:16px 0}
+.wrap{max-width:1480px;margin:0 auto;padding:0 max(16px,env(safe-area-inset-left,0px))}
+header{border-bottom:2px solid var(--fg);padding:10px 0 8px}
 h1{font-size:1.35rem;line-height:1.35;margin:0}
+/* 標題橫跨整行、字小一點，下面讀文章的空間大（本人 2026-10-27） */
+.ptitle{font-size:1.12rem;line-height:1.35;margin:6px 48px 0 0}
+.ptitle-zh{font-size:.98rem;color:var(--muted);margin-top:2px;margin-right:48px}
+.plinks{display:inline-flex;gap:12px}.plinks a{color:#15803d;font-weight:600;text-decoration:underline;text-underline-offset:3px}
 h2{font-size:1.2rem;margin:28px 0 10px;padding-top:14px;border-top:1px solid var(--line)}
 h3{font-size:1rem;margin:16px 0 6px}
 .muted{color:var(--muted)}.small{font-size:.9rem}
@@ -86,6 +90,18 @@ header.top{border-bottom:1px solid var(--line)}
 .crumbs .sep{color:#b8bcc2}
 .crumbs [aria-current]{color:var(--fg);font-weight:600}
 
+/* 研究發現表格 */
+.bline{border:1px solid var(--line);border-left:4px solid #15803d;border-radius:8px;padding:10px 14px;margin:8px 0 10px;background:#fff}
+.ftbl{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+.ftbl table{border-collapse:collapse;width:100%;min-width:640px}
+.ftbl th,.ftbl td{border-bottom:1px solid var(--line);padding:10px 12px;text-align:left;vertical-align:top}
+.ftbl th{background:var(--soft);font-size:.85rem;white-space:nowrap}
+.ftbl td.num{width:2.5em;color:var(--muted);font-weight:700}
+.ftbl td.srccol{width:7em}
+.ftbl tr:last-child td{border-bottom:none}
+.en-sub{font-size:.85em;color:var(--muted);margin-top:4px}
+.ftbl details.src summary{min-height:32px}
+
 /* 圖表逐步解讀：每一步一列，左英右中 */
 .steps{margin-top:12px}
 .steps .bi{border-radius:0;border-top:none}
@@ -148,9 +164,8 @@ header .wrap{position:relative}
 <header><div class="wrap">
   <nav class="crumbs" id="crumbs" aria-label="目前位置"></nav>
   <a class="gear" href="settings.html#ai" aria-label="設定與 AI 小幫手" title="設定與 AI 小幫手"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
-  <div class="bi" style="margin-top:12px;border:none"><div class="en"><h1 id="t-en" lang="en"></h1></div><div><h1 id="t-zh"></h1></div></div>
-  <div class="small muted" id="meta" style="margin-top:6px"></div>
-  <div class="row" id="links" style="margin-top:8px"></div>
+  <h1 id="t-en" lang="en" class="ptitle"></h1><div id="t-zh" class="ptitle-zh"></div>
+  <div class="row small muted" style="margin-top:4px;gap:4px 12px"><span id="meta"></span><span id="links" class="plinks"></span></div>
 </div></header>
 <div class="wrap"><div class="tabs" role="tablist" id="tabs" hidden></div><p class="tabtip" id="tabtip" hidden>選取任何一段文字，可以畫螢光筆、寫筆記、問 AI、翻成中文、收藏到計畫書素材。</p></div>
 <main class="wrap" id="main"><div class="empty" style="margin-top:16px">載入中…</div></main>
@@ -187,8 +202,9 @@ function render(d, w, quiet){
     : [w.year, esc(w.venue || "期刊來源未提及"), (ROLE[w.target_position] || "作者序不明") + (w.target_corresponding ? "＋通訊作者" : ""),
     w.card && w.card.exists ? (w.text_source === "abstract" ? "依摘要解析" : w.text_source === "none" ? "只有標題" : "依全文解析") : "還沒解析",
     (w.exceptions || []).some(e => e.kind === "preprint_text") ? "全文是預印本版本" : ""]).filter(Boolean).join("｜");
-  $("#links").innerHTML = (w.pdf_href ? `<a class="btn btn-green" href="${esc(w.pdf_href)}" target="_blank" rel="noopener">開啟全文 PDF</a>` : `<span class="btn btn-red" aria-disabled="true">沒有全文檔</span>`) +
-    (w.doi ? `<a class="btn btn-green" href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">期刊頁（DOI）</a>` : "");
+  // 本人 2026-10-27：不用大按鈕，小連結就好
+  $("#links").innerHTML = (w.pdf_href ? `<a href="${esc(w.pdf_href)}" target="_blank" rel="noopener">全文 PDF ↗</a>` : `<span>沒有全文檔</span>`) +
+    (w.doi ? `<a href="https://doi.org/${esc(w.doi)}" target="_blank" rel="noopener">期刊頁 ↗</a>` : "");
 
   const F = Object.fromEntries((w.card.fields || []).map(f => [f.key, f]));
   const g = w.digest;
@@ -203,12 +219,14 @@ function render(d, w, quiet){
   }
   // 1b. 研究發現（白話）：一句話結論＋每一項結果（原文數字與白話說明）
   if (g && (g.bottom_line || (g.findings || []).length)){
+    // 本人 2026-10-27：做成表格，不要一段一段散開
+    const cell = (k, zh, en) => `${zh ? T(k + ":zh", zh) : none}${en ? `<div class="en-sub" lang="en">${T(k + ":en", en)}</div>` : ""}`;
+    const src = cs => (cs && cs.length) ? `<details class="src"><summary>${cs.length} 處</summary>${cs.map(c => `<blockquote lang="en">"${esc(c.quote)}" <span class="loc">[${esc(c.loc)}]</span></blockquote>`).join("")}</details>` : `<span class="muted">—</span>`;
     h += `<h2>研究發現（白話）</h2>`;
-    if (g.bottom_line) h += `<div class="card" style="margin:8px 0;border-left:4px solid #15803d"><div class="small muted">一句話結論</div>${pair(g.bottom_line.en, g.bottom_line.zh, "", "", "", "bl")}${cites(g.bottom_line.citations)}</div>`;
-    (g.findings || []).forEach((f, i) => {
-      h += `<div class="field"><div class="name">發現 ${i + 1}</div>${pair(f.plain_en, f.plain_zh, "", "", "", `f${i}p`)}
-        <div class="small muted" style="margin-top:4px">原文結果：</div>${pair(f.en, f.zh, "", "", "", `f${i}o`)}${cites(f.citations)}</div>`;
-    });
+    if (g.bottom_line) h += `<div class="bline"><span class="small muted">一句話結論</span><div>${cell("bl", g.bottom_line.zh, g.bottom_line.en)}</div></div>`;
+    if ((g.findings || []).length) h += `<div class="ftbl"><table><thead><tr><th scope="col">#</th><th scope="col">白話說明</th><th scope="col">原文結果</th><th scope="col">出處</th></tr></thead><tbody>
+      ${g.findings.map((f, i) => `<tr><td class="num">${i + 1}</td><td>${cell(`f${i}p`, f.plain_zh, f.plain_en)}</td><td>${cell(`f${i}o`, f.zh, f.en)}</td><td class="srccol">${src(f.citations)}</td></tr>`).join("")}
+      </tbody></table></div>`;
   } else if (g){
     h += `<h2>研究發現（白話）</h2><div class="empty">這篇還沒有白話的研究發現（舊的整理沒有這一段）。在教授頁「工作進度」回覆「補研究發現」就會補上。</div>`;
   }
