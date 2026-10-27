@@ -153,6 +153,11 @@ header .wrap{position:relative}
 .ft .para.li{position:relative;padding-left:1.2em;margin-bottom:.45em}
 .ft .para.li::before{content:"•";position:absolute;left:.2em;color:var(--muted)}
 .ft .ptable{overflow-x:auto;margin:0 0 1.1em}
+.ft .pfig{margin:.4em 0 1.4em;padding:10px;border:1px solid var(--line);border-radius:8px;background:#fff}
+.ft .pfig img{display:block;max-width:100%;height:auto;margin:0 auto 8px;cursor:zoom-in;border-radius:4px}
+.ft .pfig img.big{position:fixed;inset:0;margin:auto;max-width:96vw;max-height:94vh;z-index:500;background:#fff;box-shadow:0 0 0 100vmax rgba(0,0,0,.6);cursor:zoom-out}
+.ft .pfig figcaption{font-family:var(--font);font-size:.82rem;line-height:1.55;color:var(--muted)}
+.ft .pfig .tbl{margin:0 0 8px}
 .ft .ptable table{border-collapse:collapse;font-size:.9em;line-height:1.5;min-width:100%}
 .ft .ptable th,.ft .ptable td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 .ft .ptable th{background:var(--soft);font-weight:700}
@@ -310,7 +315,27 @@ function fullHTML(w){
     const head = rows.length > 1 && rows[1].every(c => !c || /^:?-{2,}:?$/.test(c)); if (head) rows = [rows[0], ...rows.slice(2)]; return {rows, head}; };
   const tbl = (pre, k, rows, head, page) => `<div class="para ptable" data-k="${esc(k)}"><table>${rows.map((r, ri) => `<tr>${r.map((c, ci) => { const tg = head && ri === 0 ? "th" : "td";
     return `<${tg}>${Reader.hl(`${pre}:${k}:${ri}:${ci}`, c, page)}</${tg}>`; }).join("")}</tr>`).join("")}</table></div>`;
-  B.forEach(b => {
+  // 圖與表放進全文（本人 2026-10-27）：放在第一段提到它（或以它的圖說開頭）的段落後面；沒人提到就放在它那一頁的最後；頁碼也不知道就放在最後
+  const figs = (w.figures || []).map((f, i) => ({...f, i, page: (String(f.loc || "").match(/p\.\d+/) || [])[0] || null}));
+  const figRe = f => { const m = String(f.label || "").match(/^(fig(?:ure)?\.?|table|圖|表)\s*([A-Z]?\d+[a-z]?)/i); if (!m) return null;
+    const word = /^t/i.test(m[1]) || m[1] === "表" ? "(?:table|表)" : "(?:fig(?:ure)?\\.?|圖)"; return new RegExp(`(^|[^\\w])${word}\\s*${m[2]}(?![\\d])`, "i"); };
+  const placed = new Set(), atBlock = {};
+  const nz = x => String(x || "").toLowerCase().replace(/^(fig(ure)?|table)\s*\w+[.:]?\s*/i, "").replace(/[^a-z0-9]+/g, "");
+  figs.forEach(f => {
+    const cap = nz(f.caption).slice(0, 40), re = figRe(f);
+    const onPage = x => !f.page || x.page === f.page || !/^p\./.test(x.page || "");
+    const b = (cap.length >= 15 && B.find(x => onPage(x) && nz(x.text).startsWith(cap)))  // 圖說那一段（XML 全文有圖說、沒有「Figure 1」字樣）
+      || (re && B.find(x => onPage(x) && re.test(x.text)));                                // 第一段提到「Figure 1」的
+    if (b){ (atBlock[b.key] = atBlock[b.key] || []).push(f); placed.add(f.i); } });
+  const figHTML = f => {
+    const media = f.image ? `<img loading="lazy" src="${esc(f.image)}" alt="${esc(f.label)}">` : f.table_html ? `<div class="tbl">${f.table_html}</div>` : "";
+    const en = `<figure class="para pfig" data-k="fig-${f.i}">${media}<figcaption lang="en"><b>${esc(f.label)}</b>${f.caption ? " " + esc(f.caption) : ""}</figcaption></figure>`;
+    const zz = `<figure class="para pfig" data-k="fig-${f.i}">${media}<figcaption><b>${esc(f.label)}</b>${f.zh ? " " + esc(f.zh) : f.caption ? ` <span lang="en">${esc(f.caption)}</span>` : ""}</figcaption></figure>`;
+    return [en, zz]; };
+  const putFigs = list => list.forEach(f => { placed.add(f.i); const [a, b] = figHTML(f); en += a; zh += b; });
+  const pageEnd = p => putFigs(figs.filter(f => f.page === p && !placed.has(f.i)));
+  B.forEach((b, bi) => {
+    if (pg && b.page !== pg) pageEnd(pg);
     if (b.page !== pg && lab(b)){ en += `<div class="pg">${lab(b)}</div>`; zh += `<div class="pg">${lab(b)}</div>`; }
     pg = b.page;
     const t = tagOf(b);
@@ -318,11 +343,16 @@ function fullHTML(w){
       en += tbl("t", b.key, b.rows || mdRows(b.text).rows, b.head, b.page);
       const z = R.zh[b.key] && mdRows(R.zh[b.key]);
       zh += z && z.rows.length ? tbl("z", b.key, z.rows, z.head, b.page) : `<div class="para" data-k="${esc(b.key)}">${R.zh[b.key] ? Reader.hl("z:" + b.key, R.zh[b.key], b.page) : `<span class="muted small">（表格還沒翻）</span>`}</div>`;
+      putFigs(atBlock[b.key] || []);
       return;
     }
     en += `<${t} class="para${b.kind === "li" ? " li" : ""}" data-k="${esc(b.key)}" lang="en">${Reader.hl("t:" + b.key, b.text, b.page)}</${t}>`;
     zh += `<${t} class="para${b.kind === "li" ? " li" : ""}" data-k="${esc(b.key)}">${R.zh[b.key] ? Reader.hl("z:" + b.key, R.zh[b.key], b.page) : /[A-Za-z]{2}/.test(b.text) ? `<span class="muted small">（還沒翻）</span>` : esc(b.text)}</${t}>`;
+    putFigs(atBlock[b.key] || []);
   });
+  if (pg) pageEnd(pg);
+  const rest = figs.filter(f => !placed.has(f.i));
+  if (rest.length){ en += `<div class="pg">圖與表</div>`; zh += `<div class="pg">圖與表</div>`; putFigs(rest); }
   const bar = job.status === "running" ? `<div class="zhbar" role="status">AI 翻譯中… ${job.done}/${job.total} 段（可以先讀，翻好的會自動出現）</div>`
     : need ? `<div class="zhbar">${job.status === "error" ? `<span class="rd-err">翻譯沒有完成：${esc(job.error)}</span><br>` : ""}還有 ${need} 段沒翻成中文。<button type="button" class="rd-btn primary" id="zhGo">${icon("translate", 15)} 整篇翻成中文</button><span class="small muted">（用便宜的模型，背景翻，約幾分鐘）</span></div>` : "";
   return `<div class="ptabs" role="tablist" aria-label="手機上切換"><button type="button" data-show="en" aria-selected="true">English</button><button type="button" data-show="zh" aria-selected="false">中文</button></div>
@@ -350,6 +380,7 @@ function wirePanes(){
     to.scrollTo({top: to.scrollTop + (q.getBoundingClientRect().top - to.getBoundingClientRect().top) - want, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
   };
   L.addEventListener("mouseup", e => setTimeout(() => pair(e, L, Z), 0)); Z.addEventListener("mouseup", e => setTimeout(() => pair(e, Z, L), 0));
+  [L, Z].forEach(P => P.addEventListener("click", e => { const im = e.target.closest(".pfig img"); if (im) im.classList.toggle("big"); }));  // 點圖放大，再點一下縮回
   document.querySelectorAll(".ptabs [data-show]").forEach(b => b.onclick = () => { $(".panes").dataset.show = b.dataset.show; document.querySelectorAll(".ptabs [data-show]").forEach(x => x.setAttribute("aria-selected", x === b)); });
   const go = $("#zhGo"); if (go) go.onclick = async () => { go.disabled = true; try { await Reader.translateAll(); } catch (e){ Reader.toast((e && e.error) || "沒辦法開始翻譯"); } redrawFull(); };
   clearTimeout(zhTimer);
