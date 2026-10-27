@@ -36,6 +36,50 @@ from urllib.parse import unquote, urlparse
 # Windows 中文版預設編碼是 cp950：腳本裡沒寫 encoding 的讀寫會讀壞 UTF-8 的 JSON、印不出某些字。
 # 應用程式叫的每個子程序（腳本、Claude Code 再叫的腳本）都繼承這個設定，一律用 UTF-8。
 os.environ["PYTHONUTF8"] = "1"
+for _s in (sys.stdout, sys.stderr):  # 照 ieltsgod：印中文不會因為 cp950 當掉
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):
+        pass
+
+
+def utf8_io(fallback=None):
+    """照 ieltsgod：主程式自己的讀寫也一律 UTF-8（Windows 中文版預設 cp950，讀到背景腳本寫的 UTF-8 中文檔就當掉、打不開）。
+    沒指定編碼的 open()／read_text()／write_text() 改用 UTF-8；讀到舊版主程式用 cp950 寫的檔，改用 fallback 讀，不會當掉。
+    回傳還原用的函式（測試用）。"""
+    import builtins
+    import locale
+    import pathlib
+    fb = fallback or locale.getpreferredencoding(False)
+    o_open, o_read, o_write = builtins.open, pathlib.Path.read_text, pathlib.Path.write_text
+
+    def read_text(self, encoding=None, errors=None, **kw):
+        if encoding is not None:
+            return o_read(self, encoding=encoding, errors=errors, **kw)
+        try:
+            return o_read(self, encoding="utf-8", errors=errors, **kw)
+        except UnicodeDecodeError:
+            return o_read(self, encoding=fb, errors="replace", **kw)
+
+    def write_text(self, data, encoding=None, errors=None, **kw):
+        return o_write(self, data, encoding=encoding or "utf-8", errors=errors, **kw)
+
+    def open_(file, mode="r", buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
+        if "b" not in mode and encoding is None:
+            encoding = "utf-8"
+            if errors is None and not any(c in mode for c in "wax+"):
+                errors = "replace"  # 讀到舊的 cp950 檔：顯示亂碼但不當掉
+        return o_open(file, mode, buffering, encoding, errors, newline, closefd, opener)
+    read_text.__name__, write_text.__name__ = "read_text", "write_text"
+    pathlib.Path.read_text, pathlib.Path.write_text, builtins.open = read_text, write_text, open_
+
+    def restore():
+        pathlib.Path.read_text, pathlib.Path.write_text, builtins.open = o_read, o_write, o_open
+    return restore
+
+
+if os.name == "nt":
+    utf8_io()
 
 
 def hide_console_windows(sp):
@@ -749,7 +793,7 @@ class App:
         def run():
             try:
                 for c in chunks:
-                    job["done"] += merge_zh(z, self.ai_once(zh_chunk_prompt(c, body.get("title")), level="easy"), c)
+                    job["done"] += merge_zh(z, self.ai_once(zh_chunk_prompt(c, body.get("title")), level="easy", task="translate"), c)
                 job["status"] = "done"
             except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as e:
                 job.update(status="error", error=str(e)[:300])
@@ -772,12 +816,13 @@ class App:
         """選取文字問 AI／翻譯：一次性的小問題，不碰任何檔案。"""
         from pipeline.reader import ask_prompt, translate_prompt
         prompt = translate_prompt(body.get("sel")) if translate else ask_prompt(body.get("sel"), body.get("ctx"), body.get("title"), body.get("q"), body.get("history"))
-        return {"a": self.ai_once(prompt, level="easy" if translate else "hard")}
+        return {"a": self.ai_once(prompt, level="easy" if translate else "hard", task="translate" if translate else "ask")}
 
-    def ai_once(self, prompt, level="hard"):
-        """問一次、拿一個回答（問 AI、翻譯、分類）：用 AI 小幫手選的那位；額度用完或沒登入就自動換下一位測試過的（照 ieltsgod）。"""
+    def ai_once(self, prompt, level="hard", task="ask"):
+        """問一次、拿一個回答（問 AI、翻譯、分類）：用設定裡這個工作選的那位（沒選就 StepFun 或預設那位）；
+        額度用完或沒登入就自動換下一位測試過的（照 ieltsgod）。"""
         from pipeline import ai as AI
-        pv = AI.current_provider()
+        pv = AI.task_provider(task)
         if not pv:
             raise ValueError("還沒有可以用的 AI：到「設定 → AI 小幫手」安裝、登入並測試一位")
         try:
@@ -802,6 +847,15 @@ class App:
                 c["provider"] = body["provider"]
             if "autoSwitch" in body:
                 c["autoSwitch"] = bool(body["autoSwitch"])
+            if isinstance(body.get("tasks"), dict):  # 各小工作用哪一位；空的＝自動
+                t = dict(c.get("tasks") or {})
+                for k, v in body["tasks"].items():
+                    if k in AI.TASKS:
+                        if v in AI.PROVIDERS:
+                            t[k] = v
+                        else:
+                            t.pop(k, None)
+                c["tasks"] = t
             AI.write_json(AI.WSET, c)
             return AI.engine_status()
         if path == "ai-agy":
@@ -819,6 +873,23 @@ class App:
             return AI.agy_status()
         if pv not in AI.PROVIDERS:
             raise ValueError("不認得的 AI")
+        if path == "ai-key":  # StepFun：本人貼的 key 存進金鑰檔（經雲端硬碟同步），之後只顯示末四碼
+            if pv != "stepfun":
+                raise ValueError("這位不用 key")
+            if body.get("remove"):
+                self.set_secret("STEPFUN_API_KEY", "")
+                c = AI.w_settings()
+                (c.get("tested") or {}).pop("stepfun", None)
+                AI.write_json(AI.WSET, c)
+                return AI.engine_status()
+            key = str(body.get("key") or "").strip()
+            if not (8 <= len(key) <= 300) or re.search(r"\s", key):
+                raise ValueError("這看起來不是 key：請貼 StepFun 開放平台「介面金鑰」頁複製的整串")
+            self.set_secret("STEPFUN_API_KEY", key)
+            AI.ai_test("stepfun")
+            return AI.engine_status()
+        if AI.PROVIDERS[pv].get("api") and path in ("ai-install", "ai-login", "ai-logout", "ai-terminal"):
+            raise ValueError(f"{AI.PROVIDERS[pv]['name']} 不用安裝或登入：在設定貼 key 就好")
         try:
             if path == "ai-install":
                 if AI.ai_bin(pv) and not (pv == "gemini" and not AI.is_agy(AI.ai_bin(pv))):
@@ -944,7 +1015,7 @@ class App:
                     cur = load_meta(lib)
                     if (cur["items"].get(w["id"]) or {}).get("topic") and (cur["items"].get(w["id"]) or {}).get("ptype"):
                         continue
-                    topic, ptype = parse_classify(self.ai_once(classify_prompt(w.get("title"), w.get("abstract"), topics(cur)), level="easy"))
+                    topic, ptype = parse_classify(self.ai_once(classify_prompt(w.get("title"), w.get("abstract"), topics(cur)), level="easy", task="classify"))
                     if topic:
                         set_topic(lib, w["id"], topic, by="ai")
                     if not (load_meta(lib)["items"].get(w["id"]) or {}).get("ptype"):

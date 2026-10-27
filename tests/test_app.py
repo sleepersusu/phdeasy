@@ -554,3 +554,48 @@ def test_library_add_returns_at_once_and_runs_in_background(tmp_path):
     for fn in pending:
         fn()
     assert any(c[0] == "add-doi" for c in calls) and any(c[0] == "job" for c in calls)  # 加完自動開始處理
+
+
+def test_stepfun_key_saved_in_secrets_and_tasks_routed(tmp_path, monkeypatch):
+    """本人在設定貼 StepFun 的 key：存進金鑰檔（經雲端硬碟同步），畫面只看得到末四碼；各小工作用哪一位可以改。"""
+    import json
+    import pytest
+    from app import App
+    import pipeline.ai as AI
+    app = App(tmp_path)
+    monkeypatch.setattr(AI, "ai_test", lambda pv: AI.set_tested(pv, True) or {"ok": True})
+    with pytest.raises(ValueError):
+        app.post("ai-key", {"provider": "stepfun", "key": "  "})
+    with pytest.raises(ValueError):
+        app.post("ai-key", {"provider": "stepfun", "key": "abc def"})
+    r = app.post("ai-key", {"provider": "stepfun", "key": "sk-live-ABCDEFGH1234"})
+    assert "STEPFUN_API_KEY=sk-live-ABCDEFGH1234" in (tmp_path / "runs" / "_me" / "secrets.env").read_text()
+    assert r["stepfunKey"] == "…1234" and "ABCDEFGH" not in json.dumps(r)  # 畫面拿不到整串
+    assert r["tasks"]["translate"]["using"] == "stepfun"
+    app.post("ai-settings", {"tasks": {"translate": "claude", "ask": "bogus"}})
+    assert AI.w_settings()["tasks"] == {"translate": "claude"}
+    app.post("ai-key", {"provider": "stepfun", "remove": True})
+    assert AI.stepfun_key() is None
+    with pytest.raises(ValueError):
+        app.post("ai-install", {"provider": "stepfun"})
+
+
+def test_main_process_reads_utf8_and_old_cp950_files(tmp_path):
+    """Windows 中文版主程式預設 cp950：背景腳本寫的 UTF-8 中文檔一讀就當掉（打不開）。
+    裝上之後沒指定編碼的讀寫一律 UTF-8；舊版主程式用 cp950 寫的檔也讀得回來，不會當掉。"""
+    import pathlib
+    import app
+    utf = tmp_path / "state.json"
+    utf.write_bytes('{"name": "邱尚志 教授"}'.encode("utf-8"))
+    old = tmp_path / "queue.json"
+    old.write_bytes('[{"title": "Meeting 文獻：林"}]'.encode("cp950"))
+    restore = app.utf8_io(fallback="cp950")
+    try:
+        assert "邱尚志" in utf.read_text() and "林" in old.read_text()
+        (tmp_path / "new.json").write_text("新的")
+        assert (tmp_path / "new.json").read_bytes() == "新的".encode("utf-8")
+        with open(tmp_path / "new.json") as f:
+            assert f.read() == "新的"
+    finally:
+        restore()
+    assert pathlib.Path.read_text.__name__ == "read_text"

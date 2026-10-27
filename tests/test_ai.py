@@ -94,7 +94,7 @@ def test_quota_from_codex_events_and_claude_rate_limit():
 
 def test_order_and_current_provider():
     ai.w_set(provider="codex")
-    assert ai.ai_order("gemini") == ["gemini", "codex", "claude"]
+    assert ai.ai_order("gemini") == ["gemini", "codex", "claude", "stepfun"]
     assert ai.current_provider() == "codex"
 
 
@@ -102,3 +102,64 @@ def test_error_summary_and_friendly():
     assert ai.error_summary('{"error": {"message": "Quota exceeded"}}') == "Quota exceeded"
     assert "需要重新登入" in ai.friendly_error("claude", "401 Unauthorized")
     assert "個人的 Gmail" in ai.friendly_error("gemini", "GOOGLE_CLOUD_PROJECT required")
+
+
+# ---------- StepFun（API，不用裝工具；本人在設定貼 key） ----------
+def _key(tmp_path, key="sk-test-123456"):
+    (tmp_path / "_me").mkdir(exist_ok=True)
+    (tmp_path / "_me" / "secrets.env").write_text(f"S2_API_KEY=\nSTEPFUN_API_KEY={key}\n", encoding="utf-8")
+
+
+def test_stepfun_needs_key_and_calls_chat_completions(cfg, monkeypatch):
+    monkeypatch.undo()  # 用真的 ai_bin：StepFun 有沒有「裝」看 key
+    assert ai.stepfun_key() is None and ai.ai_bin("stepfun") is None  # 沒 key＝沒裝
+    _key(cfg)
+    assert ai.stepfun_key() == "sk-test-123456" and ai.ai_bin("stepfun") and ai.logged_in("stepfun", "api") is True
+    sent = {}
+
+    class R:
+        def __init__(self, body): self.body = body
+        def read(self): return self.body
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+
+    def fake(req, timeout=0):
+        sent.update(url=req.full_url, auth=req.headers.get("Authorization"), body=json.loads(req.data))
+        return R(json.dumps({"choices": [{"message": {"content": " 好的 "}}], "model": "step-5-preview"}).encode())
+    monkeypatch.setattr(ai.urllib.request, "urlopen", fake)
+    ai.ai_level("hard")
+    assert ai._ai_run_one("stepfun", "hello") == "好的"
+    assert sent["url"] == "https://api.stepfun.ai/v1/chat/completions" and sent["auth"] == "Bearer sk-test-123456"
+    assert sent["body"]["model"] == "step-5-preview" and sent["body"]["messages"][-1]["content"] == "hello"
+
+
+def test_stepfun_http_errors_become_switchable_kinds(cfg, monkeypatch):
+    monkeypatch.undo()
+    _key(cfg)
+    import io
+    import urllib.error
+
+    def boom(code):
+        def f(req, timeout=0):
+            raise urllib.error.HTTPError(req.full_url, code, "x", {}, io.BytesIO(b'{"error":{"message":"bad key"}}'))
+        return f
+    monkeypatch.setattr(ai.urllib.request, "urlopen", boom(401))
+    with pytest.raises(RuntimeError) as e:
+        ai._ai_run_one("stepfun", "hi")
+    assert ai.ai_fail_kind(str(e.value)) == "auth" and "sk-test" not in str(e.value)  # 錯誤訊息不能帶出 key
+    monkeypatch.setattr(ai.urllib.request, "urlopen", boom(429))
+    with pytest.raises(RuntimeError) as e:
+        ai._ai_run_one("stepfun", "hi")
+    assert ai.ai_fail_kind(str(e.value)) == "quota"
+
+
+def test_task_routing_prefers_choice_then_tested_stepfun():
+    assert set(ai.TASKS) == {"ask", "translate", "classify"}
+    ai.w_set(provider="claude")
+    assert ai.task_provider("translate") == "claude"  # StepFun 還沒測過：用預設那位
+    ai.set_tested("stepfun", True)
+    assert ai.task_provider("translate") == "stepfun"  # 測過了：沒特別選的工作改用 StepFun
+    ai.w_set(tasks={"ask": "gemini"})
+    assert ai.task_provider("ask") == "gemini" and ai.task_provider("classify") == "stepfun"
+    ai.w_set(tasks={"ask": "nonsense"})
+    assert ai.task_provider("ask") == "stepfun"

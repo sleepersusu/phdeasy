@@ -18,14 +18,18 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.error
+import urllib.request
 
 WIN = os.name == "nt"
 WSET = None   # 設定檔：configure() 設成 runs/_app/ai.json
 WDIR = None   # agy 跑的資料夾：runs/_app/ai_work
+RUNS = None   # runs/：StepFun 的 key 在 runs/_me/secrets.env（本人在設定貼，經雲端硬碟同步）
 
 
 def configure(runs):
-    global WSET, WDIR
+    global WSET, WDIR, RUNS
+    RUNS = str(runs)
     WSET = os.path.join(str(runs), "_app", "ai.json")
     WDIR = os.path.join(str(runs), "_app", "ai_work")
 
@@ -51,7 +55,12 @@ PROVIDERS = {
     "gemini": {"name": "Gemini", "tool": "Antigravity CLI", "cmd": "agy", "npm": None},   # 2026-06-18 起 Google AI Pro／Ultra 改用 Antigravity CLI（agy）
     "codex": {"name": "ChatGPT", "tool": "Codex CLI", "cmd": "codex", "npm": "@openai/codex"},
 }
-PROVIDER_ORDER = ("claude", "gemini", "codex")
+# StepFun（本人 2026-10-27 加）：不用裝工具，OpenAI 相容的 API，本人在設定貼 key
+PROVIDERS["stepfun"] = {"name": "StepFun", "tool": "Step API", "cmd": None, "npm": None, "api": True}
+STEPFUN_URL = "https://api.stepfun.ai/v1/chat/completions"
+PROVIDER_ORDER = ("claude", "gemini", "codex", "stepfun")
+# 「問一次」的小工作：各自用哪一位可以在設定改；沒選的，StepFun 測試成功就用它，否則用預設那位
+TASKS = {"ask": "問 AI（選取文字）", "translate": "翻譯（選取的文字、整篇全文）", "classify": "Meeting 文獻的主題與類型"}
 # 每位 AI 可以選的模型：值、顯示名稱、說明。'' = 交給工具自己決定（自動）
 MODELS = {"claude": [("", "自動", "重要的工作用 Opus 5.5，簡單的用 Haiku 5.5"), ("claude-opus-5-5", "Opus 5.5", "最強，最仔細"), ("claude-sonnet-5-5", "Sonnet 5.5", "較快、省額度"), ("claude-haiku-5-5", "Haiku 5.5", "最便宜、最快")],
           # Gemini：ieltsgod 列的 3.1 Pro 已經下架（2026-10 agy models 只剩 4 Argon、3.8 Flash）
@@ -60,7 +69,10 @@ MODELS = {"claude": [("", "自動", "重要的工作用 Opus 5.5，簡單的用 
 AUTO_PICK = {"claude": {"hard": "claude-opus-5-5", "easy": "claude-haiku-5-5"},
              "gemini": {"hard": "Gemini 4 Argon (High)", "easy": "Gemini 3.8 Flash (Medium)"},
              "codex": {"hard": "gpt-6.1-sol", "easy": "gpt-6-luna"}}
-MODEL_DEFAULT = {"claude": "", "gemini": "", "codex": ""}
+MODELS["stepfun"] = [("step-5-preview", "Step 5 Preview", "旗艦，1M 上下文"), ("step-3.7-flash", "Step 3.7 Flash", "較快、便宜"),
+                     ("step-3.5-flash", "Step 3.5 Flash", "最便宜、只有文字"), ("", "自動", "重要的工作用 Step 5 Preview，簡單的用 Step 3.7 Flash")]
+AUTO_PICK["stepfun"] = {"hard": "step-5-preview", "easy": "step-3.7-flash"}
+MODEL_DEFAULT = {"claude": "", "gemini": "", "codex": "", "stepfun": "step-5-preview"}  # 本人指定用 Step 5 Preview
 
 AI_LAST = threading.local()  # 這個工作實際用了哪一位、哪個模型、難易度
 
@@ -185,7 +197,25 @@ def _search_bin(cmd):
     return None
 
 
+def stepfun_key():
+    """StepFun 的 key：環境變數 STEPFUN_API_KEY，或 runs/_me/secrets.env（本人在設定貼的）。不印出、不寫進錯誤訊息。"""
+    k = os.environ.get("STEPFUN_API_KEY")
+    if k:
+        return k.strip()
+    try:
+        with open(os.path.join(RUNS or "", "_me", "secrets.env"), encoding="utf-8") as f:
+            for line in f:
+                name, sep, v = line.partition("=")
+                if sep and name.strip() == "STEPFUN_API_KEY":
+                    return v.strip() or None
+    except OSError:
+        pass
+    return None
+
+
 def ai_bin(pv):
+    if pv == "stepfun":  # API：有 key 就算「裝好了」
+        return "api" if stepfun_key() else None
     env = os.environ.get(pv.upper() + "_BIN")
     if env == "none":
         return None          # 測試用：假裝沒裝
@@ -242,6 +272,8 @@ install_states = {k: {"proc": None, "log": [], "done": False, "ok": None, "error
 
 # --- 登入狀態 ---
 def logged_in(pv, exe):
+    if pv == "stepfun":
+        return bool(stepfun_key())
     try:
         if pv == "claude":
             if os.environ.get("ANTHROPIC_API_KEY"):
@@ -877,7 +909,51 @@ def _ai_run_one(pv, prompt, timeout=600):
                 err = "Not logged in"
             raise RuntimeError(err[-200:])
         return text
+    if pv == "stepfun":
+        return _stepfun(prompt, timeout)
     raise RuntimeError("不認得的 AI：" + pv)
+
+
+def _stepfun(prompt, timeout=600):
+    """StepFun Chat Completions（OpenAI 相容）：回 choices[0].message.content。錯誤訊息只留狀態碼和服務的說明，不帶出 key。"""
+    key = stepfun_key()
+    if not key:
+        raise RuntimeError("Not logged in：還沒貼 StepFun 的 key")
+    mdl = model_for("stepfun") or "step-5-preview"
+    body = {"model": mdl, "messages": [{"role": "user", "content": prompt}],
+            "reasoning_effort": "low" if getattr(AI_LAST, "level", None) == "easy" else "medium"}
+    req = urllib.request.Request(STEPFUN_URL, data=json.dumps(body).encode("utf-8"), method="POST",
+                                 headers={"Authorization": "Bearer " + key, "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            d = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        try:
+            why = error_summary(e.read().decode("utf-8", "replace"))
+        except Exception:
+            why = ""
+        why = why.replace(key, "***")
+        kind = {401: "401 unauthorized（key 不對或過期）", 403: "403 forbidden", 429: "429 rate limit（額度或請求太多）"}.get(e.code, f"HTTP {e.code}")
+        raise RuntimeError(f"StepFun {kind}：{why}"[:300]) from None
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"連不到 StepFun（{e.reason}）") from None
+    if d.get("model"):
+        note_model("stepfun", mdl, d["model"])
+    try:
+        return str(d["choices"][0]["message"]["content"] or "").strip()
+    except (KeyError, IndexError, TypeError):
+        raise RuntimeError("StepFun 回應格式不對：" + json.dumps(d, ensure_ascii=False)[:200]) from None
+
+
+def task_provider(task):
+    """這個小工作用哪一位：本人在設定選的（而且能用）→ 沒選的話 StepFun 測試成功就用它 → 預設那位。"""
+    c = w_settings()
+    pv = (c.get("tasks") or {}).get(task)
+    if pv in PROVIDERS and ai_bin(pv):
+        return pv
+    if ((c.get("tested") or {}).get("stepfun") or {}).get("ok") and ai_bin("stepfun"):
+        return "stepfun"
+    return current_provider()
 
 
 # --- 額度和實際模型：從 AI 工具的輸出順便記下來，顯示在「AI 小幫手」 ---
@@ -1079,4 +1155,5 @@ def engine_status(pv=None):
     ids = [pv] if pv in PROVIDERS else list(PROVIDER_ORDER)
     c = w_settings()
     return {"providers": {k: provider_status(k) for k in ids}, "selected": current_provider(), "autoSwitch": ai_auto(),
-            "provider": c.get("provider")}
+            "provider": c.get("provider"), "tasks": {k: {"label": v, "choice": (c.get("tasks") or {}).get(k) or "", "using": task_provider(k)} for k, v in TASKS.items()},
+            "stepfunKey": ("…" + stepfun_key()[-4:]) if stepfun_key() else None}
