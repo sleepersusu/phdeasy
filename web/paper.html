@@ -286,7 +286,8 @@ function render(d, w, quiet){
 // ---------- 分頁：AI 解析／全文閱讀／我的筆記 ----------
 const VIEWS = {ai: "", full: ""};
 function fullHTML(w){
-  const R = Reader.state, B = R.blocks || [];
+  const R = Reader.state;
+  let B = R.blocks || [];
   if (!R.ok) return `<div class="empty" style="margin-top:16px">${esc(R.err || "要用 phdeasy 應用程式打開，才能看全文與標記。")}</div>`;
   if (!B.length) return `<div class="empty" style="margin-top:16px">這篇沒有轉好的全文${w.pdf_href ? "（可以按上面「開啟全文 PDF」看原檔）" : ""}。</div>`;
   // 左右兩欄（學 ieltsgod 閱讀題）：左邊英文原文，右邊中文；同一段左右對齊、一起捲動
@@ -294,6 +295,10 @@ function fullHTML(w){
   const tagOf = b => b.kind === "h1" ? "h2" : /^h/.test(b.kind || "") ? "h3" : "p";
   let en = R.source === "abstract" ? `<div class="empty">這篇沒有免費全文，只有摘要。</div>` : "", zh = "", pg = null;
   const need = B.filter(b => /[A-Za-z]{2}/.test(b.text) && !R.zh[b.key]).length, job = R.zhJob || {};
+  // 論文標題最上面已經有了：全文裡重複的標題那一段不再顯示（XML 的 # 標題；PDF 是跟標題一樣的那一段）
+  const norm = x => String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const T0 = norm(w.title);
+  B = B.filter((b, i) => !(b.kind === "h1" || (i < 6 && T0.length > 20 && norm(b.text) === T0)));
   B.forEach(b => {
     if (b.page !== pg && lab(b)){ en += `<div class="pg">${lab(b)}</div>`; zh += `<div class="pg">${lab(b)}</div>`; }
     pg = b.page;
