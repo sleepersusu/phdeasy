@@ -132,7 +132,7 @@ function check(ok, good, bad){ return `<li>${ok ? `<span class="pill g">✓</spa
 
 let lastShape = "";
 /* 設定與工作進度（本人 2026-10-26 合併成一頁）：每一項是一列，摘要在列上，點開才看到可以改的東西 */
-const OPEN_ROWS = new Set(["row-job"]);
+const OPEN_ROWS = new Set(["row-job", "row-ai"]);  // AI 小幫手放在設定最上面、預設打開
 function setRow(id, title, status, inner){
   return `<details class="setrow" id="${id}" ${OPEN_ROWS.has(id) ? "open" : ""}><summary><span class="setrow-t">${title}</span><span class="setrow-s">${status}</span></summary><div class="setrow-b">${inner}</div></details>`;
 }
@@ -199,6 +199,14 @@ function renderSettings(st){
   lastSettings = shape;
   const t = g.claude_test;
   el.innerHTML =
+    setRow("row-ai", "AI 小幫手", `<span class="small muted">背景建檔用 ${st.engine === "codex" ? "Codex" : "Claude Code"}</span>`, `
+        <p class="small muted" style="margin-top:0">點一位設定它：① 安裝 → ② 登入 → ③ 測試連線；右邊選模型。已連線的點一下就設成預設：問 AI、翻譯、研究類型分類都用它，額度用完會自動換下一位。</p>
+        ${typeof aiHelperHTML === "function" ? aiHelperHTML() : ""}
+        <h4 style="margin:16px 0 4px">背景建檔（建新教授、整理文獻、AI 編修）用</h4>
+        <div class="row" role="radiogroup" aria-label="背景工作用哪個 AI">
+          <label><input type="radio" name="engine" value="claude" ${st.engine !== "codex" ? "checked" : ""}> Claude Code（預設）</label>
+          <label><input type="radio" name="engine" value="codex" ${st.engine === "codex" ? "checked" : ""}> Codex（ChatGPT，備用）</label></div>
+        <p class="small muted">建檔要能讀寫檔案、跑腳本、再派小幫手，只有 Claude Code 和 Codex 做得到（Gemini 的 Antigravity 在背景不能操作檔案）。Claude 額度用完時可以切到 Codex；這個選擇只存在這台電腦。</p>`) +
     setRow("row-drive", "Google 雲端硬碟", g.account ? `<span class="small muted">${esc(g.account)}${st.syncing ? "｜同步中" : ""}</span>` : '<span class="pill r">沒有帳號</span>', `
         ${g.drives && g.drives.length ? `<p class="small">教授檔案放在：<br><span class="muted">${esc(g.folder || "（還沒選帳號）")}</span></p>
           <div class="small" style="margin-bottom:6px">這台電腦登入的帳號（按一下就換成這個帳號）：</div>
@@ -209,14 +217,6 @@ function renderSettings(st){
           ${st.blocked ? `<span class="pill y">另一台（${esc(st.blocked)}）正在用：只拉不推</span>` : ""}</div>`
         : `<p><span class="pill r">✗</span> 這台電腦找不到 Google 雲端硬碟。</p>
           <ol class="small"><li>安裝 <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive 電腦版</a></li><li>用你的 Google 帳號登入</li><li>重開這個程式</li></ol>`}`) +
-    setRow("row-ai", "AI 小幫手", `<span class="small muted">背景建檔用 ${st.engine === "codex" ? "Codex" : "Claude Code"}</span>`, `
-        <p class="small muted" style="margin-top:0">點一位設定它：① 安裝 → ② 登入 → ③ 測試連線；右邊選模型。已連線的點一下就設成預設：問 AI、翻譯、研究類型分類都用它，額度用完會自動換下一位。</p>
-        ${typeof aiHelperHTML === "function" ? aiHelperHTML() : ""}
-        <h4 style="margin:16px 0 4px">背景建檔（建新教授、整理文獻、AI 編修）用</h4>
-        <div class="row" role="radiogroup" aria-label="背景工作用哪個 AI">
-          <label><input type="radio" name="engine" value="claude" ${st.engine !== "codex" ? "checked" : ""}> Claude Code（預設）</label>
-          <label><input type="radio" name="engine" value="codex" ${st.engine === "codex" ? "checked" : ""}> Codex（ChatGPT，備用）</label></div>
-        <p class="small muted">建檔要能讀寫檔案、跑腳本、再派小幫手，只有 Claude Code 和 Codex 做得到（Gemini 的 Antigravity 在背景不能操作檔案）。Claude 額度用完時可以切到 Codex；這個選擇只存在這台電腦。</p>`) +
     setRow("row-applicant", "申請身分", g.applicant ? `<span class="pill g">${g.applicant.status === "international" ? "國際生" : "本地生"}</span> <span class="small muted">${esc([g.applicant.citizenship, g.applicant.intake && g.applicant.intake + " 入學"].filter(Boolean).join("｜"))}</span>` : '<span class="pill y">還沒設定</span>',
       `<form id="applicant-form" class="match-form" style="max-width:none">
          <div class="row" role="radiogroup" aria-label="申請身分">
@@ -258,6 +258,7 @@ function renderSettings(st){
           : `<p class="small"><span class="pill r">✗</span> 沒有 uv（要建新教授才需要）。</p><button class="btn btn-yellow" id="install-uv2">安裝 uv</button>`}
         <p class="small muted">流水線放在：${esc(g.workspace || "")}</p>`);
   if (typeof aiHelperMount === "function") aiHelperMount();
+  if (location.hash === "#ai" && !renderSettings.jumped){ renderSettings.jumped = true; const r = document.getElementById("row-ai"); if (r){ r.open = true; r.scrollIntoView({block: "start"}); } }
   const act = fn => async ev => { const b = ev.currentTarget; b.disabled = true; try { await fn(); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); b.disabled = false; } };
   el.querySelectorAll("[data-switch]").forEach(b => b.onclick = act(async () => {
     if (!confirm(`換成 ${b.dataset.switch} 的雲端硬碟？會從那個帳號重新同步教授檔案。`)) throw new Error("已取消");
