@@ -213,6 +213,19 @@
   // 每 5 分鐘更新一次（血條、暫停）
   setInterval(() => { if (ROOT && document.body.contains(ROOT) && !aiBusy && !document.hidden) checkEngine().catch(() => {}); }, 5 * 60 * 1000);
 
+  // 畫面錯誤（白畫面、按了沒反應）：送到程式，寫進會同步的 _logs，別台電腦或 Claude 也看得到
+  const report = msg => { try { fetch("/api/client-error", {method: "POST", headers: {"Content-Type": "application/json", "X-Phdeasy-App": "1"},
+    body: JSON.stringify({page: location.pathname + location.search, msg: String(msg).slice(0, 4000)})}).catch(() => {}); } catch (e) {} };
+  window.addEventListener("error", e => report(`${e.message} @ ${e.filename}:${e.lineno}:${e.colno}\n${e.error && e.error.stack || ""}`));
+  window.addEventListener("unhandledrejection", e => report("未處理的錯誤：" + ((e.reason && (e.reason.stack || e.reason.message)) || e.reason)));
+  // 設定頁 15 秒後還是空白：記下來（看得出是程式沒回應還是畫面壞掉）
+  if (/settings\.html$/.test(location.pathname)) setTimeout(() => {
+    const p = document.querySelector("#pipeline .body"), s = document.querySelector("#settings .body");
+    if (p && s && !p.textContent.trim() && !s.textContent.trim()){
+      const t0 = Date.now();
+      fetch("/api/status", {cache: "no-store"}).then(r => report(`設定頁 15 秒還是空白；再要一次狀態：${r.status}，${Date.now() - t0} ms`), e => report("設定頁 15 秒還是空白；狀態要不到：" + e));
+    } }, 15000);
+
   // 通知：自動換 AI、全部不能用（每 15 秒看一次，任何一頁都會跳）
   let since = Date.now() - 60000;
   const show = a => { const d = document.createElement("div"); d.className = "aialert" + (a.level === "bad" ? " bad" : ""); d.setAttribute("role", "status");

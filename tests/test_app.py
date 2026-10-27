@@ -149,6 +149,7 @@ def _lib_app(tmp_path):
     calls = []
     app.lib_script = lambda *a: calls.append(a) or "ADD W1 2024 Paper"
     app._rebuild_site = lambda slug: None
+    app._bg = lambda fn: fn()  # 背景工作在測試裡直接跑完
     app.jobs.start = lambda kind, prompt, title, slug=None, key=None, session=None: calls.append(("job", kind, slug, prompt)) or {"ok": True}
     return app, calls
 
@@ -501,8 +502,8 @@ def test_library_add_processes_automatically_without_button(tmp_path):
     def busy(*a, **k):
         raise RuntimeError("這位教授（或這份文件）已經有一個工作在跑：Meeting 文獻")
     app.jobs.start = busy
-    r = app.post("library-add", {"slug": "doe-jane", "dois": ["10.1234/b"]})
-    assert r.get("process", {}).get("pending")
+    app.post("library-add", {"slug": "doe-jane", "dois": ["10.1234/b"]})
+    assert "doe-jane" in app._lib_again  # 正在跑：跑完再接著跑
     app.jobs.start = lambda kind, prompt, title, slug=None, key=None, session=None: calls.append(("job", kind, slug, key)) or {"ok": True}
     app.rebuild_after = False
     app._drain_queue = lambda: None
@@ -530,3 +531,26 @@ def test_library_delete_moves_files_and_forgets_entry(tmp_path):
     assert (lib / "inbox" / "L2__upload_2.pdf").exists()
     with pytest.raises(ValueError):
         app.post("lib-delete", {"slug": "doe-jane", "id": "../x"})
+
+
+
+def test_library_add_returns_at_once_and_runs_in_background(tmp_path):
+    """上傳／貼 DOI 馬上回應（照 ieltsgod：背景處理）；加入中的篇數與失敗訊息在狀態裡，畫面看得到。"""
+    app, calls = _lib_app(tmp_path)
+    pending = []
+    app._bg = pending.append  # 先不跑：模擬還在背景
+    r = app.library_upload("doe-jane", b"%PDF-1.7 ...", {})
+    assert r["ok"] and not [c for c in calls if c[0] == "add-pdf"]  # 還沒查 OpenAlex 就回應了
+    assert app.lib_status()["doe-jane"]["adding"] == 1
+    app.lib_script = lambda *a: (_ for _ in ()).throw(ValueError("PermissionError: [WinError 32]"))
+    for fn in pending:
+        fn()
+    st = app.lib_status()["doe-jane"]
+    assert st["adding"] == 0 and "WinError 32" in st["errors"][-1]
+    app.lib_script = lambda *a: calls.append(a) or "ADD W2 2024 B"
+    pending.clear()
+    app.post("library-add", {"slug": "doe-jane", "dois": ["10.1234/x"]})
+    assert app.lib_status()["doe-jane"]["adding"] == 1
+    for fn in pending:
+        fn()
+    assert any(c[0] == "add-doi" for c in calls) and any(c[0] == "job" for c in calls)  # 加完自動開始處理

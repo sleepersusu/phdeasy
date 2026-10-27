@@ -211,7 +211,8 @@ class App:
         self.gcal_pending = None
         from pipeline import ai as AI
         AI.configure(self.runs)  # AI 小幫手（照 ieltsgod）：設定存在 runs/_app/ai.json，只在這台
-        self._lib_again = set()  # 文獻處理在跑時又加了文獻的教授：跑完再接著跑一次
+        self._lib_again = set()
+        self._lib_state, self._lib_locks = {}, {}  # Meeting 文獻在背景加入中：{教授: {adding, errors}}  # 文獻處理在跑時又加了文獻的教授：跑完再接著跑一次
         self.zh_jobs = {}  # 全文翻中文的背景工作：{(教授, 文章, 討論文獻?): {status, done, total, error}}
         self.jobs.on_done = self.after_job
         self.blocked = None
@@ -304,7 +305,7 @@ class App:
                 "log": self.jobs.log_tail(job["id"]) if job else [], "professors": professors(self.runs),
                 "exception_actions": {k: exception_actions(k) for k in sorted(FULLTEXT_KINDS | REJUDGE_KINDS | {"grant_unresolved", "possible_author_split", "external_candidates", "possible_duplicate", "affiliation_mismatch"})},
                 "settings": self.settings(), "update": self.update_info, "version": self.version,
-                "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job), "jobs": self.job_list(),
+                "boot": self.boot, "update_state": self.update_state, "progress": self.job_progress(job), "jobs": self.job_list(), "lib": self.lib_status(),
                 "queue": [q["title"] for q in self.queue]}
 
     def job_list(self):
@@ -849,11 +850,40 @@ class App:
         inbox.mkdir(parents=True, exist_ok=True)
         dst = inbox / f"_upload_{datetime.now().strftime('%Y%m%d-%H%M%S-%f')}.pdf"
         dst.write_bytes(data)
-        out = self.lib_script("add-pdf", f"runs/{slug}", "--pdf", str(dst.relative_to(self.workspace)) if dst.is_relative_to(self.workspace) else str(dst),
-                              *self._lib_meta(meta))
-        self._rebuild_site(slug)
-        self.lib_classify(slug)
-        return {"ok": True, "result": out, "process": self.lib_autoprocess(slug)}
+        pdf = str(dst.relative_to(self.workspace)) if dst.is_relative_to(self.workspace) else str(dst)
+        args = self._lib_meta(meta)
+        self._lib_add_bg(slug, lambda: self.lib_script("add-pdf", f"runs/{slug}", "--pdf", pdf, *args))
+        return {"ok": True, "background": True}
+
+    def _bg(self, fn):
+        threading.Thread(target=fn, daemon=True).start()
+
+    def _lib_add_bg(self, slug, fn):
+        """加入文獻在背景做（照 ieltsgod：按了就回應，查 OpenAlex、建檔、重建、分類都在背景）。
+        同一位教授一次加一篇（works.json 才不會互相蓋掉）；最後一篇加完才重建、分類、開始處理。"""
+        st = self._lib_state.setdefault(slug, {"adding": 0, "errors": []})
+        st["adding"] += 1
+        lock = self._lib_locks.setdefault(slug, threading.Lock())
+
+        def run():
+            try:
+                with lock:
+                    fn()
+            except Exception as e:
+                st["errors"] = (st["errors"] + [f"{datetime.now().strftime('%H:%M')} 加入失敗：{str(e)[:300]}"])[-5:]
+            finally:
+                st["adding"] -= 1
+                if st["adding"] == 0:
+                    try:
+                        self._rebuild_site(slug)
+                        self.lib_classify(slug)
+                        self.lib_autoprocess(slug)
+                    except Exception as e:
+                        self.log_error(f"Meeting 文獻加入後處理 {slug}", repr(e))
+        self._bg(run)
+
+    def lib_status(self):
+        return {k: {"adding": v["adding"], "errors": list(v["errors"])} for k, v in self._lib_state.items()}
 
     def lib_autoprocess(self, slug):
         """加入文獻後自動處理（找全文、轉文字、圖表、AI 重點），不用另外按按鈕。
@@ -1086,6 +1116,9 @@ class App:
             return self.login_codex()
         if path == "paper-text":
             return self.paper_text(body)
+        if path == "client-error":  # 畫面上的錯誤（白畫面、按了沒反應）：寫進會同步的 _logs，別台也看得到
+            self.log_error(f"畫面錯誤 {str(body.get('page') or '')[:120]}", str(body.get("msg") or "")[:4000])
+            return {"ok": True}
         if path.startswith("ai-"):
             return self.ai_post(path, body)
         if path == "paper-translate":
@@ -1151,10 +1184,10 @@ class App:
             if bad or not dois:
                 raise ValueError(f"這不是 DOI：{', '.join(bad) or '（空的）'}")
             src = "zotero" if body.get("source") == "zotero" else "doi"
-            res = [self.lib_script("add-doi", f"runs/{slug}", "--doi", d, "--source", src, *self._lib_meta(body)) for d in dois]
-            self._rebuild_site(slug)
-            self.lib_classify(slug)
-            return {"ok": True, "result": res, "process": self.lib_autoprocess(slug)}
+            args = self._lib_meta(body)
+            for d in dois:
+                self._lib_add_bg(slug, lambda d=d: self.lib_script("add-doi", f"runs/{slug}", "--doi", d, "--source", src, *args))
+            return {"ok": True, "background": True, "n": len(dois)}
         if path in ("library-process", "library-draft"):
             if self.blocked:
                 raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")
@@ -1379,7 +1412,16 @@ def make_handler(app):
                 self.end_headers()
                 return
             if self.path.startswith("/api/status"):
-                return self._json(200, app.status())
+                t0 = time.time()
+                try:
+                    return self._json(200, app.status())
+                except Exception:
+                    import traceback
+                    app.log_error("GET /api/status", traceback.format_exc())
+                    raise
+                finally:
+                    if time.time() - t0 > 10:
+                        app.log_error("GET /api/status 很慢", f"{time.time() - t0:.0f} 秒")
             return super().do_GET()
 
         def do_POST(self):
@@ -1409,6 +1451,7 @@ def make_handler(app):
                     return self._json(200, app.upload(unquote(slug), unquote(wid), self.rfile.read(n)))
                 except (ValueError, RuntimeError) as e:
                     return self._json(400, {"error": str(e)})
+            t0 = time.time()
             try:
                 n = int(self.headers.get("Content-Length") or 0)
                 body = json.loads(self.rfile.read(n) or b"{}")
@@ -1417,6 +1460,13 @@ def make_handler(app):
                 return self._json(404, {"error": "沒有這個功能"})
             except (ValueError, RuntimeError) as e:
                 return self._json(400, {"error": str(e)})
+            except Exception as e:  # 沒想到的錯：完整訊息寫進 _logs，畫面看得到一句
+                import traceback
+                app.log_error(f"POST {self.path}", traceback.format_exc())
+                return self._json(500, {"error": f"程式出錯：{e}（完整訊息在雲端硬碟 _logs 資料夾）"})
+            finally:
+                if time.time() - t0 > 20 and "ai-" not in self.path and "ask" not in self.path and "translate" not in self.path:
+                    app.log_error(f"POST {self.path} 很慢", f"{time.time() - t0:.0f} 秒")
     return Handler
 
 

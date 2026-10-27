@@ -51,6 +51,7 @@ h3{font-size:1.05rem;margin:20px 0 8px}
 .lrow{display:flex;align-items:center;gap:6px}
 .lit{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;padding:6px 10px;border-radius:8px;text-decoration:none;color:var(--fg)}
 .lit:hover{background:var(--soft)}
+.lit.off{color:var(--muted);cursor:default}.lit.off:hover{background:none}
 .lit .t{font-weight:600}
 .lst{font-size:.8rem;color:var(--muted)}
 .spin{display:inline-block;width:11px;height:11px;border:2px solid #c7cbd1;border-top-color:#15803d;border-radius:50%;animation:lspin .8s linear infinite;vertical-align:-1px;margin-right:5px}
@@ -1063,6 +1064,11 @@ async function libReload(msg){
   try { D = await loadData(); await loadLibMeta(); const m = $("#lb-msg") && $("#lb-msg").textContent; libraryView(); if (m) $("#lb-msg").textContent = m; } catch (e) {}
 }
 
+async function libStatusReload(msg){
+  try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok) APP = await r.json(); } catch (e) {}
+  return libReload(msg);
+}
+
 const PTYPES = {meta: "統合分析", sr: "系統性回顧", scoping: "範圍回顧", review: "文獻回顧", rct: "隨機對照試驗", protocol: "研究計畫書", cohort: "世代研究", cross: "橫斷研究",
   casecontrol: "病例對照", case: "個案研究", qual: "質性研究", mixed: "混合方法", guideline: "指引／建議", tool: "方法／工具", commentary: "評論／觀點", other: "其他"};
 let LIBMETA = {items: {}}, LIBGROUP = (() => { try { return localStorage.getItem("phd.libGroup") === "type" ? "type" : "topic"; } catch (e) { return "topic"; } })(), LIBPICK = false;
@@ -1082,11 +1088,13 @@ const CHEV_SVG = '<svg class="chev" viewBox="0 0 12 12" width="12" height="12" a
 /* 列表照 ieltsgod 閱讀：資料夾裡一行一篇，點標題進去；旁邊一個小標籤和狀態，最右邊刪除 */
 function libraryView(){
   const el = body("library"), L = D.library || [], drafts = D.drafts || [], busy = libBusy();
+  const LS = ((APP && APP.lib) || {})[SLUG] || {adding: 0, errors: []};
   const state = w => w.digest ? "" : busy ? `<span class="lst"><span class="spin"></span>處理中</span>` : `<span class="lst">${w.fulltext === "no_free_fulltext" ? "只有摘要" : "等待處理"}</span>`;
   const tag = w => LIBGROUP === "type" ? (libTopic(w) === "分類中" ? `<span class="tpill pending">分類中</span>` : `<span class="tpill">${esc(libTopic(w))}</span>`)
     : (libType(w) ? `<span class="tpill">${esc(PTYPES[libType(w)] || libType(w))}</span>` : `<span class="tpill pending">分類中</span>`);
+  // 照 ieltsgod：還沒整理好的不能點進去（灰色），好了才變成連結
   const item = w => `<div class="lrow">${LIBPICK ? `<input type="checkbox" data-libsel="${esc(w.id)}" ${LIBSEL.has(w.id) ? "checked" : ""} aria-label="選這篇擬初稿">` : ""}
-      <a class="lit" href="${OFFLINE ? "#" : libPage(w.id)}"><span class="t">${esc(w.title || w.id)}</span>${tag(w)}${state(w)}</a>
+      ${w.digest ? `<a class="lit" href="${OFFLINE ? "#" : libPage(w.id)}">` : `<span class="lit off" aria-disabled="true" title="還在處理，好了才能點進去">`}<span class="t">${esc(w.title || w.id)}</span>${tag(w)}${state(w)}${w.digest ? "</a>" : "</span>"}
       ${APP ? `<button type="button" class="btn btn-icon btn-sm ghost" data-lib-del="${esc(w.id)}" title="刪除這篇" aria-label="刪除「${esc(w.title || w.id)}」">${icon("trash", 15)}</button>` : ""}</div>`;
   const OPEN = libOpen(), byType = LIBGROUP === "type", groups = {};
   L.forEach(w => { const k = byType ? (libType(w) ? PTYPES[libType(w)] || libType(w) : "分類中") : libTopic(w); (groups[k] = groups[k] || []).push(w); });
@@ -1103,7 +1111,9 @@ function libraryView(){
         ${L.length ? `<a class="btn btn-icon btn-sm" href="../runs/${encodeURIComponent(SLUG)}/library/out/zotero/library.ris" download title="匯出到 Zotero（RIS）" aria-label="匯出到 Zotero（RIS）">${icon("download", 16)}</a>` : ""}</span></div>
     ${libAddHTML()}
     ${LIBPICK ? `<div class="row small" style="margin-top:8px">勾選要用的文獻，<button class="btn btn-green btn-sm" data-lib-draft>用勾選的 <span id="lb-n">${LIBSEL.size}</span> 篇擬初稿</button></div>` : ""}
-    ${L.length ? `<div class="libtree">${keys.map(k => folder(k, groups[k])).join("")}</div>` : `<div class="empty" style="margin-top:10px">還沒有 Meeting 文獻。按「上傳 PDF」，或貼 DOI、從 Zotero 選；加入後會自動整理。</div>`}` +
+    ${LS.adding ? `<div class="lrow"><span class="lit off"><span class="spin"></span><span class="t">加入中 ${LS.adding} 篇</span><span class="lst">查 DOI 與標題，好了會出現在下面的資料夾</span></span></div>` : ""}
+    ${(LS.errors || []).map(e => `<div class="small" style="color:#9f1d1d;margin:4px 0" role="alert">${esc(e)}</div>`).join("")}
+    ${L.length ? `<div class="libtree">${keys.map(k => folder(k, groups[k])).join("")}</div>` : LS.adding ? "" : `<div class="empty" style="margin-top:10px">還沒有 Meeting 文獻。按「上傳 PDF」，或貼 DOI、從 Zotero 選；加入後會自動整理。</div>`}` +
     (drafts.length ? `<h3 style="margin-top:24px">初稿</h3>${drafts.map((d, i) => `<details class="item" ${i ? "" : "open"}><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         ${pill("y", "初稿")}<strong>${bi((d.title || {}).zh, (d.title || {}).en)}</strong><span class="small muted">${esc((d.built || "").slice(0, 10))}｜用了 ${(d.selected_ids || []).length} 篇</span></summary>
         <div class="small muted" style="margin-top:6px">這是 AI 依你勾選的文獻與她的文章擬的素材，寄給教授前請自己改寫。</div>${versionHTML(d, {noTitle: true})}</details>`).join("")}` : "");
@@ -1111,9 +1121,9 @@ function libraryView(){
   const unsorted = L.some(w => !libType(w) || libTopic(w) === "分類中");
   if (APP && unsorted && !libraryView.asked){ libraryView.asked = true; APIX("lib-classify", {slug: SLUG}).catch(() => {}); }
   clearTimeout(libraryView.t);
-  if (APP && (unsorted || busy)) libraryView.t = setTimeout(async () => {
+  if (APP && (unsorted || busy || LS.adding)) libraryView.t = setTimeout(async () => {
     try { const r = await fetch("/api/status", {cache: "no-store"}); if (r.ok) APP = await r.json(); } catch (e) {}
-    libReload(); }, busy ? 20000 : 8000);
+    libReload(); }, busy && !LS.adding ? 20000 : 4000);
 }
 document.addEventListener("click", async ev => {
   if (!ev.target.closest("#library")) return;
@@ -1134,7 +1144,7 @@ document.addEventListener("click", async ev => {
       const dois = $("#lb-doi").value.split(/\s+/).filter(Boolean);
       if (!dois.length) return;
       $("#lb-msg").textContent = "加入中…";
-      await APIX("library-add", {slug: SLUG, dois, ...libMeta()}); await libReload(`已加入 ${dois.length} 篇，正在自動整理（找全文、AI 重點、圖表）。`);
+      await APIX("library-add", {slug: SLUG, dois, ...libMeta()}); $("#lb-doi").value = ""; await libStatusReload(`已收到 ${dois.length} 篇，在背景加入並自動整理。`);
     } else if (t.matches("[data-lib-zotero]")){
       $("#lb-more").hidden = false;
       const r = await APIX("zotero", {slug: SLUG});
@@ -1148,7 +1158,7 @@ document.addEventListener("click", async ev => {
       const dois = [...document.querySelectorAll("[data-zdoi]:checked")].map(x => x.dataset.zdoi).filter(Boolean);
       if (!dois.length) return;
       $("#lb-msg").textContent = "加入中…";
-      await APIX("library-add", {slug: SLUG, dois, source: "zotero", ...libMeta()}); await libReload(`已從 Zotero 加入 ${dois.length} 篇，正在自動整理。`);
+      await APIX("library-add", {slug: SLUG, dois, source: "zotero", ...libMeta()}); await libStatusReload(`已從 Zotero 收到 ${dois.length} 篇，在背景加入並自動整理。`);
     } else if (t.matches("[data-lib-draft]")){
       if (!LIBSEL.size) return alert("先勾選要用的文獻");
       if (busyHere()) return alert("這位教授已經有一個工作在跑，等它跑完再按");
@@ -1166,7 +1176,7 @@ document.addEventListener("change", async ev => {
     $("#lb-msg").textContent = `上傳中（${files.length} 個）…`;
     let ok = 0;
     try { for (const f of files){ await APIX(`library-upload/${encodeURIComponent(SLUG)}?${q}`, null, await f.arrayBuffer()); ok++; }
-      await libReload(`已加入 ${ok} 篇，正在自動整理（找全文、AI 重點、圖表；每篇約 3–5 分鐘）。`); }
+      await libStatusReload(`已收到 ${ok} 個 PDF，在背景加入並自動整理（每篇約 3–5 分鐘），可以先去做別的。`); }
     catch (e) { $("#lb-msg").textContent = (ok ? `加入了 ${ok} 篇；` : "") + "加入失敗：" + e.message; }
   }
 });
