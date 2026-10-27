@@ -150,6 +150,7 @@ header .wrap{position:relative}
 .ft .para{margin:0 0 1em;border-radius:6px;transition:background .3s}
 .ft h2.para{font-size:1.3em;margin:0 0 .6em}.ft h3.para{font-size:1.05em;margin:1.2em 0 .4em}
 .ft .para.flash{background:#e8f5ec}
+.ft .para.pair{background:#dcf2e3;box-shadow:-6px 0 0 #dcf2e3,-10px 0 0 #15803d;border-radius:2px}
 .zhbar{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:.9rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ptabs{display:none;gap:4px;padding:8px 16px}
 .ptabs button{font:inherit;font-weight:600;min-height:40px;padding:0 16px;border-radius:8px;border:1px solid #d5d8dc;background:#fff;cursor:pointer}
@@ -315,9 +316,17 @@ function wirePanes(){
     const top = from.getBoundingClientRect().top; const p = [...from.querySelectorAll(".para")].find(x => x.getBoundingClientRect().bottom > top + 8); if (!p) return;
     const q = to.querySelector(`.para[data-k="${CSS.escape(p.dataset.k)}"]`); if (q) to.scrollTop += (q.getBoundingClientRect().top - to.getBoundingClientRect().top) - (p.getBoundingClientRect().top - top); };
   L.addEventListener("scroll", follow(L, Z)); Z.addEventListener("scroll", follow(Z, L));
-  // 點一段：另一邊同一段閃一下
-  const flash = (e, other) => { const p = e.target.closest(".para"); if (!p || getSelection().toString()) return; const q = other.querySelector(`.para[data-k="${CSS.escape(p.dataset.k)}"]`); if (q){ q.classList.add("flash"); setTimeout(() => q.classList.remove("flash"), 900); } };
-  L.addEventListener("click", e => flash(e, Z)); Z.addEventListener("click", e => flash(e, L));
+  // 照 ieltsgod 檢討：在一邊點一段或選取文字，另一邊捲到同一段、對齊到同一個高度，兩邊都標著，直到點別段
+  const pair = (e, from, to) => {
+    const p = e.target.closest(".para"); if (!p || e.target.closest(".rd-pop,.rd-box")) return;
+    const q = to.querySelector(`.para[data-k="${CSS.escape(p.dataset.k)}"]`); if (!q) return;
+    document.querySelectorAll(".para.pair").forEach(x => x.classList.remove("pair"));
+    p.classList.add("pair"); q.classList.add("pair");
+    lock = from; clearTimeout(follow.t); follow.t = setTimeout(() => lock = null, 400);  // 這次捲動是對齊，不要反過來帶動另一邊
+    const want = p.getBoundingClientRect().top - from.getBoundingClientRect().top;
+    to.scrollTo({top: to.scrollTop + (q.getBoundingClientRect().top - to.getBoundingClientRect().top) - want, behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+  };
+  L.addEventListener("mouseup", e => setTimeout(() => pair(e, L, Z), 0)); Z.addEventListener("mouseup", e => setTimeout(() => pair(e, Z, L), 0));
   document.querySelectorAll(".ptabs [data-show]").forEach(b => b.onclick = () => { $(".panes").dataset.show = b.dataset.show; document.querySelectorAll(".ptabs [data-show]").forEach(x => x.setAttribute("aria-selected", x === b)); });
   const go = $("#zhGo"); if (go) go.onclick = async () => { go.disabled = true; try { await Reader.translateAll(); } catch (e){ Reader.toast((e && e.error) || "沒辦法開始翻譯"); } redrawFull(); };
   clearTimeout(zhTimer);
