@@ -18,6 +18,7 @@ import html
 import http.server
 import json
 import os
+import re
 import secrets
 import shlex
 import shutil
@@ -679,9 +680,21 @@ class App:
         if r.returncode:
             out = (r.stdout + r.stderr).strip()
             print(f"library.py {' '.join(args)} 失敗：\n{out}")  # 完整訊息進 app.log
+            self.log_error(f"library.py {' '.join(args)}", out)
             last = next((l for l in reversed(out.splitlines()) if l.strip()), "")
-            raise ValueError(f"{last}（完整訊息在 app.log）" if last else "加入失敗")
+            raise ValueError(f"{last}（完整訊息在雲端硬碟 _logs 資料夾）" if last else "加入失敗")
         return r.stdout.strip()
+
+    def log_error(self, what, detail):
+        """錯誤也寫進 runs/_logs/<這台電腦>.log：會同步到雲端硬碟，別台電腦（或 Claude）也看得到；app.log 只在這台。"""
+        try:
+            d = self.runs / "_logs"
+            d.mkdir(parents=True, exist_ok=True)
+            name = re.sub(r"[^\w.-]", "_", socket.gethostname() or "this") + ".log"
+            with open(d / name, "a", encoding="utf-8") as f:
+                f.write(f"===== {datetime.now().isoformat(timespec='seconds')} {what}\n{detail.strip()[-6000:]}\n")
+        except OSError:
+            pass
 
     def _lib_slug(self, slug):
         import re as _re

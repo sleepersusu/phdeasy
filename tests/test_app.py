@@ -474,3 +474,19 @@ def test_windows_background_commands_get_no_console_window():
     app.hide_console_windows(FakeSP)
     assert FakeSP.Popen(["claude"]).k["creationflags"] == 0x08000000
     assert FakeSP.Popen(["cmd"], creationflags=0x10).k["creationflags"] == 0x10
+
+
+def test_library_failure_is_logged_where_drive_syncs(tmp_path, monkeypatch):
+    """加入失敗的完整訊息寫進 runs/_logs/（會同步），不只寫在 Windows 那台的 app.log。"""
+    import subprocess
+    import app
+    a = app.App.__new__(app.App)
+    a.workspace, a.runs = tmp_path, tmp_path / "runs"
+    monkeypatch.setattr(app, "find_uv", lambda: "uv")
+    monkeypatch.setattr(subprocess, "run", lambda *x, **k: subprocess.CompletedProcess(x, 1, "", "Traceback ...\nPermissionError: [WinError 32] 檔案正由另一個程序使用"))
+    import pytest
+    with pytest.raises(ValueError) as e:
+        a.lib_script("add-pdf", "runs/x", "--pdf", "y.pdf")
+    assert "WinError 32" in str(e.value)
+    logs = list((tmp_path / "runs" / "_logs").glob("*.log"))
+    assert logs and "WinError 32" in logs[0].read_text(encoding="utf-8") and "add-pdf" in logs[0].read_text(encoding="utf-8")

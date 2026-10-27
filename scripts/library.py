@@ -50,8 +50,17 @@ def lib_dir(run):
     return lib
 
 
+def _load(lib):
+    return json.loads((lib / "work" / "works.json").read_text())
+
+
 def _save(lib, works):
-    (lib / "work" / "works.json").write_text(json.dumps(works, ensure_ascii=False, indent=2))
+    seen, out = set(), []
+    for w in works:  # 同一篇只留一筆（舊版在 Windows 重試會重複加）
+        if w["id"] not in seen:
+            seen.add(w["id"])
+            out.append(w)
+    (lib / "work" / "works.json").write_text(json.dumps(out, ensure_ascii=False, indent=2))
 
 
 def _meta(a):
@@ -73,19 +82,45 @@ def add_doi(lib, doi, source, **meta):
     return w
 
 
-def add_pdf(lib, pdf, **meta):
+def _pdf_head(pdf):
+    """PDF 前兩頁的字與檔案資訊的標題；讀完馬上關掉（Windows 不能改名還開著的檔案）。"""
     import pymupdf
+    with pymupdf.open(pdf) as doc:
+        return "\n".join(doc[i].get_text() for i in range(min(2, doc.page_count))), (doc.metadata or {}).get("title")
+
+
+def _move_to(pdf, dest):
+    """改成帶文章 id 的檔名；Windows 不准改名（檔案被別的程式開著，例如雲端硬碟正在同步）就複製一份。"""
+    if pdf.resolve() == dest.resolve():
+        return
+    try:
+        pdf.rename(dest)
+    except OSError:
+        import shutil
+        shutil.copyfile(pdf, dest)
+
+
+def _find(works, doi, h):
+    return next((x for x in works if (doi and x.get("doi") == doi) or x["id"] == f"L{h}"), None)
+
+
+def add_pdf(lib, pdf, **meta):
     pdf = Path(pdf)
-    doc = pymupdf.open(pdf)
-    head = "\n".join(doc[i].get_text() for i in range(min(2, doc.page_count)))
+    head, meta_title = _pdf_head(pdf)
     doi = doi_from_text(head)
+    h = hashlib.sha256(pdf.read_bytes()).hexdigest()[:8]
+    old = _find(_load(lib), doi, h)
+    if old:  # 同一個檔（或同一個 DOI）重傳：不再多加一筆，只把檔案對上
+        print(f"SKIP {old['id']} 已在 Meeting 文獻")
+        _move_to(pdf, lib / "inbox" / f"{old['id']}_{pdf.name}")
+        return old
     w = None
     if doi:
         try:
             w = add_doi(lib, doi, "pdf", **meta)
         except RuntimeError as e:
             print(f"WARN OpenAlex 查不到 {doi}（{e}），改用 PDF 本身的標題")
-    guess = title_guess((doc.metadata or {}).get("title"), head, pdf.stem)
+    guess = title_guess(meta_title, head, pdf.stem)
     if w is None and not doi and len(head.strip()) >= 200:  # 沒有 DOI：用 PDF 的標題查 OpenAlex，標題字詞對得上第一頁才採用；掃描檔沒字就不查
         try:
             hits = get_json(f"https://api.openalex.org/works?search={quote(guess[:200])}&per-page=3{openalex_params()}").get("results") or []
@@ -100,16 +135,30 @@ def add_pdf(lib, pdf, **meta):
             w = next(x for x in works if x.get("doi") == doi)
         else:
             title = guess
-            h = hashlib.sha256(pdf.read_bytes()).hexdigest()[:8]
             w = tag_item({"id": f"L{h}", "title": title, "year": None, "type": "article", "doi": doi, "authors": [], "abstract": None,
                           "venue": None}, source="pdf", **meta)
             works.append(w)
             _save(lib, works)
             print(f"ADD {w['id']}（沒有 DOI，標題取自 PDF）{title[:70]}")
-    dest = lib / "inbox" / f"{w['id']}_{pdf.name}"
-    if pdf.resolve() != dest.resolve():
-        pdf.rename(dest)  # 檔名帶文章 id，找全文時 inbox 一定對得上
+    _move_to(pdf, lib / "inbox" / f"{w['id']}_{pdf.name}")  # 檔名帶文章 id，找全文時 inbox 一定對得上
     return w
+
+
+def relink_uploads(lib):
+    """舊版在 Windows 加進去了、但改名失敗留下的 _upload_*.pdf：用 DOI 或檔案雜湊對回文章，補上帶 id 的檔名。回傳對上幾個。"""
+    works, n = _load(lib), 0
+    for pdf in sorted((lib / "inbox").glob("_upload_*.pdf")):
+        try:
+            head, _ = _pdf_head(pdf)
+        except Exception:
+            continue
+        w = _find(works, doi_from_text(head), hashlib.sha256(pdf.read_bytes()).hexdigest()[:8])
+        if w and not any((lib / "inbox").glob(f"{w['id']}_*{pdf.name}")):
+            _move_to(pdf, lib / "inbox" / f"{w['id']}_{pdf.name}")
+            n += 1
+    if n:
+        print(f"DONE 對回 {n} 個之前沒改到檔名的上傳檔")
+    return n
 
 
 def run_step(*args):
@@ -119,6 +168,8 @@ def run_step(*args):
 
 
 def process(lib):
+    relink_uploads(lib)
+    _save(lib, _load(lib))  # 清掉舊版留下的重複
     run_step(SCRIPTS / "setup_fulltext.py", lib)
     run_step(SCRIPTS / "ingest.py", lib)
     run_step(SCRIPTS / "figures.py", "extract", lib)
@@ -218,6 +269,8 @@ def main():
         add_doi(lib, a.doi, a.source, **_meta(a))
     elif a.cmd == "add-pdf":
         add_pdf(lib, a.pdf, **_meta(a))
+        relink_uploads(lib)
+        _save(lib, _load(lib))
     elif a.cmd == "process":
         process(lib)
     elif a.cmd == "zotero":
