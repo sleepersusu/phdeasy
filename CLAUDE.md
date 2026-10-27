@@ -57,7 +57,7 @@
 | cards | `cards.py todo／check／diff／check-refute／assemble` |
 | profile | `profile.py facts／check／assemble`、`basic_info.py`（教授首頁基本資訊：ORCID 職稱與系所、OpenAlex 指標） |
 | match | `match.py inputs／check／check-refute／assemble` → `out/match.json`（首頁教授卡片讀它） |
-| Meeting（原討論文獻） | `library.py add-doi／add-pdf／process／zotero／ris／draft-inputs／draft-check／draft-assemble`（skill `prof-library`）：教授給的文獻放 `runs/<slug>/library/`（結構同教授批次，同一套腳本處理），勾選擬的初稿放 `runs/<slug>/drafts/`；Zotero 只讀，匯出 RIS 由本人匯入；教授頁「Meeting」是資料夾樹，按主題或研究類型（`library/meta.json`；`pipeline/libmeta.py`：類型腳本先判，主題由 AI 判斷並沿用已有的主題，本人改的最優先） |
+| Meeting（原討論文獻） | `library.py add-doi／add-pdf／process／zotero／ris／draft-inputs／draft-check／draft-assemble`（skill `prof-library`）：教授給的文獻放 `runs/<slug>/library/`（結構同教授批次，同一套腳本處理），勾選擬的初稿放 `runs/<slug>/drafts/`；Zotero 只讀，匯出 RIS 由本人匯入；上傳／貼 DOI／Zotero 加入後自動處理（`lib:<slug>` 工作，正在跑就跑完再接一次），可刪除（PDF 移到 `library/_已刪除/`）；教授頁「Meeting」是資料夾樹，按主題或研究類型（`library/meta.json`；`pipeline/libmeta.py`：類型腳本先判，主題由 AI 判斷並沿用已有的主題，本人改的最優先） |
 | 全文閱讀 | `pipeline/reader.py`＋`web/reader.js`：單篇頁「全文閱讀」左英右中、整篇翻中文（`annotations/<id>.zh.json`）；選取文字螢光筆、筆記、問 AI、翻譯、收藏素材（標記 `annotations/<id>.json`，素材 `runs/_me/clips.json`） |
 | verify | `e2e.py`、`build_site.py`（教授詳細頁，任何階段後都可重跑） |
 | 本人計畫書與自述 | `me_proposal.py import <計畫書.docx>`、`me_proposal.py statement ps|sop <檔案.docx>`（首頁 Personal Statement／SOP 頁籤）：依原檔順序匯入段落、圖（原始圖檔）、表（真的表格）到 `runs/_me/`（不進 git），教授頁「研究計畫書」照原排版顯示 |

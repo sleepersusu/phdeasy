@@ -211,6 +211,7 @@ class App:
         self.gcal_pending = None
         from pipeline import ai as AI
         AI.configure(self.runs)  # AI 小幫手（照 ieltsgod）：設定存在 runs/_app/ai.json，只在這台
+        self._lib_again = set()  # 文獻處理在跑時又加了文獻的教授：跑完再接著跑一次
         self.zh_jobs = {}  # 全文翻中文的背景工作：{(教授, 文章, 討論文獻?): {status, done, total, error}}
         self.jobs.on_done = self.after_job
         self.blocked = None
@@ -245,7 +246,7 @@ class App:
         try:
             return self.jobs.start(kind, prompt, title, slug=slug, key=key)
         except RuntimeError as e:
-            if "個工作在跑" not in str(e):
+            if not re.search(r"已經有 \d+ 個工作在跑", str(e)):  # 只有「滿了」才排隊；同一位教授已在跑照樣回錯誤
                 raise
             if not any(q["title"] == title for q in self.queue):
                 self.queue.append({"kind": kind, "prompt": prompt, "title": title, "slug": slug, "key": key})
@@ -258,7 +259,7 @@ class App:
             try:
                 self.jobs.start(q["kind"], q["prompt"], q["title"], slug=q["slug"], key=q["key"])
             except RuntimeError as e:
-                if "個工作在跑" in str(e):
+                if re.search(r"已經有 \d+ 個工作在跑", str(e)):
                     return
                 print(f"排隊的工作開不了：{q['title']}：{e}")
             self.queue.pop(0)
@@ -274,6 +275,13 @@ class App:
         p.write_text(json.dumps(t, ensure_ascii=False, indent=1))
 
     def after_job(self, job):
+        slug = (job or {}).get("slug")
+        if (job or {}).get("key", "").startswith("lib:") and slug in self._lib_again:  # 跑的時候又加了文獻：接著再跑一次
+            self._lib_again.discard(slug)
+            try:
+                self.lib_autoprocess(slug)
+            except Exception as e:
+                print(f"文獻接著處理失敗：{e}")
         try:
             self._drain_queue()
         except Exception as e:
@@ -845,7 +853,43 @@ class App:
                               *self._lib_meta(meta))
         self._rebuild_site(slug)
         self.lib_classify(slug)
-        return {"ok": True, "result": out}
+        return {"ok": True, "result": out, "process": self.lib_autoprocess(slug)}
+
+    def lib_autoprocess(self, slug):
+        """加入文獻後自動處理（找全文、轉文字、圖表、AI 重點），不用另外按按鈕。
+        同一位教授的文獻處理已經在跑：記下來，跑完再自動接著跑一次（新加的才會處理到）。"""
+        if self.blocked:
+            return {"skipped": f"另一台電腦（{self.blocked}）正在用"}
+        from pipeline.jobs import prompt_library_process
+        try:
+            return self.start_or_queue("library", prompt_library_process(slug), f"Meeting 文獻：{slug}", slug=slug, key=f"lib:{slug}")
+        except RuntimeError as e:
+            if "已經有一個工作在跑" not in str(e):
+                return {"skipped": str(e)}
+            self._lib_again.add(slug)
+            return {"pending": True}
+
+    def lib_delete(self, body):
+        """刪除一篇 Meeting 文獻：從清單與分類拿掉；它的 PDF 不真的刪，移到 library/_已刪除/（照 ieltsgod）。"""
+        import shutil
+        from pipeline.libmeta import load_meta
+        slug = self._lib_slug(body.get("slug"))
+        wid = str(body.get("id") or "")
+        lib = self.runs / slug / "library"
+        works = self._lib_works(slug)
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,40}", wid) or wid not in {w["id"] for w in works}:
+            raise ValueError(f"沒有這篇：{wid}")
+        (lib / "work" / "works.json").write_text(json.dumps([w for w in works if w["id"] != wid], ensure_ascii=False, indent=2), encoding="utf-8")
+        m = load_meta(lib)
+        if m["items"].pop(wid, None) is not None:
+            (lib / "meta.json").write_text(json.dumps(m, ensure_ascii=False, indent=1), encoding="utf-8")
+        trash = lib / "_已刪除"
+        for d in ("inbox", "pdfs"):
+            for f in list((lib / d).glob(f"**/{wid}_*")) if (lib / d).exists() else []:
+                trash.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(f), str(trash / f.name))
+        self._rebuild_site(slug)
+        return {"ok": True}
 
     # ---------- Meeting 文獻：資料夾與類型標籤 ----------
     def _lib_works(self, slug):
@@ -1090,6 +1134,8 @@ class App:
             if not isinstance(b, int) or b < 0:
                 raise ValueError("段落不對")
             return self.jobs.start("doc-edit", prompt_doc_edit(key, v, b, (body.get("instruction") or "")[:300]), f"AI 編修：{key} 第 {v} 版第 {b + 1} 段", key=f"doc:{key}")
+        if path == "lib-delete":
+            return self.lib_delete(body)
         if path == "lib-meta":
             return self.lib_meta(body)
         if path == "lib-classify":
@@ -1108,7 +1154,7 @@ class App:
             res = [self.lib_script("add-doi", f"runs/{slug}", "--doi", d, "--source", src, *self._lib_meta(body)) for d in dois]
             self._rebuild_site(slug)
             self.lib_classify(slug)
-            return {"ok": True, "result": res}
+            return {"ok": True, "result": res, "process": self.lib_autoprocess(slug)}
         if path in ("library-process", "library-draft"):
             if self.blocked:
                 raise ValueError(f"另一台電腦（{self.blocked}）正在用，這台先不要跑流水線；那台關掉後重開這個程式")

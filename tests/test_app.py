@@ -169,7 +169,7 @@ def test_library_add_doi_and_jobs(tmp_path):
     import pytest
     app, calls = _lib_app(tmp_path)
     app.post("library-add", {"slug": "doe-jane", "dois": ["10.1234/a", " "], "given_by": "Jane", "source": "zotero"})
-    assert [c[0] for c in calls if c[0] != "build"] == ["add-doi"] and "10.1234/a" in calls[0] and "zotero" in calls[0]
+    assert [c[0] for c in calls if c[0] not in ("build", "job")] == ["add-doi"] and "10.1234/a" in calls[0] and "zotero" in calls[0]
     with pytest.raises(ValueError):
         app.post("library-add", {"slug": "doe-jane", "dois": ["not-a-doi"]})
     app.post("library-process", {"slug": "doe-jane"})
@@ -490,3 +490,43 @@ def test_library_failure_is_logged_where_drive_syncs(tmp_path, monkeypatch):
     assert "WinError 32" in str(e.value)
     logs = list((tmp_path / "runs" / "_logs").glob("*.log"))
     assert logs and "WinError 32" in logs[0].read_text(encoding="utf-8") and "add-pdf" in logs[0].read_text(encoding="utf-8")
+
+
+def test_library_add_processes_automatically_without_button(tmp_path):
+    """上傳或貼 DOI 之後就自動開始處理（找全文、AI 重點）；同一位教授的文獻處理已在跑，就等它跑完再自動接著跑一次。"""
+    app, calls = _lib_app(tmp_path)
+    app.library_upload("doe-jane", b"%PDF-1.7 ...", {})
+    jobs = [c for c in calls if c[0] == "job"]
+    assert jobs and jobs[-1][1] == "library" and "prof-library" in jobs[-1][3]
+    def busy(*a, **k):
+        raise RuntimeError("這位教授（或這份文件）已經有一個工作在跑：Meeting 文獻")
+    app.jobs.start = busy
+    r = app.post("library-add", {"slug": "doe-jane", "dois": ["10.1234/b"]})
+    assert r.get("process", {}).get("pending")
+    app.jobs.start = lambda kind, prompt, title, slug=None, key=None, session=None: calls.append(("job", kind, slug, key)) or {"ok": True}
+    app.rebuild_after = False
+    app._drain_queue = lambda: None
+    import app as appmod
+    appmod.rebuild = lambda ws: None
+    app.after_job({"key": "lib:doe-jane", "slug": "doe-jane"})
+    assert calls[-1] == ("job", "library", "doe-jane", "lib:doe-jane")
+
+
+def test_library_delete_moves_files_and_forgets_entry(tmp_path):
+    import json
+    import pytest
+    app, calls = _lib_app(tmp_path)
+    lib = tmp_path / "runs" / "doe-jane" / "library"
+    (lib / "work").mkdir(parents=True)
+    (lib / "inbox").mkdir()
+    (lib / "work" / "works.json").write_text(json.dumps([{"id": "W1", "title": "a"}, {"id": "L2", "title": "b"}]))
+    (lib / "meta.json").write_text(json.dumps({"items": {"W1": {"topic": "x"}, "L2": {"topic": "y"}}}))
+    (lib / "inbox" / "W1__upload_1.pdf").write_bytes(b"%PDF")
+    (lib / "inbox" / "L2__upload_2.pdf").write_bytes(b"%PDF")
+    app.post("lib-delete", {"slug": "doe-jane", "id": "W1"})
+    assert [w["id"] for w in json.loads((lib / "work" / "works.json").read_text())] == ["L2"]
+    assert "W1" not in json.loads((lib / "meta.json").read_text())["items"]
+    assert not (lib / "inbox" / "W1__upload_1.pdf").exists() and (lib / "_已刪除" / "W1__upload_1.pdf").exists()  # 不真的刪：移到 _已刪除
+    assert (lib / "inbox" / "L2__upload_2.pdf").exists()
+    with pytest.raises(ValueError):
+        app.post("lib-delete", {"slug": "doe-jane", "id": "../x"})
