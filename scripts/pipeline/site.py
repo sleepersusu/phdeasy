@@ -178,6 +178,10 @@ def _library(run):
     out = []
     for w in sorted(works, key=lambda w: ((w.get("library") or {}).get("added") or "", w["id"]), reverse=True):
         r, ex = idx.get(w["id"], {}), _paper_extras(lib, w)
+        if r.get("status") != "ok":  # 本人上傳的 PDF 還沒整理（還在 inbox）：一樣算有全文，可以打開
+            up = sorted((lib / "inbox").glob(f"{w['id']}_*.pdf")) if (lib / "inbox").exists() else []
+            if up:
+                r = {"status": "ok", "path": str(up[0].relative_to(lib)).replace("\\", "/")}
         out.append({"id": w["id"], "title": w.get("title"), "year": w.get("year"), "venue": w.get("venue"), "doi": w.get("doi"),
                     "type": w.get("type"), "kind": "full", "abstract": w.get("abstract"), "library": w.get("library") or {},
                     "authors": [{"name": a.get("name")} for a in w.get("authors") or []],

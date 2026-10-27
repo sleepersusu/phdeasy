@@ -47,8 +47,9 @@ def verify_hashes(run, hashes):
     return changed
 
 
-def convert(run, w, row):
-    """回傳 (文字, 來源類型, 例外清單[(kind, detail)])。"""
+def convert(run, w, row, library=False):
+    """回傳 (文字, 來源類型, 例外清單[(kind, detail)])。
+    library＝Meeting 文件：不一定是論文（指引、檢核表、報告）——表格留成表格，不檢查標題、不因為像附錄而隔離。"""
     exc = []
     if row.get("status") == "ok" and row.get("path"):
         src = run / row["path"]
@@ -57,16 +58,16 @@ def convert(run, w, row):
                 text, _ = xml_to_marked(src.read_bytes())
                 stype = "xml"
             else:
-                text, _ = pdf_to_marked(src)
+                text, _ = pdf_to_marked(src, tables=library, ocr=library)  # Meeting 文件：表格留成表格、掃描檔用 OCR 讀字
                 stype = "pdf"
         except Exception as e:
             text, stype = "", None
             exc.append(("unreadable", f"{row['path']}：{type(e).__name__}: {e}"))
-        if stype and not has_text(text):
+        if stype and not (has_text(text, min_chars=40) if library else has_text(text)):  # Meeting 文件可能只有一兩頁
             exc.append(("no_text", f"{row['path']} 抽不出文字（可能是掃描檔）"))
-        elif stype and looks_like_supplement(text):
+        elif stype and not library and looks_like_supplement(text):
             exc.append(("not_main_text", f"{row['path']} 看起來是附錄或檢核表，不是論文正文，已隔離"))
-        elif stype and not title_matches(text, w["title"]):
+        elif stype and not library and not title_matches(text, w["title"]):
             exc.append(("title_mismatch", f"{row['path']} 前兩頁找不到文章標題，可能拿錯檔案，已隔離"))
         if not exc:
             if is_preprint_url(row.get("url")) and w.get("type") != "preprint":  # 判斷規則：正式版無全文時用預印本，標 preprint_text
@@ -87,6 +88,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
     ap.add_argument("--limit", type=float, default=0.3)
+    ap.add_argument("--library", action="store_true", help="Meeting 文件：不一定是論文，表格留成表格")
     args = ap.parse_args()
     run = Path(args.run)
     wd = run / "work"
@@ -111,10 +113,13 @@ def main():
         row = index.get(w["id"], {})
         src_hash = row.get("sha256") or hashlib.sha256((w.get("abstract") or "").encode()).hexdigest()
         prev = ing.get(w["id"])
+        if prev and prev.get("ocr") and (wd / "text" / f"{w['id']}.txt").exists():  # 掃描檔已由轉錄者轉好：不要蓋掉
+            counts["pdf"] = counts.get("pdf", 0) + 1
+            continue
         if not needs_redo(prev, src_hash, (wd / "text" / f"{w['id']}.txt").exists()):
             counts[prev["source_type"]] = counts.get(prev["source_type"], 0) + 1
             continue
-        text, stype, exc = convert(run, w, row)
+        text, stype, exc = convert(run, w, row, library=args.library)
         header = f"# {w['id']} | {stype} | {w['title']}\n\n"
         (wd / "text" / f"{w['id']}.txt").write_text(header + text)
         now = {k for k, _ in exc}

@@ -150,6 +150,12 @@ header .wrap{position:relative}
 .ft .para{margin:0 0 1em;border-radius:6px;transition:background .3s}
 .ft h2.para{font-size:1.3em;margin:0 0 .6em}.ft h3.para{font-size:1.05em;margin:1.2em 0 .4em}
 .ft .para.flash{background:#e8f5ec}
+.ft .para.li{position:relative;padding-left:1.2em;margin-bottom:.45em}
+.ft .para.li::before{content:"•";position:absolute;left:.2em;color:var(--muted)}
+.ft .ptable{overflow-x:auto;margin:0 0 1.1em}
+.ft .ptable table{border-collapse:collapse;font-size:.9em;line-height:1.5;min-width:100%}
+.ft .ptable th,.ft .ptable td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.ft .ptable th{background:var(--soft);font-weight:700}
 .ft .para.pair{background:#dcf2e3;box-shadow:-6px 0 0 #dcf2e3,-10px 0 0 #15803d;border-radius:2px}
 .zhbar{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 12px;margin:0 0 14px;font-size:.9rem;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .ptabs{display:none;gap:4px;padding:8px 16px}
@@ -299,12 +305,23 @@ function fullHTML(w){
   const norm = x => String(x || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
   const T0 = norm(w.title);
   B = B.filter((b, i) => !(b.kind === "h1" || (i < 6 && T0.length > 20 && norm(b.text) === T0)));
+  // 表格（PDF 抓到的、轉錄者寫的）：兩邊都照原本的行列；中文的表格從翻譯回來的 Markdown 解析
+  const mdRows = md => { let rows = String(md || "").split("\n").map(x => x.trim()).filter(x => x.startsWith("|")).map(r => r.replace(/^\||\|$/g, "").split("|").map(c => c.trim()));
+    const head = rows.length > 1 && rows[1].every(c => !c || /^:?-{2,}:?$/.test(c)); if (head) rows = [rows[0], ...rows.slice(2)]; return {rows, head}; };
+  const tbl = (pre, k, rows, head, page) => `<div class="para ptable" data-k="${esc(k)}"><table>${rows.map((r, ri) => `<tr>${r.map((c, ci) => { const tg = head && ri === 0 ? "th" : "td";
+    return `<${tg}>${Reader.hl(`${pre}:${k}:${ri}:${ci}`, c, page)}</${tg}>`; }).join("")}</tr>`).join("")}</table></div>`;
   B.forEach(b => {
     if (b.page !== pg && lab(b)){ en += `<div class="pg">${lab(b)}</div>`; zh += `<div class="pg">${lab(b)}</div>`; }
     pg = b.page;
     const t = tagOf(b);
-    en += `<${t} class="para" data-k="${esc(b.key)}" lang="en">${Reader.hl("t:" + b.key, b.text, b.page)}</${t}>`;
-    zh += `<${t} class="para" data-k="${esc(b.key)}">${R.zh[b.key] ? Reader.hl("z:" + b.key, R.zh[b.key], b.page) : /[A-Za-z]{2}/.test(b.text) ? `<span class="muted small">（還沒翻）</span>` : esc(b.text)}</${t}>`;
+    if (b.kind === "table"){
+      en += tbl("t", b.key, b.rows || mdRows(b.text).rows, b.head, b.page);
+      const z = R.zh[b.key] && mdRows(R.zh[b.key]);
+      zh += z && z.rows.length ? tbl("z", b.key, z.rows, z.head, b.page) : `<div class="para" data-k="${esc(b.key)}">${R.zh[b.key] ? Reader.hl("z:" + b.key, R.zh[b.key], b.page) : `<span class="muted small">（表格還沒翻）</span>`}</div>`;
+      return;
+    }
+    en += `<${t} class="para${b.kind === "li" ? " li" : ""}" data-k="${esc(b.key)}" lang="en">${Reader.hl("t:" + b.key, b.text, b.page)}</${t}>`;
+    zh += `<${t} class="para${b.kind === "li" ? " li" : ""}" data-k="${esc(b.key)}">${R.zh[b.key] ? Reader.hl("z:" + b.key, R.zh[b.key], b.page) : /[A-Za-z]{2}/.test(b.text) ? `<span class="muted small">（還沒翻）</span>` : esc(b.text)}</${t}>`;
   });
   const bar = job.status === "running" ? `<div class="zhbar" role="status">AI 翻譯中… ${job.done}/${job.total} 段（可以先讀，翻好的會自動出現）</div>`
     : need ? `<div class="zhbar">${job.status === "error" ? `<span class="rd-err">翻譯沒有完成：${esc(job.error)}</span><br>` : ""}還有 ${need} 段沒翻成中文。<button type="button" class="rd-btn primary" id="zhGo">${icon("translate", 15)} 整篇翻成中文</button><span class="small muted">（用便宜的模型，背景翻，約幾分鐘）</span></div>` : "";

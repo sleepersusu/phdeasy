@@ -243,7 +243,8 @@
     {group: "library", title: "Meeting：教授給的文獻", nodes: [
       {s: "上傳 PDF／貼 DOI／Zotero", tools: "OpenAlex 查 DOI 與標題"},
       {task: "classify"},
-      {s: "找全文、轉文字、抓圖表", tools: "同建檔的腳本"},
+      {s: "找全文、轉文字（表格留成表格）、抓圖表", tools: "PyMuPDF 表格偵測"},
+      {ai: ["library.transcriber"]},
       {ai: ["library.digester"]},
       {ai: ["library.drafter"]}]},
     {group: "research", title: "查詢與比對", nodes: [

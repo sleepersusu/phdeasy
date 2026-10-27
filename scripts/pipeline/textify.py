@@ -20,13 +20,107 @@ def clean_pdf_text(s):
     return re.sub(r"(?<=\d)\$(?=\d)", ".", s)
 
 
-def pdf_to_marked(path):
+def _cell(c):
+    return re.sub(r"\s+", " ", clean_pdf_text(str(c or ""))).replace("|", "／").strip()
+
+
+def _page_with_tables(page):
+    """一頁的文字，表格留成 Markdown 表格（| a | b |）放在原本的位置；表格裡的字不在別處重複。
+    給 Meeting 文件用（指引、檢核表常是表格）；找不到表格就是一般的文字。"""
+    try:
+        tabs = [t for t in page.find_tables().tables if t.row_count >= 2 and t.col_count >= 2]
+    except Exception:
+        tabs = []
+    if not tabs:
+        return clean_pdf_text(page.get_text()).strip()
+    import pymupdf
+    boxes = [pymupdf.Rect(t.bbox) for t in tabs]
+    items = []
+    for b in page.get_text("blocks"):
+        r = pymupdf.Rect(b[:4])
+        if b[6] == 0 and not any(r.intersects(x) and (r & x).get_area() > 0.5 * r.get_area() for x in boxes):
+            items.append((r.y0, clean_pdf_text(b[4]).strip()))
+    for t, x in zip(tabs, boxes):
+        rows = [[_cell(c) for c in row] for row in t.extract()]
+        rows = [r for r in rows if any(r)]
+        if len(rows) < 2:
+            continue
+        md = ["| " + " | ".join(rows[0]) + " |", "| " + " | ".join("---" for _ in rows[0]) + " |"] + ["| " + " | ".join(r) + " |" for r in rows[1:]]
+        items.append((x.y0, "\n".join(md)))
+    return "\n\n".join(t for _, t in sorted(items, key=lambda z: z[0]) if t)
+
+
+_ENGINE = []
+
+
+def _ocr_engine():
+    """OCR 套件（rapidocr-onnxruntime：模型跟著套件來，不用另外裝程式、不用網路，Windows 也能用）；裝不起來就回 None。"""
+    if not _ENGINE:
+        try:
+            from rapidocr_onnxruntime import RapidOCR
+            _ENGINE.append(RapidOCR())
+        except Exception:
+            _ENGINE.append(None)
+    return _ENGINE[0]
+
+
+def fix_ocr_spacing(s):
+    """OCR 讀英文常把字黏在一起（PeoplewhomeettheICMJE…）：很長一串沒有空白的英文字母拆回單字；標點後面補空白。"""
+    s = re.sub(r"(?<=[a-z])([,;:])(?=[A-Za-z])", r"\1 ", s)
+    try:
+        import wordninja
+    except ImportError:
+        return s
+
+    def split(m):
+        parts = wordninja.split(m.group(0))
+        out = []
+        for p in parts:  # 拆成一個一個大寫字母的（縮寫）黏回去
+            if out and p.isupper() and len(p) <= 2 and out[-1].isupper() and len(out[-1]) <= 6:
+                out[-1] += p
+            else:
+                out.append(p)
+        return " ".join(out)
+    return re.sub(r"[A-Za-z]{10,}", split, s)
+
+
+def _ocr_page(page, engine):
+    """掃描頁：轉成圖片讀字，再依行距把一行一行接成段落。"""
+    res, _ = engine(page.get_pixmap(dpi=200).tobytes("png"))
+    lines = []
+    for box, txt, _score in res or []:
+        ys = [p[1] for p in box]
+        lines.append((min(ys), max(ys), fix_ocr_spacing(str(txt).strip())))
+    lines.sort(key=lambda x: x[0])
+    paras, cur, last = [], [], None
+    for y0, y1, t in lines:
+        h = max(y1 - y0, 1)
+        if cur and last is not None and y0 - last > 0.9 * h:  # 行距特別大：換段
+            paras.append(" ".join(cur))
+            cur = []
+        cur.append(t)
+        last = y1
+    if cur:
+        paras.append(" ".join(cur))
+    return "\n\n".join(paras)
+
+
+def pdf_to_marked(path, tables=False, ocr=False):
+    """ocr＝True：沒有文字層的頁（掃描檔）用 OCR 讀字（Meeting 文件用）。"""
     import pymupdf
 
     parts = []
     with pymupdf.open(path) as doc:
         for i, page in enumerate(doc, 1):
-            parts.append(f"[p.{i}]\n{clean_pdf_text(page.get_text()).strip()}\n")
+            body = _page_with_tables(page) if tables else clean_pdf_text(page.get_text()).strip()
+            if ocr and len(re.sub(r"\s+", "", body)) < 20:
+                eng = _ocr_engine()
+                if eng is not None:
+                    try:
+                        body = _ocr_page(page, eng)
+                    except Exception:
+                        pass
+            parts.append(f"[p.{i}]\n{body}\n")
         n = len(doc)
     return "\n".join(parts), n
 

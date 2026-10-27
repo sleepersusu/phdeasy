@@ -14,7 +14,19 @@ uv run python scripts/drive_sync.py runs
 uv run python scripts/library.py process runs/<slug>
 ```
 
-`process` 會跑找全文（含本機 Zotero 唯讀、inbox 裡本人上傳的檔）→ 轉文字 → 抓圖表 → 列出還沒寫重點的文獻。
+`process` 會跑找全文（含本機 Zotero 唯讀、inbox 裡本人上傳的檔）→ 轉文字（Meeting 文件不一定是論文：表格留成 Markdown 表格，不因為標題對不上或像檢核表而隔離）→ 抓圖表 → 列出還沒寫重點的文獻。
+
+**掃描檔（印出 `OCR n 份掃描檔要轉錄`）**：先轉錄，再整理。每份派一個轉錄者（`model: sonnet`），同時最多 3 個：
+
+> 讀 `.claude/skills/prof-library/transcriber.md` 照做。slug=<slug>，id=<id>
+
+回來後逐份核對並套用：
+
+```bash
+uv run python scripts/library.py ocr-apply runs/<slug> --id <id>
+```
+
+`FAIL 轉錄缺頁…` → **只修一輪**（SendMessage 給原本的轉錄者，附上缺哪幾頁）。仍失敗 → 記進 `progress.md`，這份跳過，不擋其他文獻。全部套用完再跑一次 `uv run python scripts/digest.py todo <lib>`，轉錄好的就會列進待整理。
 
 每 4–5 篇派一個整理者（`model: opus`），同時最多 5 個；重點、圖表、研究方法十部分一次寫完：
 

@@ -225,9 +225,62 @@ def process(lib):
     with _works_lock(lib):
         _save(lib, _load(lib))  # 清掉舊版留下的重複
     run_step(SCRIPTS / "setup_fulltext.py", lib)
-    run_step(SCRIPTS / "ingest.py", lib)
+    run_step(SCRIPTS / "ingest.py", lib, "--library")
+    todo = ocr_todo(lib)
+    if todo:  # 掃描檔：交給轉錄者（skill A 段）
+        print(f"OCR {len(todo)} 份掃描檔要轉錄：{','.join(t['id'] for t in todo)}")
     run_step(SCRIPTS / "figures.py", "extract", lib)
     run_step(SCRIPTS / "digest.py", "todo", lib)
+
+
+def ocr_todo(lib):
+    """抽不出字的 PDF（掃描檔）：列出來給轉錄者一頁一頁看圖轉成文字。已經轉好的不列。"""
+    import pymupdf
+    from pipeline.index import load_index
+    ing = _j(lib / "work" / "ingest.json", {}) or {}
+    idx = load_index(lib)
+    out = []
+    for w in _load(lib):
+        e, row = ing.get(w["id"]) or {}, idx.get(w["id"]) or {}
+        if e.get("ocr") or "no_text" not in (e.get("exceptions") or []) or row.get("status") != "ok" or not row.get("path"):
+            continue
+        pdf = lib / row["path"]
+        if not pdf.exists():
+            continue
+        with pymupdf.open(pdf) as d:
+            n = d.page_count
+        out.append({"id": w["id"], "title": w.get("title"), "pdf": str(pdf), "pages": n, "out": str(lib / "work" / "ocr" / f"{w['id']}.txt")})
+    (lib / "work" / "ocr").mkdir(parents=True, exist_ok=True)
+    (lib / "work" / "ocr" / "todo.json").write_text(json.dumps(out, ensure_ascii=False, indent=1))
+    return out
+
+
+def ocr_apply(lib, wid):
+    """核對轉錄者寫的 work/ocr/<id>.txt：每一頁 [p.N] 都要有、而且有字（空白頁寫「（空白頁）」）；過了才變成全文。"""
+    import re
+    from pipeline.index import load_index
+    t = next((x for x in json.loads((lib / "work" / "ocr" / "todo.json").read_text()) if x["id"] == wid), None) if (lib / "work" / "ocr" / "todo.json").exists() else None
+    if not t:
+        raise ValueError(f"{wid} 不在轉錄清單")
+    p = lib / "work" / "ocr" / f"{wid}.txt"
+    if not p.exists():
+        raise ValueError(f"轉錄者還沒寫 {p}")
+    text = p.read_text()
+    pages = re.split(r"^\[p\.(\d+)\]\s*$", text, flags=re.M)
+    got = {int(pages[i]): pages[i + 1].strip() for i in range(1, len(pages) - 1, 2)}
+    missing = [n for n in range(1, t["pages"] + 1) if not got.get(n)]
+    if missing:
+        raise ValueError("轉錄缺頁：" + "、".join(f"p.{n}" for n in missing))
+    w = next(x for x in _load(lib) if x["id"] == wid)
+    body = "\n".join(f"[p.{n}]\n{got[n]}\n" for n in range(1, t["pages"] + 1))
+    (lib / "work" / "text" / f"{wid}.txt").write_text(f"# {wid} | pdf | {w.get('title') or ''}\n\n" + body)
+    ing = _j(lib / "work" / "ingest.json", {}) or {}
+    row = load_index(lib).get(wid) or {}
+    ing[wid] = {**(ing.get(wid) or {}), "source_type": "pdf", "source_path": row.get("path"), "ocr": True, "chars": len(body),
+                "exceptions": [k for k in (ing.get(wid) or {}).get("exceptions", []) if k != "no_text"]}
+    (lib / "work" / "ingest.json").write_text(json.dumps(ing, ensure_ascii=False, indent=2))
+    print(f"DONE {wid} 轉錄 {t['pages']} 頁")
+    return ing[wid]
 
 
 def zotero(collection=None):
@@ -305,7 +358,7 @@ def draft_check(run, lib, did, assemble=False):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("cmd", choices=["add-doi", "add-pdf", "process", "zotero", "ris", "draft-inputs", "draft-check", "draft-assemble"])
+    ap.add_argument("cmd", choices=["add-doi", "add-pdf", "process", "ocr-todo", "ocr-apply", "zotero", "ris", "draft-inputs", "draft-check", "draft-assemble"])
     ap.add_argument("run")
     ap.add_argument("--doi")
     ap.add_argument("--pdf")
@@ -316,6 +369,7 @@ def main():
     ap.add_argument("--collection")
     ap.add_argument("--ids")
     ap.add_argument("--draft")
+    ap.add_argument("--id", help="ocr-apply：哪一份")
     a = ap.parse_args()
     run = Path(a.run)
     lib = lib_dir(run)
@@ -326,6 +380,14 @@ def main():
         relink_uploads(lib)
     elif a.cmd == "process":
         process(lib)
+    elif a.cmd == "ocr-todo":
+        print(json.dumps(ocr_todo(lib), ensure_ascii=False, indent=1))
+    elif a.cmd == "ocr-apply":
+        try:
+            ocr_apply(lib, a.id)
+        except ValueError as e:
+            print(f"FAIL {e}")
+            sys.exit(1)
     elif a.cmd == "zotero":
         print(json.dumps(zotero(a.collection), ensure_ascii=False, indent=1))
     elif a.cmd == "ris":

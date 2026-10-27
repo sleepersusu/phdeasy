@@ -7,6 +7,8 @@ dependencies = [
     "openpyxl>=3.1.5",
     "pymupdf>=1.24",
     "pywebview>=5 ; sys_platform == 'darwin'",
+    "rapidocr-onnxruntime>=1.4",
+    "wordninja>=2.0.0",
 ]
 
 [dependency-groups]

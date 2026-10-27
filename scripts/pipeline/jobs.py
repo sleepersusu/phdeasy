@@ -113,7 +113,7 @@ def prompt_match(slug):
 
 
 def prompt_library_process(slug):
-    return (f"處理 runs/{slug} 的討論文獻：照 .claude/skills/prof-library/SKILL.md 的 A 段（drive_sync → library.py process → 整理者（重點＋研究方法一次寫完）→ "
+    return (f"處理 runs/{slug} 的討論文獻：照 .claude/skills/prof-library/SKILL.md 的 A 段（drive_sync → library.py process → 掃描檔先派轉錄者、ocr-apply 核對 → 整理者（重點＋研究方法一次寫完）→ "
             "digest check（只修一輪）→ assemble → ris → build_site），完成後回報 DONE 那一行。" + UNATTENDED)
 
 

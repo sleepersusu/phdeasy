@@ -1190,6 +1190,7 @@ FLOW_STEPS = [
     {"id": "profile.refute", "group": "build", "skill": "prof-profile", "role": "總覽推翻者", "label": "推翻總覽的句子", "tier": "opus", "progress": "profile"},
     {"id": "match.matcher", "group": "build", "skill": "prof-match", "role": "比對者", "label": "跟你的研究比對", "tier": "sonnet", "progress": "match"},
     {"id": "verify.judge", "group": "build", "skill": "prof-verify", "role": "獨立驗收者", "label": "獨立驗收", "tier": "opus", "progress": "verify"},
+    {"id": "library.transcriber", "group": "library", "skill": "prof-library", "role": "轉錄者", "label": "掃描檔一頁一頁看圖轉成文字（含表格）", "tier": "sonnet"},
     {"id": "library.digester", "group": "library", "skill": "prof-library", "role": "整理者", "label": "整理重點、圖表、研究方法", "tier": "opus"},
     {"id": "library.drafter", "group": "library", "skill": "prof-library", "role": "擬稿者", "label": "用勾選的文獻擬初稿", "tier": "opus"},
     {"id": "research.discover", "group": "research", "skill": "prof-discover", "role": "查詢者", "label": "補排名、學程、資助、實驗室", "tier": "sonnet"},

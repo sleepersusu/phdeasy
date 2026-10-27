@@ -18,7 +18,7 @@ END = re.compile(r"[.:?!)\]\"”]$")
 
 
 def text_blocks(raw):
-    """全文 → [{key, page, kind（p 段落／h1–h3 標題）, text}]。空行或位置標記分段；短行且句點結尾、或下一行大寫開頭，也當段落結束（PDF 抽出來的字沒有空行）；
+    """全文 → [{key, page, kind（p 段落／h1–h3 標題／li 條列／table 表格（rows、head））, text}]。空行或位置標記分段；短行且句點結尾、或下一行大寫開頭，也當段落結束（PDF 抽出來的字沒有空行）；
     行尾連字號接回去（under-\\nestimate → underestimate）。"""
     lines = (raw or "").splitlines()
     if lines and lines[0].startswith("# "):
@@ -31,6 +31,16 @@ def text_blocks(raw):
         i = n.get(page, 0)
         n[page] = i + 1
         out.append({"key": f"{page or 'x'}-{i}".replace(".", "").replace("§", "s"), "page": page, "kind": kind, "text": text})
+
+    tbl = []
+
+    def add_table(rows_md):
+        rows = [[c.strip() for c in r.strip("|").split("|")] for r in rows_md]
+        head = len(rows) > 1 and all(re.fullmatch(r":?-{2,}:?", c) for c in rows[1] if c)
+        if head:
+            rows = [rows[0]] + rows[2:]
+        add("table", "\n".join(rows_md))
+        out[-1].update(rows=rows, head=head)
 
     def flush():
         if cur:
@@ -49,6 +59,19 @@ def text_blocks(raw):
             continue
         if not s:
             flush()
+            continue
+        if s.startswith("|") and s.endswith("|"):  # Markdown 表格（PDF 抓到的表、轉錄者寫的表）：連續幾行收成一個表格
+            flush()
+            tbl.append(s)
+            nxt = lines[j + 1].strip() if j + 1 < len(lines) else ""
+            if not (nxt.startswith("|") and nxt.endswith("|")):
+                add_table(tbl)
+                tbl = []
+            continue
+        li = re.match(r"^(?:[-•*·▪]|\d{1,2}[.)])\s+(.+)$", s)  # 條列
+        if li:
+            flush()
+            add("li", li.group(1).strip())
             continue
         h = re.match(r"^(#{1,3}) (.+)$", s)  # XML 全文的標題（# 論文標題、## 章節）
         if h:
@@ -156,7 +179,7 @@ def todo_chunks(blocks, done, size=40):
 def zh_chunk_prompt(chunk, title):
     body = "\n".join(f"[{b['key']}] {b['text']}" for b in chunk)
     return ("把下面論文的每一段翻成通順的繁體中文（台灣用語），忠實翻譯、不要摘要；人名、數字、統計值照原文；術語第一次出現時括號附英文。"
-            "標題類的短句也照翻。\n" + DATA_RULE.replace("<selected>", "<passage>") +
+            "標題類的短句也照翻。內容是 Markdown 表格（| 格 | 格 |）的段落：只翻每一格的字，行數、欄數、| 與 --- 分隔線完全照原樣，回傳同樣格式的表格。\n" + DATA_RULE.replace("<selected>", "<passage>") +
             f"\n只回一個 JSON 物件，key 是方括號裡的段落代號，value 是那段的中文，共 {len(chunk)} 段，例："
             + '{"' + chunk[0]["key"] + '": "中文"}' + f"\n\n<paper>{(title or '')[:300]}</paper>\n<passage>\n{body}\n</passage>\n")
 
