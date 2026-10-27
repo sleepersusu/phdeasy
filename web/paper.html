@@ -110,8 +110,8 @@ header.top{border-bottom:1px solid var(--line)}
 .steps .step>div{padding:8px 14px}
 
 /* 全文閱讀：分頁、螢光筆、筆記、問 AI（學 ieltsgod 的閱讀題） */
-.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:16px 0 0;overflow-x:auto}
-.tabs button{font:inherit;font-weight:600;background:none;border:none;border-bottom:3px solid transparent;padding:10px 14px;min-height:44px;cursor:pointer;color:var(--muted);white-space:nowrap}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin:6px 0 0;overflow-x:auto}
+.tabs button{font:inherit;font-size:.86rem;font-weight:600;background:none;border:none;border-bottom:2px solid transparent;padding:4px 10px;min-height:34px;cursor:pointer;color:var(--muted);white-space:nowrap}
 .tabs button[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--green)}
 .tabtip{font-size:.85rem;color:var(--muted);margin:10px 0 0}
 mark.rd-hl{background:#fde68a;color:inherit;padding:0 1px;border-radius:2px}
@@ -141,7 +141,7 @@ mark.rd-hl{background:#fde68a;color:inherit;padding:0 1px;border-radius:2px}
 #paneZh{font-size:calc(var(--rfs,17px) - 1.5px);line-height:1.85}
 #main:not(.wide){font-size:calc(var(--rfs,17px) - 1px)}
 .fsz{margin-left:auto;display:inline-flex;align-items:center;gap:2px;padding-left:12px}
-.fsz button{font-family:Georgia,serif;font-weight:700;min-width:36px;min-height:36px;border:1px solid #d5d8dc;background:#fff;border-radius:8px;cursor:pointer;color:var(--fg)}
+.fsz button{font-family:Georgia,serif;font-weight:700;min-width:30px;min-height:30px;border:1px solid #d5d8dc;background:#fff;border-radius:7px;cursor:pointer;color:var(--fg)}
 .fsz button[aria-pressed="true"]{background:#111;color:#fff;border-color:#111}
 .gear{position:absolute;top:14px;right:max(16px,env(safe-area-inset-right,0px));display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:10px;color:var(--fg)}
 .gear:hover{background:var(--soft)}
@@ -166,9 +166,10 @@ header .wrap{position:relative}
   <nav class="crumbs" id="crumbs" aria-label="目前位置"></nav>
   <a class="gear" href="settings.html#ai" aria-label="設定與 AI 小幫手" title="設定與 AI 小幫手"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
   <h1 id="t-en" lang="en" class="ptitle"></h1><div id="t-zh" class="ptitle-zh"></div>
-  <div class="row small muted" style="margin-top:4px;gap:4px 12px"><span id="meta"></span><span id="links" class="plinks"></span></div>
+  <div class="row small muted" style="margin-top:4px;gap:4px 12px"><span id="meta"></span><span id="links" class="plinks"></span>
+    <span class="fsz" id="fszTop" role="group" aria-label="文章字體大小"></span></div>
 </div></header>
-<div class="wrap"><div class="tabs" role="tablist" id="tabs" hidden></div><p class="tabtip" id="tabtip" hidden>選取任何一段文字，可以畫螢光筆、寫筆記、問 AI、翻成中文、收藏到計畫書素材。</p></div>
+<div class="wrap"><div class="tabs" role="tablist" id="tabs" hidden></div></div>
 <main class="wrap" id="main"><div class="empty" style="margin-top:16px">載入中…</div></main>
 <script src="icons.js"></script><script src="reader.js"></script><script src="ai.js"></script>
 <script>
@@ -344,19 +345,20 @@ function notesHTML(){
 function showTab(t){
   if (!["ai", "full", "notes"].includes(t)) t = "ai";
   const n = Reader.notes().length;
-  $("#tabs").hidden = false; $("#tabtip").hidden = t === "notes";
+  $("#tabs").hidden = false;
+  $("#tabs").title = "選取任何一段文字，可以畫螢光筆、寫筆記、問 AI、翻成中文、收藏到計畫書素材";
   $("#tabs").innerHTML = [["ai", "AI 解析"], ["full", "全文閱讀"], ["notes", `我的筆記${n ? `（${n}）` : ""}`]]
-    .map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === t}">${l}</button>`).join("") +
-    // 字體大小（照 ieltsgod 閱讀題：三個 A，記住選擇）＋一個更大的
-    `<span class="fsz" role="group" aria-label="文章字體大小">${FS.map((v, i) => `<button type="button" data-fs="${v}" aria-pressed="${v === fsGet()}" title="字體 ${v}px" style="font-size:${11 + i * 3}px">A</button>`).join("")}</span>`;
+    .map(([k, l]) => `<button type="button" role="tab" data-tab="${k}" aria-selected="${k === t}">${l}</button>`).join("");
+  // 字體大小（照 ieltsgod 閱讀題：A 按鈕，記住選擇）放在上面標題那一列，下面只留閱讀
+  $("#fszTop").innerHTML = FS.map((v, i) => `<button type="button" data-fs="${v}" aria-pressed="${v === fsGet()}" title="字體 ${v}px" aria-label="字體 ${v}px" style="font-size:${10 + i * 2.5}px">A</button>`).join("");
   $("#main").innerHTML = t === "notes" ? notesHTML() : VIEWS[t];
   $("#main").classList.toggle("wide", t === "full");
   if (t === "full") wirePanes();
   document.querySelectorAll(".fig img").forEach(img => img.onclick = () => img.classList.toggle("big"));
   const u = new URL(location.href); if (t === "ai") u.searchParams.delete("tab"); else u.searchParams.set("tab", t); history.replaceState(null, "", u);
 }
+$("#fszTop").addEventListener("click", e => { const f = e.target.closest("[data-fs]"); if (f) fsSet(+f.dataset.fs); });
 $("#tabs").addEventListener("click", e => {
-  const f = e.target.closest("[data-fs]"); if (f){ fsSet(+f.dataset.fs); return; }
   const b = e.target.closest("[data-tab]"); if (b){ rebuild(); showTab(b.dataset.tab); } });
 // 文章字體大小：全文閱讀與 AI 解析都跟著變；存在這台瀏覽器
 const FS = [15, 17, 20, 23];
