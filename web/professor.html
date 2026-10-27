@@ -703,7 +703,7 @@ const VIEWS = [
    d => d.meeting ? (d.meeting.when || {}).local || "已準備" : "還沒有"],
   ["proposal", "研究計畫書", "定案的計畫書，或 AI 依她的方向擬的幾個版本",
    d => [d.joint_proposal ? "已定案" : "", draftVersions(d).length ? `草稿 ${draftVersions(d).length} 版${d.proposal_draft.stale ? "（過期）" : ""}` : ""].filter(Boolean).join("＋") || "還沒有"],
-  ["library", "Meeting", "她給你的文獻，依資料夾與研究類型歸類：中英重點、研究方法、圖表；勾選幾篇擬初稿",
+  ["library", "Meeting", "她給你的文獻，AI 自動依主題與研究類型歸類：中英重點、研究方法、圖表；勾選幾篇擬初稿",
    d => (d.library || []).length ? `${d.library.length} 篇${(d.drafts || []).length ? `｜初稿 ${d.drafts.length}` : ""}` : "還沒有"],
   ["match", "與我的研究比對", "依你的興趣推薦先看哪幾篇、哪個計畫", d => d.recommend ? `${d.recommend.read_first.length} 篇先看` : "還沒比對"],
   ["profile", "教授總覽", "研究主線、演變、合作、可以問的問題", d => `${(d.profile || []).length} 章`],
@@ -1039,7 +1039,7 @@ function proposalView(){
 }
 
 /* Meeting（原「討論文獻」）：教授給的文獻（上傳 PDF、貼 DOI、從 Zotero 選），跟她的文章走同一套處理；勾選幾篇擬初稿。
-   列表學 ieltsgod 閱讀題的資料夾樹：按資料夾（預設「<日期> Meeting」，可新增、改名、移動）或按研究類型（加入時自動判斷） */
+   列表學 ieltsgod 閱讀題的資料夾樹：按主題（加入時 AI 判斷，沿用已有的主題；可以改、可以整個主題改名）或按研究類型（腳本先判、判不出用 AI） */
 const LIBSEL = new Set();
 const libPage = id => paperPage(id) + "&lib=1";
 const today = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };  // 本地日期
@@ -1048,7 +1048,7 @@ function libAddHTML(){
   if (!APP) return `<p class="small muted">在應用程式裡打開才能加入文獻。</p>`;
   return `<details class="item"><summary style="cursor:pointer;min-height:44px;display:flex;align-items:center"><strong>＋ 加入文獻</strong></summary>
     <div class="match-form" style="margin-top:8px">
-      <div><label for="lb-when">哪次 Meeting</label> <input id="lb-when" type="date" value="${today()}"> <span class="small muted">預設放進「<日期> Meeting」資料夾</span></div>
+      <div><label for="lb-when">哪次 Meeting</label> <input id="lb-when" type="date" value="${today()}"> <span class="small muted">加入後 AI 會自動判斷主題和研究類型，放進對應的資料夾</span></div>
       <div><label for="lb-doi">DOI（一行一個）</label><textarea id="lb-doi" rows="2" placeholder="10.2196/12345"></textarea>
         <button class="btn btn-green" data-lib-doi style="margin-top:6px">加入</button></div>
       <div><button class="btn" data-lib-zotero>從 Zotero 選</button> <span class="small muted">讀這台電腦的 Zotero（只讀不改；Zotero 要開著）</span>
@@ -1062,14 +1062,14 @@ async function libAfterAdd(msg){ $("#lb-msg").textContent = msg + " 重新整理
 
 const PTYPES = {meta: "統合分析", sr: "系統性回顧", scoping: "範圍回顧", review: "文獻回顧", rct: "隨機對照試驗", protocol: "研究計畫書", cohort: "世代研究", cross: "橫斷研究",
   casecontrol: "病例對照", case: "個案研究", qual: "質性研究", mixed: "混合方法", guideline: "指引／建議", tool: "方法／工具", commentary: "評論／觀點", other: "其他"};
-let LIBMETA = {folders: [], items: {}}, LIBGROUP = (() => { try { return localStorage.getItem("phd.libGroup") || "folder"; } catch (e) { return "folder"; } })();
+let LIBMETA = {items: {}}, LIBGROUP = (() => { try { return localStorage.getItem("phd.libGroup") === "type" ? "type" : "topic"; } catch (e) { return "topic"; } })();
 const libOpen = () => { try { return JSON.parse(localStorage.getItem("phd.libOpen") || "{}"); } catch (e) { return {}; } };
 async function loadLibMeta(){
   if (OFFLINE) return;
-  try { const r = await fetch(`../runs/${encodeURIComponent(SLUG)}/library/meta.json`, {cache: "no-store"}); LIBMETA = r.ok ? await r.json() : {folders: [], items: {}}; } catch (e) {}
-  LIBMETA.folders = LIBMETA.folders || []; LIBMETA.items = LIBMETA.items || {};
+  try { const r = await fetch(`../runs/${encodeURIComponent(SLUG)}/library/meta.json`, {cache: "no-store"}); LIBMETA = r.ok ? await r.json() : {items: {}}; } catch (e) {}
+  LIBMETA.items = LIBMETA.items || {};
 }
-const libFolder = w => (LIBMETA.items[w.id] || {}).folder || ((w.library || {}).discussion ? `${w.library.discussion} Meeting` : "未分類");
+const libTopic = w => (LIBMETA.items[w.id] || {}).topic || "分類中";
 const libType = w => (LIBMETA.items[w.id] || {}).ptype;
 const FOLDER_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2.2h8.4A1.5 1.5 0 0 1 21 8.7v9.8a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>';
 const FOLDER_OPEN_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M3 18.5V6.5A1.5 1.5 0 0 1 4.5 5h4.6l2 2.2h7.4A1.5 1.5 0 0 1 20 8.7V10"/><path d="M3 18.5l2.6-7.3A1.5 1.5 0 0 1 7 10.2h13.4a1 1 0 0 1 .95 1.3l-2.3 7.2a1.5 1.5 0 0 1-1.4 1H4.5A1.5 1.5 0 0 1 3 18.5z"/></svg>';
@@ -1080,36 +1080,36 @@ function libraryView(){
   const pending = L.filter(w => !w.digest).length;
   const typePill = w => { const t = libType(w), by = (LIBMETA.items[w.id] || {}).ptype_by;
     return t ? `<span class="tpill" title="${by === "me" ? "你改的" : by === "ai" ? "AI 判斷" : "依標題與摘要判斷"}（可以改）">${esc(PTYPES[t] || t)}</span>` : `<span class="tpill pending" title="正在判斷研究類型">分類中</span>`; };
-  const folders = [...new Set([...LIBMETA.folders, ...L.map(libFolder)])];
+  const topicsAll = [...new Set(L.map(libTopic).filter(t => t !== "分類中"))];
+  const byTag = (w, f) => { const by = (LIBMETA.items[w.id] || {})[f + "_by"]; return by === "me" ? "你改的" : by === "ai" ? "AI 判斷" : by === "rule" ? "依標題與摘要判斷" : ""; };
   const item = w => { const l = w.library || {}, g = w.digest;
     return `<details class="item lib-it"><summary style="cursor:pointer;min-height:44px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <input type="checkbox" data-libsel="${esc(w.id)}" ${LIBSEL.has(w.id) ? "checked" : ""} aria-label="勾選這篇擬初稿" onclick="event.stopPropagation()">
-        <strong>${esc(w.title || w.id)}</strong> <span class="small muted">${esc(w.year || "")}</span> ${typePill(w)}
+        <strong>${esc(w.title || w.id)}</strong> <span class="small muted">${esc(w.year || "")}</span> ${LIBGROUP === "type" ? `<span class="tpill" title="${byTag(w, "topic")}">${esc(libTopic(w))}</span>` : typePill(w)}
+        ${l.discussion ? `<span class="small muted">${esc(l.discussion)} Meeting</span>` : ""}
         ${g ? pill("g", "已整理") : pill("y", w.fulltext === "no_free_fulltext" ? "只找到摘要／待處理" : "待處理")}</summary>
       <div style="margin-top:8px">${l.note ? `<div class="small">備註：${esc(l.note)}</div>` : ""}
         ${g && (g.key_points || []).length ? `<ul>${g.key_points.map(k => `<li>${bi(k.zh, k.en, "div")}</li>`).join("")}</ul>` : `<div class="small muted">還沒整理。</div>`}
         ${g && g.design ? `<div class="small"><strong>研究設計</strong>${bi(g.design.zh, g.design.en, "div")}</div>` : ""}
-        ${APP ? `<div class="row small" style="margin-top:8px"><label>資料夾 <select data-lib-move="${esc(w.id)}">${folders.map(f => `<option ${f === libFolder(w) ? "selected" : ""}>${esc(f)}</option>`).join("")}<option value="__new">＋ 新資料夾…</option></select></label>
+        ${APP ? `<div class="row small" style="margin-top:8px"><label>主題 <select data-lib-move="${esc(w.id)}">${libTopic(w) === "分類中" ? `<option value="">分類中</option>` : ""}${topicsAll.map(f => `<option ${f === libTopic(w) ? "selected" : ""}>${esc(f)}</option>`).join("")}<option value="__new">＋ 新主題…</option></select></label>
           <label>研究類型 <select data-lib-type="${esc(w.id)}">${libType(w) ? "" : `<option value="">分類中</option>`}${Object.entries(PTYPES).map(([k, v]) => `<option value="${k}" ${k === libType(w) ? "selected" : ""}>${v}</option>`).join("")}</select></label></div>` : ""}
         <div class="row" style="margin-top:8px"><a class="btn btn-green" href="${OFFLINE ? "#" : libPage(w.id)}">看完整單篇頁（全文閱讀、中英對照、圖表）→</a>
           ${w.pdf_href ? `<a class="btn" href="../runs/${encodeURIComponent(SLUG)}/out/site/${esc(w.pdf_href)}" target="_blank" rel="noopener">開啟 PDF</a>` : ""}</div></div></details>`; };
   // 資料夾樹（學 ieltsgod）：可以收折，記住開關；按資料夾或按研究類型
   const OPEN = libOpen(), byType = LIBGROUP === "type";
   const groups = {};
-  L.forEach(w => { const k = byType ? (libType(w) ? PTYPES[libType(w)] || libType(w) : "分類中") : libFolder(w); (groups[k] = groups[k] || []).push(w); });
-  if (!byType) LIBMETA.folders.forEach(f => { groups[f] = groups[f] || []; });
-  const keys = Object.keys(groups).sort((a, b) => byType ? ((a === "分類中") - (b === "分類中") || groups[b].length - groups[a].length || a.localeCompare(b, "zh-Hant"))
-    : ((a === "未分類") - (b === "未分類") || b.localeCompare(a, "zh-Hant", {numeric: true})));
-  const folder = (k, xs) => { const key = (byType ? "t:" : "f:") + k, op = OPEN[key] != null ? OPEN[key] : true, done = xs.filter(w => w.digest).length;
+  L.forEach(w => { const k = byType ? (libType(w) ? PTYPES[libType(w)] || libType(w) : "分類中") : libTopic(w); (groups[k] = groups[k] || []).push(w); });
+  // 照 ieltsgod：分類中放最後，其他篇數多的在前
+  const keys = Object.keys(groups).sort((a, b) => (a === "分類中") - (b === "分類中") || groups[b].length - groups[a].length || a.localeCompare(b, "zh-Hant"));
+  const folder = (k, xs) => { const key = (byType ? "t:" : "p:") + k, op = OPEN[key] != null ? OPEN[key] : true, done = xs.filter(w => w.digest).length;
     return `<div class="tree"><div class="fold-row"><button type="button" class="fold" data-fold="${esc(key)}" aria-expanded="${op}">${CHEV_SVG}${op ? FOLDER_OPEN_SVG : FOLDER_SVG}<span class="fname">${esc(k)}</span>
       <span class="fcnt" title="已整理 ${done} 篇，共 ${xs.length} 篇">${done}/${xs.length}</span></button>
-      ${!byType && APP && k !== "未分類" ? `<button type="button" class="btn btn-icon btn-sm ghost" data-lib-rename="${esc(k)}" title="資料夾改名" aria-label="資料夾改名">${icon("edit", 15)}</button>` : ""}</div>
-      <div class="fbody"${op ? "" : " hidden"}>${xs.length ? [...xs].reverse().map(item).join("") : `<div class="small muted" style="padding:6px 0 6px 30px">空的資料夾：在文獻的「資料夾」選這個就會移進來。</div>`}</div></div>`; };
+      ${!byType && APP && k !== "分類中" ? `<button type="button" class="btn btn-icon btn-sm ghost" data-lib-rename="${esc(k)}" title="主題改名" aria-label="主題改名">${icon("edit", 15)}</button>` : ""}</div>
+      <div class="fbody"${op ? "" : " hidden"}>${[...xs].reverse().map(item).join("")}</div></div>`; };
   el.innerHTML = libAddHTML() +
     (pending && APP ? `<div class="item attn" style="margin-top:10px">${pill("y", `${pending} 篇待處理`)} <button class="btn btn-green" data-lib-process>開始處理（AI 整理中英重點、研究方法、圖表）</button> <span class="small muted">每篇約 3–5 分鐘</span></div>` : "") +
     (L.length ? `<div class="row" style="margin-top:14px;justify-content:space-between">
-        <span class="row"><span class="seg" role="group" aria-label="歸類方式"><button type="button" data-lib-group="folder" aria-pressed="${!byType}">按資料夾</button><button type="button" data-lib-group="type" aria-pressed="${byType}">按研究類型</button></span>
-          ${!byType && APP ? `<button type="button" class="btn btn-icon btn-sm ghost" data-lib-newfolder title="新增資料夾" aria-label="新增資料夾">${icon("plus", 16)}</button>` : ""}
+        <span class="row"><span class="seg" role="group" aria-label="歸類方式"><button type="button" data-lib-group="topic" aria-pressed="${!byType}">按主題</button><button type="button" data-lib-group="type" aria-pressed="${byType}">按研究類型</button></span>
           <span class="small muted">共 ${L.length} 篇。勾選幾篇可以擬初稿。</span></span>
         <span class="row">${APP ? `<button class="btn btn-green" data-lib-draft>用勾選的 <span id="lb-n">${LIBSEL.size}</span> 篇擬初稿</button>` : ""}
         <a class="btn" href="../runs/${encodeURIComponent(SLUG)}/library/out/zotero/library.ris" download>匯出到 Zotero（RIS）</a></span></div>
@@ -1118,9 +1118,10 @@ function libraryView(){
         ${pill("y", "初稿")}<strong>${bi((d.title || {}).zh, (d.title || {}).en)}</strong><span class="small muted">${esc((d.built || "").slice(0, 10))}｜用了 ${(d.selected_ids || []).length} 篇</span></summary>
         <div class="small muted" style="margin-top:6px">這是 AI 依你勾選的文獻與她的文章擬的素材，寄給教授前請自己改寫。</div>${versionHTML(d, {noTitle: true})}</details>`).join("")}` : "");
   // 還有「分類中」的：在背景判斷，過一下重新讀
-  if (APP && L.some(w => !libType(w)) && !libraryView.asked){ libraryView.asked = true; APIX("lib-classify", {slug: SLUG}).catch(() => {}); }
+  const unsorted = L.some(w => !libType(w) || libTopic(w) === "分類中");
+  if (APP && unsorted && !libraryView.asked){ libraryView.asked = true; APIX("lib-classify", {slug: SLUG}).catch(() => {}); }
   clearTimeout(libraryView.t);
-  if (APP && L.some(w => !libType(w))) libraryView.t = setTimeout(async () => { await loadLibMeta(); libraryView(); }, 8000);
+  if (APP && unsorted) libraryView.t = setTimeout(async () => { await loadLibMeta(); libraryView(); }, 8000);
 }
 async function libMetaDo(body){ await APIX("lib-meta", {slug: SLUG, ...body}); await loadLibMeta(); libraryView(); }
 document.addEventListener("click", async ev => {
@@ -1129,15 +1130,14 @@ document.addEventListener("click", async ev => {
   const g = ev.target.closest("[data-lib-group]");
   if (g){ LIBGROUP = g.dataset.libGroup; try { localStorage.setItem("phd.libGroup", LIBGROUP); } catch (e) {} libraryView(); return; }
   try {
-    if (ev.target.closest("[data-lib-newfolder]")){ const n = prompt("新資料夾名稱（例：Study 1 系統性回顧、2026-11-04 Meeting）"); if (n) await libMetaDo({act: "new-folder", name: n}); }
     const r = ev.target.closest("[data-lib-rename]");
-    if (r){ const n = prompt("資料夾新名稱", r.dataset.libRename); if (n && n !== r.dataset.libRename) await libMetaDo({act: "rename-folder", old: r.dataset.libRename, name: n}); }
+    if (r){ const n = prompt("主題新名稱（這個主題的文章都會跟著改）", r.dataset.libRename); if (n && n !== r.dataset.libRename) await libMetaDo({act: "rename-topic", old: r.dataset.libRename, name: n}); }
   } catch (e) { alert(e.message); }
 });
 document.addEventListener("change", async ev => {
   const m = ev.target.closest("[data-lib-move]"), t = ev.target.closest("[data-lib-type]");
   try {
-    if (m){ let f = m.value; if (f === "__new"){ f = prompt("新資料夾名稱"); if (!f) return libraryView(); } await libMetaDo({act: "move", id: m.dataset.libMove, folder: f}); }
+    if (m){ let f = m.value; if (f === "__new"){ f = prompt("新主題名稱"); if (!f) return libraryView(); } if (f) await libMetaDo({act: "topic", id: m.dataset.libMove, topic: f}); }
     if (t && t.value) await libMetaDo({act: "type", id: t.dataset.libType, ptype: t.value});
   } catch (e) { alert(e.message); libraryView(); }
 });

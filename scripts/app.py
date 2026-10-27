@@ -824,42 +824,49 @@ class App:
         return json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
 
     def lib_classify(self, slug, wait=False):
-        """還沒有類型的文獻：腳本先判，判不出來在背景問 AI（便宜的模型）。"""
-        from pipeline.libmeta import ai_type, load_meta, rule_type, set_type, type_prompt
+        """還沒有主題或類型的文獻：類型腳本先判；主題（判不出的類型也一起）在背景問 AI（便宜的模型），沿用已經有的主題。照 ieltsgod 閱讀的主題分類。"""
+        from pipeline.libmeta import classify_prompt, load_meta, parse_classify, rule_type, set_topic, set_type, topics
         lib = self.runs / slug / "library"
         items = load_meta(lib)["items"]
-        todo = [w for w in self._lib_works(slug) if not (items.get(w["id"]) or {}).get("ptype")]
-        ask = []
+        todo = [w for w in self._lib_works(slug) if not (items.get(w["id"]) or {}).get("topic") or not (items.get(w["id"]) or {}).get("ptype")]
         for w in todo:
             t = rule_type(w.get("title"), w.get("abstract"), w.get("type"))
-            if t:
+            if t and not (items.get(w["id"]) or {}).get("ptype"):
                 set_type(lib, w["id"], t, by="rule")
-            else:
-                ask.append(w)
 
         def run():
-            for w in ask:
+            for w in todo:
+                if getattr(self, "_classifying", {}).get((slug, w["id"])):
+                    continue
+                self._classifying = {**getattr(self, "_classifying", {}), (slug, w["id"]): True}
                 try:
-                    set_type(lib, w["id"], ai_type(self.ai_once(type_prompt(w.get("title"), w.get("abstract")), level="easy")), by="ai")
+                    cur = load_meta(lib)
+                    if (cur["items"].get(w["id"]) or {}).get("topic") and (cur["items"].get(w["id"]) or {}).get("ptype"):
+                        continue
+                    topic, ptype = parse_classify(self.ai_once(classify_prompt(w.get("title"), w.get("abstract"), topics(cur)), level="easy"))
+                    if topic:
+                        set_topic(lib, w["id"], topic, by="ai")
+                    if not (load_meta(lib)["items"].get(w["id"]) or {}).get("ptype"):
+                        set_type(lib, w["id"], ptype, by="ai")
                 except (ValueError, RuntimeError, OSError, subprocess.TimeoutExpired) as e:
-                    print(f"文獻類型判斷失敗 {slug}/{w['id']}：{e}")
-        if ask:
+                    print(f"文獻分類失敗 {slug}/{w['id']}：{e}")
+                finally:
+                    self._classifying.pop((slug, w["id"]), None)
+        if todo:
             run() if wait else threading.Thread(target=run, daemon=True).start()
-        return {"rule": len(todo) - len(ask), "ai": len(ask)}
+        return {"todo": len(todo)}
 
     def lib_meta(self, body):
-        from pipeline.libmeta import move, new_folder, rename_folder, set_type
+        from pipeline.libmeta import rename_topic, set_topic, set_type
         slug = self._lib_slug(body.get("slug"))
         lib, act = self.runs / slug / "library", body.get("act")
-        if act == "new-folder":
-            return new_folder(lib, body.get("name"))
-        if act == "rename-folder":
-            return rename_folder(lib, body.get("old") or "", body.get("name"), items=self._lib_works(slug))
+        if act == "rename-topic":
+            return rename_topic(lib, body.get("old") or "", body.get("name"))
         wid = str(body.get("id") or "")
         if wid not in {w["id"] for w in self._lib_works(slug)}:
             raise ValueError(f"沒有這篇：{wid}")
-        if act == "move":
-            return move(lib, wid, body.get("folder"))
+        if act == "topic":
+            return set_topic(lib, wid, body.get("topic"), by="me")
         if act == "type":
             return set_type(lib, wid, body.get("ptype"), by="me")
         raise ValueError("不知道要做什麼")
