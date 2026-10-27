@@ -30,6 +30,26 @@
   .aigrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,260px);gap:6px 12px;align-items:center;font-size:.9rem}
   .aigrid select{min-height:36px;width:100%}
   @media (max-width:640px){.aigrid{grid-template-columns:1fr}}
+  .fl-lanes{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;align-items:start}
+  .fl-lane{border:2px dashed #9aa0a6;border-radius:18px;padding:12px;display:flex;flex-direction:column;align-items:stretch}
+  .fl-head{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+  .fl-head b{font-size:.95rem}.fl-head select{min-height:36px}
+  .fl-row{display:flex;gap:8px}.fl-row>.fl-node{flex:1}
+  .fl-node{display:flex;flex-direction:column;gap:2px;text-align:left;font:inherit;font-size:.85rem;padding:8px 10px;border-radius:8px;border:2px solid #111;background:#fff;color:#111}
+  .fl-script{border-color:#9aa0a6;background:#f4f5f6;color:#3f4348}
+  .fl-tools{font-size:.75rem;color:#6b7076}
+  .fl-ai{border-color:#15803d;background:#f3faf5;cursor:pointer;min-height:44px}
+  .fl-ai:hover{background:#e3f4e8}.fl-ai:focus-visible{outline:3px solid #15803d;outline-offset:2px}
+  .fl-ai[disabled]{cursor:default;opacity:.65}
+  .fl-ai.own{box-shadow:0 0 0 3px rgba(21,128,61,.25)}
+  .fl-main{border-style:double;border-width:4px}
+  .fl-tag{font-size:.72rem;font-weight:700;color:#15803d}
+  .fl-model{font-size:.78rem;font-weight:700;margin-top:2px}
+  .fl-arrow{align-self:center;width:2px;height:16px;background:#555;position:relative;margin:2px 0 6px}
+  .fl-arrow::after{content:"";position:absolute;left:-5px;bottom:-6px;border:6px solid transparent;border-top:7px solid #555;border-bottom:0}
+  .fl-pop{position:fixed;z-index:600;background:#fff;border:1px solid #111;border-radius:10px;padding:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);display:flex;flex-direction:column;gap:4px;min-width:220px;max-width:calc(100vw - 16px)}
+  .fl-opt{font:inherit;font-size:.88rem;text-align:left;min-height:40px;padding:0 10px;border:1px solid #d5d8dc;border-radius:8px;background:#fff;cursor:pointer}
+  .fl-opt:hover{background:#f4f5f6}.fl-opt.on{background:#15803d;color:#fff;border-color:#15803d}
   .aimsg{font-size:.9rem;line-height:1.6}
   .aimsg .note{font-size:.82rem;color:#5b5f66}
   .spin{display:inline-block;width:12px;height:12px;border:2px solid #c7cbd1;border-top-color:#15803d;border-radius:50%;animation:aispin .8s linear infinite;vertical-align:-1px;margin-right:6px}
@@ -187,20 +207,108 @@
     const box = ROOT.querySelector(".airoute"); if (!box) return;
     const ready = ORDER3.filter(aiReady), name = k => (AI[k] || {}).name || k;
     const sel = (attr, opts, cur) => `<select ${attr}>${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
-    let h = `<h4 style="margin:16px 0 4px">各小工作用哪一位</h4><div class="small muted" style="margin-bottom:6px">「自動」：StepFun 測試成功就用它，不然用上面設為預設的那位；它不能用時會自動換下一位。</div>
-      <div class="aigrid">${Object.entries(TASKS).map(([k, t]) => `<span>${esc(t.label)}</span>${sel(`data-task="${k}"`, [["", `自動（現在：${name(t.using) || "沒有"}）`], ...ready.map(v => [v, name(v)])], t.choice)}`).join("")}</div>`;
-    if (JOBS){
-      const eng = Object.entries(JOBS.engines), roleRows = e => Object.entries(JOBS.roles).map(([r, lab]) =>
-        `<span>${esc(lab)}</span>${sel(`data-tier="${e}" data-role="${r}"`, JOBS.models[e].map(m => [m.v, m.name]), JOBS.tiers[e][r] || "")}`).join("");
-      h += `<h4 style="margin:18px 0 4px">背景工作（建檔流程，會大量派 agent）</h4>
-        <div class="small muted" style="margin-bottom:6px">每一類工作選一個引擎；流程裡「派 agent」的角色會照下面的模型對應。StepFun 走 Claude Code，同一個工作裡全部角色都用 Step 的模型。改了之後，新開始的工作才會用新設定。</div>
-        <div class="aigrid">${JOBS.groups.map(g => `<span>${esc(g.label)}</span>${sel(`data-jobgroup="${g.id}"`, eng.map(([v, l]) => [v, l + (v === "stepfun" && !SFKEY ? "（先貼 key）" : "")]), g.engine)}`).join("")}</div>
-        <details style="margin-top:10px"><summary class="small" style="cursor:pointer;min-height:36px">Claude 各角色用哪個模型</summary><div class="aigrid" style="margin-top:6px">${roleRows("claude")}</div></details>
-        <details style="margin-top:4px" ${JOBS.groups.some(g => g.engine === "stepfun") ? "open" : ""}><summary class="small" style="cursor:pointer;min-height:36px">StepFun 各角色用哪個模型</summary><div class="aigrid" style="margin-top:6px">${roleRows("stepfun")}
-          <span>StepFun 方案</span>${sel('data-sfbase="1"', Object.entries(JOBS.bases), JOBS.stepfunBase)}</div></details>`;
-    }
+    let h = "";
+    if (JOBS) h += flowHTML();
     box.innerHTML = h;
   }
+  /* 流程圖（照本人給的圖：每一類工作一個虛線框，框裡一步一步往下，旁邊寫用的工具）：
+     灰色＝腳本做、不用 AI；綠色＝會派 AI，點一下換模型；每個框的標題列選這一類用哪個引擎 */
+  const LANES = [
+    {group: "build", title: "建檔：一位教授近五年的文章", nodes: [
+      {s: "找教授身分、列出近五年文章", tools: "OpenAlex、ORCID、PubMed"},
+      {ai: ["setup.focus", "setup.programs"]},
+      {s: "找全文", tools: "Unpaywall、Europe PMC、PMC、Zotero"},
+      {s: "轉成文字、抓圖表", tools: "PyMuPDF"},
+      {s: "合作者與研究領域", tools: "腳本計算"},
+      {s: "查研究計畫", tools: "NIH RePORTER、NSF、GRB、UKRI"},
+      {ai: ["grants.extract", "grants.refute"]},
+      {ai: ["cards.reader", "cards.refute"]},
+      {ai: ["digest.digester"]},
+      {ai: ["profile.writer", "profile.refute"]},
+      {ai: ["match.matcher"]},
+      {ai: ["verify.judge"]},
+      {s: "總檢查、組成教授頁", tools: "E2E 腳本、網頁、RIS"}]},
+    {group: "library", title: "Meeting：教授給的文獻", nodes: [
+      {s: "上傳 PDF／貼 DOI／Zotero", tools: "OpenAlex 查 DOI 與標題"},
+      {task: "classify"},
+      {s: "找全文、轉文字、抓圖表", tools: "同建檔的腳本"},
+      {ai: ["library.digester"]},
+      {ai: ["library.drafter"]}]},
+    {group: "research", title: "查詢與比對", nodes: [
+      {s: "依你的研究興趣找教授", tools: "OpenAlex"},
+      {ai: ["research.discover"]},
+      {ai: ["research.match"]},
+      {ai: ["research.propose"]}]},
+    {group: "docs", title: "我的文件", nodes: [
+      {s: "上傳 Word／PDF", tools: "依原檔分段"},
+      {ai: ["docs.editor"]},
+      {ai: ["docs.translator"]}]},
+    {group: null, title: "閱讀時「問一次」的小工作", nodes: [{task: "ask"}, {task: "translate"}]},
+  ];
+  const STEPS = () => Object.fromEntries((JOBS.steps || []).map(x => [x.id, x]));
+  const engOf = g => ((JOBS.groups || []).find(x => x.id === g) || {}).engine || "claude";
+  const modelName = (e, v) => ((JOBS.models[e] || []).find(m => m.v === v) || {}).name || v || "帳號預設";
+  function stepModel(id){
+    const st = STEPS()[id], e = engOf(st.group);
+    if (e === "codex") return {e, v: "", name: "Codex 帳號預設", own: false};
+    const own = ((JOBS.stepModels || {})[e] || {})[id];
+    return {e, v: own || "", name: modelName(e, own || JOBS.tiers[e][st.tier]), own: !!own};
+  }
+  function flowHTML(){
+    const S = STEPS(), name = k => (AI[k] || {}).name || k, ready = ORDER3.filter(aiReady);
+    const arrow = '<div class="fl-arrow" aria-hidden="true"></div>';
+    const node = n => {
+      if (n.s) return `<div class="fl-node fl-script"><span>${esc(n.s)}</span><span class="fl-tools">${esc(n.tools)}</span></div>`;
+      if (n.task){ const t = TASKS[n.task] || {};
+        return `<button type="button" class="fl-node fl-ai" data-flow-task="${n.task}" aria-haspopup="true"><span class="fl-tag">AI 小工作</span><span>${esc(t.label || n.task)}</span>
+          <span class="fl-model">${esc(t.choice ? name(t.choice) : `自動（${name(t.using) || "沒有"}）`)}</span></button>`; }
+      return `<div class="fl-row">${n.ai.map(id => { const st = S[id], m = stepModel(id);
+        return `<button type="button" class="fl-node fl-ai${m.own ? " own" : ""}" data-flow-step="${id}" aria-haspopup="true" ${m.e === "codex" ? "disabled" : ""}>
+          <span class="fl-tag">${esc(st.role)}</span><span>${esc(st.label)}</span><span class="fl-model">${esc(m.name)}${m.own ? "（你選的）" : ""}</span></button>`; }).join("")}</div>`;
+    };
+    const lanes = LANES.map(L => {
+      const head = L.group ? `<select data-jobgroup="${L.group}" aria-label="${esc(L.title)}用哪個引擎">${Object.entries(JOBS.engines).map(([v, l]) =>
+        `<option value="${v}" ${engOf(L.group) === v ? "selected" : ""}>${esc(l)}${v === "stepfun" && !SFKEY ? "（先貼 key）" : ""}</option>`).join("")}</select>` : "";
+      const main = L.group && engOf(L.group) !== "codex" ? `<button type="button" class="fl-node fl-ai fl-main" data-flow-main="${L.group}"><span class="fl-tag">主控</span><span>照流程派工、跑腳本</span>
+        <span class="fl-model">${esc(modelName(engOf(L.group), JOBS.tiers[engOf(L.group)].main))}</span></button>${arrow}` : "";
+      return `<section class="fl-lane"><div class="fl-head"><b>${esc(L.title)}</b>${head}</div>${main}${L.nodes.map(node).join(arrow)}</section>`;
+    }).join("");
+    return `<h4 style="margin:18px 0 4px">流程圖：哪一步用哪個模型</h4>
+      <div class="small muted" style="margin-bottom:8px">灰色是腳本做的，不用 AI；綠色會用 AI，點一下換模型（框的標題列選這一類用 Claude、StepFun 或 Codex）。改了之後，新開始的工作才會用新設定。</div>
+      <div class="fl-lanes">${lanes}</div>
+      <details style="margin-top:10px"><summary class="small" style="cursor:pointer;min-height:36px">沒有特別選的步驟：各角色預設用哪個模型</summary>
+        ${["claude", "stepfun"].map(e => `<div class="small" style="margin:8px 0 4px"><b>${esc(JOBS.engines[e])}</b></div><div class="aigrid">${Object.entries(JOBS.roles).map(([r, lab]) =>
+          `<span>${esc(lab)}</span><select data-tier="${e}" data-role="${r}">${JOBS.models[e].map(m => `<option value="${esc(m.v)}" ${m.v === (JOBS.tiers[e][r] || "") ? "selected" : ""}>${esc(m.name)}</option>`).join("")}</select>`).join("")}
+          ${e === "stepfun" ? `<span>StepFun 方案</span><select data-sfbase="1">${Object.entries(JOBS.bases).map(([v, l]) => `<option value="${v}" ${v === JOBS.stepfunBase ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>` : ""}</div>`).join("")}</details>`;
+  }
+  // 點流程圖上的 AI 步驟：跳出小框選模型
+  let popEl = null;
+  const popClose = () => { if (popEl){ popEl.remove(); popEl = null; } };
+  function popAt(btn, title, opts, onPick){
+    popClose(); const r = btn.getBoundingClientRect(); popEl = document.createElement("div"); popEl.className = "fl-pop"; popEl.setAttribute("role", "dialog"); popEl.setAttribute("aria-label", title);
+    popEl.innerHTML = `<div class="small" style="font-weight:700;margin-bottom:6px">${esc(title)}</div>` + opts.map(o => `<button type="button" class="fl-opt${o.on ? " on" : ""}" data-v="${esc(o.v)}">${esc(o.l)}</button>`).join("");
+    document.body.appendChild(popEl);
+    popEl.style.left = Math.max(8, Math.min(innerWidth - popEl.offsetWidth - 8, r.left)) + "px";
+    popEl.style.top = Math.max(8, Math.min(innerHeight - popEl.offsetHeight - 8, r.bottom + 6)) + "px";
+    popEl.onclick = ev => { const b = ev.target.closest("[data-v]"); if (!b) return; popClose(); onPick(b.dataset.v); };
+    const f = popEl.querySelector(".fl-opt.on") || popEl.querySelector(".fl-opt"); if (f) f.focus();
+  }
+  document.addEventListener("mousedown", e => { if (popEl && !popEl.contains(e.target) && !e.target.closest("[data-flow-step],[data-flow-task],[data-flow-main]")) popClose(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") popClose(); });
+  document.addEventListener("click", e => {
+    if (!ROOT || !ROOT.contains(e.target)) return;
+    const st = e.target.closest("[data-flow-step]"), tk = e.target.closest("[data-flow-task]"), mn = e.target.closest("[data-flow-main]");
+    if (st){ const id = st.dataset.flowStep, s0 = STEPS()[id], m = stepModel(id);
+      return popAt(st, `${s0.role}：${s0.label}`, [{v: "", l: `照角色預設（${modelName(m.e, JOBS.tiers[m.e][s0.tier])}）`, on: !m.own},
+        ...JOBS.models[m.e].filter(x => x.v).map(x => ({v: x.v, l: x.name, on: m.own && x.v === m.v}))],
+        v => saveRouting({jobs: {steps: {[m.e]: {[id]: v}}}}, `已更新：${s0.label} 改用 ${v ? modelName(m.e, v) : "角色預設"}，新開始的工作才會用。`)); }
+    if (tk){ const k = tk.dataset.flowTask, t = TASKS[k] || {}, ready = ORDER3.filter(aiReady);
+      return popAt(tk, t.label || k, [{v: "", l: "自動（StepFun 測試成功就用它，否則預設那位）", on: !t.choice}, ...ready.map(v => ({v, l: (AI[v] || {}).name || v, on: t.choice === v}))],
+        v => saveRouting({tasks: {[k]: v}}, "已更新：這個小工作用哪一位。")); }
+    if (mn){ const g = mn.dataset.flowMain, e2 = engOf(g);
+      return popAt(mn, "主控：照流程派工、跑腳本", JOBS.models[e2].map(x => ({v: x.v, l: x.name, on: x.v === (JOBS.tiers[e2].main || "")})),
+        v => saveRouting({jobs: {tiers: {[e2]: {main: v}}}}, "已更新主控用的模型（這個引擎的每一類工作都用它）。")); }
+  });
   async function saveRouting(body, okMsg){
     try { const g = await post("ai-settings", body); TASKS = g.tasks || TASKS; JOBS = g.jobs || JOBS; renderRouting(); if (okMsg) msg(okMsg); }
     catch (err) { msg(esc((err && err.error) || "沒有存到")); checkEngine(); }

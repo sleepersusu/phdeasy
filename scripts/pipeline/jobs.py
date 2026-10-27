@@ -283,6 +283,8 @@ class Jobs:
         """key：同一個 key 一次只能有一個工作（預設是教授 slug；文件類用文件名）。"""
         launch = self.launch(kind)  # StepFun 沒貼 key 之類的，這裡就丟錯誤，畫面看得到
         engine = launch["engine"]
+        if launch.get("note") and engine != "codex":
+            prompt = prompt + launch["note"]  # 流程圖上單一步驟指定的模型
         if engine == "codex":
             exe = self.codex or find_codex()
             if not exe:

@@ -247,3 +247,29 @@ body.lang-both .facts .ll .t-en{display:none}
 .seg button{border:0;background:transparent;font:inherit;font-size:.9rem;font-weight:600;color:var(--muted,#555);padding:6px 12px;min-height:34px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .seg button[aria-selected="true"]{background:#fff;color:var(--fg);box-shadow:0 1px 2px rgba(0,0,0,.08)}
 .seg .seg-n{font-size:.8rem;font-weight:600;color:var(--muted,#555);background:rgba(0,0,0,.06);border-radius:999px;padding:0 7px;min-width:20px;text-align:center}
+
+/* 通關式進度（工作進度）：橫的一排；窄的畫面改直的 */
+.stepper{list-style:none;margin:12px 0 4px;padding:0;display:flex;overflow-x:auto;gap:0}
+.stp{position:relative;flex:1 0 92px;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 4px}
+.stp::before{content:"";position:absolute;top:13px;right:50%;width:100%;height:3px;background:#d7dbe0;z-index:0}
+.stp:first-child::before{display:none}
+.stp.lit::before{background:#15803d}
+.stp-dot{position:relative;z-index:1;width:28px;height:28px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#c4c9cf}
+.stp.done .stp-dot{background:#15803d;box-shadow:0 0 0 4px rgba(21,128,61,.15)}
+.stp.now .stp-dot{background:#fff;border:3px solid #15803d;box-shadow:0 0 0 5px rgba(21,128,61,.18),0 0 14px rgba(21,128,61,.45);animation:stpglow 1.6s ease-in-out infinite}
+.stp-spin{width:12px;height:12px;border:2px solid #b7dcc3;border-top-color:#15803d;border-radius:50%;animation:stpspin .8s linear infinite}
+.stp-txt{display:flex;flex-direction:column;gap:2px;margin-top:6px}
+.stp-name{font-size:.82rem;font-weight:600;color:#9aa0a6}
+.stp.done .stp-name,.stp.now .stp-name{color:var(--fg,#111)}
+.stp-state{font-size:.74rem;color:#9aa0a6}
+.stp.done .stp-state{color:#15803d}
+.stp-pill{display:inline-block;padding:0 8px;border:1px solid #15803d;border-radius:999px;color:#15803d;background:#eefaf2;font-weight:600}
+@keyframes stpspin{to{transform:rotate(360deg)}}
+@keyframes stpglow{50%{box-shadow:0 0 0 7px rgba(21,128,61,.12),0 0 20px rgba(21,128,61,.55)}}
+@media (prefers-reduced-motion:reduce){.stp.now .stp-dot,.stp-spin{animation:none}}
+@media (max-width:640px){
+  .stepper{flex-direction:column;overflow:visible}
+  .stp{flex:none;flex-direction:row;align-items:flex-start;text-align:left;gap:10px;padding:0 0 14px}
+  .stp::before{top:auto;bottom:calc(100% - 14px);right:auto;left:12px;width:3px;height:100%}
+  .stp-txt{margin-top:2px}
+}

@@ -1176,6 +1176,30 @@ TIER_DEFAULT = {"claude": {"main": "", "opus": "claude-opus-5-5", "sonnet": "cla
                 "stepfun": {"main": "step-5-preview", "opus": "step-5-preview", "sonnet": "step-5-preview", "haiku": "step-3.7-flash"}}
 STEPFUN_BASES = {"api": ("https://api.stepfun.ai", "一般 API（按用量計費）"), "plan": ("https://api.stepfun.ai/step_plan", "Step Plan 訂閱")}
 
+# 流程圖上會用到 AI 的步驟（派 agent 的角色）：各自可以選模型（本人 2026-10-27）。
+# tier＝skill 裡寫的 model 代稱；progress＝工作進度那一關（pipeline/progress.py 的步驟）
+FLOW_STEPS = [
+    {"id": "setup.focus", "group": "build", "skill": "prof-setup", "role": "挑選者", "label": "挑必讀前五篇", "tier": "opus", "progress": "list"},
+    {"id": "setup.programs", "group": "build", "skill": "prof-setup", "role": "查詢者", "label": "查博士學程", "tier": "sonnet", "progress": "programs"},
+    {"id": "grants.extract", "group": "build", "skill": "prof-grants", "role": "抽取者", "label": "抽取論文致謝的計畫", "tier": "sonnet", "progress": "grants"},
+    {"id": "grants.refute", "group": "build", "skill": "prof-grants", "role": "推翻者", "label": "推翻只有致謝當證據的計畫", "tier": "opus", "progress": "grants"},
+    {"id": "cards.reader", "group": "build", "skill": "prof-cards", "role": "閱讀者", "label": "讀全文寫解析卡", "tier": "opus", "progress": "cards"},
+    {"id": "cards.refute", "group": "build", "skill": "prof-cards", "role": "推翻者", "label": "推翻解析卡的推論", "tier": "opus", "progress": "cards"},
+    {"id": "digest.digester", "group": "build", "skill": "prof-digest", "role": "整理者", "label": "重點、圖表、研究方法", "tier": "opus", "progress": "digest"},
+    {"id": "profile.writer", "group": "build", "skill": "prof-profile", "role": "總覽撰寫者", "label": "寫教授總覽", "tier": "opus", "progress": "profile"},
+    {"id": "profile.refute", "group": "build", "skill": "prof-profile", "role": "總覽推翻者", "label": "推翻總覽的句子", "tier": "opus", "progress": "profile"},
+    {"id": "match.matcher", "group": "build", "skill": "prof-match", "role": "比對者", "label": "跟你的研究比對", "tier": "sonnet", "progress": "match"},
+    {"id": "verify.judge", "group": "build", "skill": "prof-verify", "role": "獨立驗收者", "label": "獨立驗收", "tier": "opus", "progress": "verify"},
+    {"id": "library.digester", "group": "library", "skill": "prof-library", "role": "整理者", "label": "整理重點、圖表、研究方法", "tier": "opus"},
+    {"id": "library.drafter", "group": "library", "skill": "prof-library", "role": "擬稿者", "label": "用勾選的文獻擬初稿", "tier": "opus"},
+    {"id": "research.discover", "group": "research", "skill": "prof-discover", "role": "查詢者", "label": "補排名、學程、資助、實驗室", "tier": "sonnet"},
+    {"id": "research.match", "group": "research", "skill": "prof-match", "role": "比對者", "label": "重新比對", "tier": "sonnet"},
+    {"id": "research.propose", "group": "research", "skill": "prof-propose", "role": "擬稿者", "label": "研究計畫書草稿", "tier": "opus"},
+    {"id": "docs.editor", "group": "docs", "skill": "my-docs", "role": "編修者", "label": "每段 AI 編修", "tier": "opus"},
+    {"id": "docs.translator", "group": "docs", "skill": "my-docs", "role": "翻譯者", "label": "翻成中文", "tier": "sonnet"},
+]
+FLOW_IDS = {s["id"]: s for s in FLOW_STEPS}
+
 
 def job_group(kind):
     return next((g for g, (_, kinds) in JOB_GROUPS.items() if kind in kinds), None)
@@ -1210,6 +1234,18 @@ def save_job_settings(d):
                     if r in TIERS and m in ok:
                         cur[r] = m
         j["tiers"] = t
+    if isinstance(d.get("steps"), dict):  # 流程圖上單一步驟的模型；空字串＝照角色預設
+        st = {e: dict(v) for e, v in (j.get("steps") or {}).items()}
+        for e, chosen in d["steps"].items():
+            ok = {m for m, _ in TIER_MODELS.get(e, []) if m}
+            if e in TIER_MODELS and isinstance(chosen, dict):
+                cur = st.setdefault(e, {})
+                for sid, m in chosen.items():
+                    if sid in FLOW_IDS and m in ok:
+                        cur[sid] = m
+                    elif sid in FLOW_IDS and not m:
+                        cur.pop(sid, None)
+        j["steps"] = {e: v for e, v in st.items() if v}
     if "stepfunBase" in d:
         if d["stepfunBase"] in STEPFUN_BASES:
             j["stepfunBase"] = d["stepfunBase"]
@@ -1227,9 +1263,10 @@ def job_launch(kind, default_engine="claude"):
     if via == "codex":
         return {"engine": "codex", "via": "codex", "model": None, "env": {}, "unset": [], "label": "Codex"}
     t = job_tiers(via)
-    env = {f"ANTHROPIC_DEFAULT_{r.upper()}_MODEL": t[r] for r in ("opus", "sonnet", "haiku") if t.get(r)}
-    if t.get("opus"):
-        env["ANTHROPIC_DEFAULT_FABLE_MODEL"] = t["opus"]
+    slots, note = _step_slots(job_group(kind), via, t)
+    env = {f"ANTHROPIC_DEFAULT_{r.upper()}_MODEL": slots[r] for r in ("opus", "sonnet", "haiku") if slots.get(r)}
+    if slots.get("opus"):
+        env["ANTHROPIC_DEFAULT_FABLE_MODEL"] = slots["opus"]
     unset = []
     if via == "stepfun":
         key = stepfun_key()
@@ -1239,7 +1276,33 @@ def job_launch(kind, default_engine="claude"):
                     "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "1000000", "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"})
         unset = ["ANTHROPIC_API_KEY"]  # 不要跟 Claude 帳號的 key 混用
     label = (JOB_ENGINES.get(via, via).split("（")[0] + " " + (t.get("main") or "預設")).strip()
-    return {"engine": "claude", "via": via, "model": t.get("main") or None, "env": env, "unset": unset, "label": label}
+    return {"engine": "claude", "via": via, "model": t.get("main") or None, "env": env, "unset": unset, "label": label, "note": note}
+
+
+def _step_slots(group, engine, tiers):
+    """這類工作每個 AI 步驟要的模型 → 分到 opus／sonnet／haiku 三格（Claude Code 派 agent 只認這些代稱）；
+    跟 skill 寫的代稱不同的步驟，寫成一段說明加在工作指示後面。每家最多三種模型，三格一定放得下。"""
+    chosen = ((w_settings().get("jobs") or {}).get("steps") or {}).get(engine) or {}
+    steps = [s for s in FLOW_STEPS if s["group"] == group]
+    want = {s["id"]: chosen.get(s["id"]) or tiers.get(s["tier"]) for s in steps}
+    slots = {r: tiers.get(r) for r in ("opus", "sonnet", "haiku")}
+    need = [m for m in dict.fromkeys(want.values()) if m]
+    alias = {}
+    for r in ("opus", "sonnet", "haiku"):  # 已經在某一格的模型留在原格
+        if slots[r] in need and slots[r] not in alias:
+            alias[slots[r]] = r
+    used_by = {alias[m] for m in alias}
+    for m in need:
+        if m not in alias:
+            free = next((r for r in ("haiku", "sonnet", "opus") if r not in used_by), None)
+            if free is None:
+                raise ValueError("一類工作最多用三種模型")
+            slots[free], alias[m] = m, free
+            used_by.add(free)
+    pick = lambda s: s["tier"] if slots.get(s["tier"]) == want[s["id"]] else alias[want[s["id"]]]  # 自己那一格就是要的模型：照 skill
+    diff = [f"{s['skill']} {s['role']} → {pick(s)}" for s in steps if want[s["id"]] and pick(s) != s["tier"]]
+    note = ("（本人在設定指定的模型：派下面這些 agent 時，Agent 工具的 model 參數改用指定的代稱，其他照 skill 寫的：" + "；".join(diff) + "。）") if diff else ""
+    return slots, note
 
 
 def jobs_status(default_engine="claude"):
@@ -1247,4 +1310,5 @@ def jobs_status(default_engine="claude"):
     return {"groups": [{"id": g, "label": lab, "engine": (j.get("groups") or {}).get(g) or default_engine} for g, (lab, _) in JOB_GROUPS.items()],
             "engines": JOB_ENGINES, "roles": TIERS, "models": {e: [{"v": v, "name": n} for v, n in ms] for e, ms in TIER_MODELS.items()},
             "tiers": {e: job_tiers(e) for e in TIER_MODELS}, "stepfunBase": j.get("stepfunBase") or "api",
+            "steps": FLOW_STEPS, "stepModels": j.get("steps") or {},
             "bases": {k: v[1] for k, v in STEPFUN_BASES.items()}}

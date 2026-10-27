@@ -200,3 +200,36 @@ def test_job_settings_reject_unknown_values(cfg):
     assert j["groups"] == {"build": "codex"} and j["tiers"]["stepfun"] == {"opus": "step-3.7-flash"} and "stepfunBase" not in j
     assert ai.job_launch("deep")["engine"] == "codex"
     assert ai.job_launch("unknown-kind", default_engine="codex")["engine"] == "codex"
+
+
+# ---------- 流程圖上的每個 AI 步驟可以各自選模型 ----------
+def test_every_flow_ai_step_belongs_to_a_job_group_and_has_a_role():
+    ids = [s["id"] for s in ai.FLOW_STEPS]
+    assert len(ids) == len(set(ids))
+    for s in ai.FLOW_STEPS:
+        assert s["group"] in ai.JOB_GROUPS and s["tier"] in ("opus", "sonnet") and s["role"] and s["skill"]
+
+
+def test_step_model_choice_goes_into_prompt_and_free_slot(cfg):
+    L = ai.job_launch("new")
+    assert L["note"] == ""  # 沒改：照 skill 寫的
+    ai.save_job_settings({"steps": {"claude": {"cards.reader": "claude-sonnet-5-5"}}})
+    L = ai.job_launch("new")
+    assert "prof-cards" in L["note"] and "閱讀者" in L["note"] and "sonnet" in L["note"]  # 閱讀者改用 sonnet 那一格
+    ai.save_job_settings({"steps": {"claude": {"cards.refute": "claude-haiku-5-5"}}})
+    L = ai.job_launch("new")
+    assert "haiku" in L["note"] and L["env"]["ANTHROPIC_DEFAULT_HAIKU_MODEL"] == "claude-haiku-5-5"
+    assert "Meeting" not in L["note"] and ai.job_launch("library")["note"] == ""  # 別類工作不受影響
+
+
+def test_stepfun_step_can_use_a_model_no_role_has(cfg, monkeypatch):
+    monkeypatch.undo()
+    _key(cfg)
+    ai.save_job_settings({"groups": {"build": "stepfun"}, "steps": {"stepfun": {"match.matcher": "step-3.5-flash", "bogus": "x", "cards.reader": "claude-opus-5-5"}}})
+    assert ai.w_settings()["jobs"]["steps"] == {"stepfun": {"match.matcher": "step-3.5-flash"}}  # 不認得的步驟、別家的模型不收
+    L = ai.job_launch("new")
+    slot = next(k for k, v in L["env"].items() if v == "step-3.5-flash" and k.startswith("ANTHROPIC_DEFAULT_") and "FABLE" not in k)
+    alias = slot.split("_")[2].lower()
+    assert f"prof-match 比對者 → {alias}" in L["note"]
+    ai.save_job_settings({"steps": {"stepfun": {"match.matcher": ""}}})  # 選回預設
+    assert ai.job_launch("new")["note"] == ""

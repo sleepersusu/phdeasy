@@ -199,9 +199,11 @@ def test_job_uses_chosen_engine_model_and_env(tmp_path, monkeypatch):
     monkeypatch.setenv("ANTHROPIC_API_KEY", "should-be-removed")
     j = Jobs(tmp_path, tmp_path / "runs", claude="claude", popen=popen)
     j.launch = lambda kind: {"engine": "claude", "via": "stepfun", "model": "step-5-preview", "label": "StepFun step-5-preview",
-                             "env": {"ANTHROPIC_BASE_URL": "https://api.stepfun.ai", "ANTHROPIC_DEFAULT_OPUS_MODEL": "step-5-preview"}, "unset": ["ANTHROPIC_API_KEY"]}
+                             "env": {"ANTHROPIC_BASE_URL": "https://api.stepfun.ai", "ANTHROPIC_DEFAULT_OPUS_MODEL": "step-5-preview"}, "unset": ["ANTHROPIC_API_KEY"],
+                             "note": "（本人在設定指定的模型：prof-library 整理者 → haiku。）"}
     job = j.start("library", "處理", "Meeting 文獻：x", slug="x", key="lib:x")
     assert seen["cmd"][seen["cmd"].index("--model") + 1] == "step-5-preview"
+    assert seen["cmd"][seen["cmd"].index("-p") + 1].endswith("prof-library 整理者 → haiku。）")
     assert seen["env"]["ANTHROPIC_BASE_URL"] == "https://api.stepfun.ai" and "ANTHROPIC_API_KEY" not in seen["env"]
     assert job["engine"] == "stepfun" and job["model"] == "StepFun step-5-preview"
     j.launch = lambda kind: (_ for _ in ()).throw(RuntimeError("還沒貼 StepFun 的 key"))

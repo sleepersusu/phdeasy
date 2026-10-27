@@ -48,8 +48,19 @@ function progressHTML(p){
     <div role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${p.percent}" style="height:10px;background:#e5e7eb;border-radius:5px;overflow:hidden;margin-top:4px">
       <div style="height:100%;width:${p.percent}%;background:#15803d;transition:width .3s"></div></div>
     ${cur ? `<div class="small" style="margin-top:6px">目前：${esc(cur.label)}${cur.total > 1 ? ` ${cur.done}／${cur.total}` : ""}，這一步${dur(cur.eta_s)}</div>` : ""}
-    <ol class="small muted" style="margin:6px 0 0;padding-left:20px">${p.steps.map(x => `<li>${x.key === p.current ? "▶ " : x.total && x.done >= x.total ? "✓ " : ""}${esc(x.label)}${x.total > 1 ? `（${x.done}／${x.total}）` : ""}</li>`).join("")}</ol>
+    ${stepperHTML(p.steps.map(x => ({label: x.label, sub: x.total > 1 ? `${x.done}／${x.total}` : "",
+      state: x.key === p.current ? "now" : (x.total ? x.done >= x.total : !p.current) ? "done" : "todo"})))}
   </div>`;
+}
+/* 通關式進度：一關一關打勾亮燈（已完成＝綠色打勾、進行中＝亮燈轉圈、還沒到＝灰色時鐘）；窄的畫面改成直的 */
+const STEP_ICON = {done: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  now: '<span class="stp-spin" aria-hidden="true"></span>',
+  todo: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>'};
+const STEP_WORD = {done: "已完成", now: "進行中", todo: "待完成"};
+function stepperHTML(steps){
+  return `<ol class="stepper" aria-label="流程進度">${steps.map((x, i) => `<li class="stp ${x.state}${i && steps[i - 1].state === "done" ? " lit" : ""}">
+      <span class="stp-dot" title="${STEP_WORD[x.state]}">${STEP_ICON[x.state]}</span>
+      <span class="stp-txt"><span class="stp-name">${esc(x.label)}</span><span class="stp-state">${x.state === "now" ? `<span class="stp-pill">進行中</span>` : STEP_WORD[x.state]}${x.sub ? `・${esc(x.sub)}` : ""}</span></span></li>`).join("")}</ol>`;
 }
 
 function jobsHTML(st, ready){
@@ -62,7 +73,7 @@ function jobsHTML(st, ready){
     const running = job.running, id = esc(job.id);
     return setRow("row-job-" + job.id, running ? "▶ " + esc(job.title) : esc(job.title),
       `${running ? (job.progress ? `<span class="pill y">${job.progress.percent}%｜還要${dur(job.progress.eta_s)}</span>` : '<span class="pill y">執行中</span>') : job.status === "done" ? '<span class="pill g">跑完了</span>' : job.status === "halted" ? '<span class="pill y">停下，等你處理</span>' : '<span class="pill r">中斷</span>'}`, `
-      ${running && job.progress ? progressHTML(job.progress) : ""}
+      ${running && job.progress ? progressHTML(job.progress) : stepperHTML([{label: "開始", state: "done"}, {label: job.kind === "library" ? "AI 整理重點與圖表" : "AI 處理中", state: running ? "now" : job.status === "done" ? "done" : "todo"}, {label: "完成", state: job.status === "done" && !running ? "done" : "todo"}])}
       <div class="row">${running ? `<button class="btn btn-red btn-sm" data-job-stop="${id}">停止</button>` : ""}
         ${!running && job.status !== "done" && job.slug ? `<button class="btn btn-green btn-sm" data-continue="${esc(job.slug)}" ${!ready ? "disabled" : ""}>繼續跑</button><span class="small muted">從中斷的地方接著跑，已完成的不會重做</span>` : ""}
         ${job.cost_usd != null ? `<span class="small muted">本段用量約 US$${Number(job.cost_usd).toFixed(2)}</span>` : ""}</div>
