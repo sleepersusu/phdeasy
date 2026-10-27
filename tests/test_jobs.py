@@ -187,3 +187,24 @@ def test_no_stop1_decisions_become_buttons():
         assert "build_site" in prompt_exception("x", {"id": "W1", "kind": kind, "detail": "d"}, act)
     p = prompt_new("Jane Doe", "Uni", slug="doe-jane")
     assert "不要停" in p and "prof-verify" in p
+
+
+def test_job_uses_chosen_engine_model_and_env(tmp_path, monkeypatch):
+    """設定裡選的：主控模型用 --model；派 agent 的角色模型、StepFun 的網址與 key 走環境變數；Claude 帳號的 key 拿掉。"""
+    seen = {}
+
+    def popen(cmd, **kw):
+        seen.update(cmd=cmd, env=kw.get("env"))
+        return FakeProc([])
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "should-be-removed")
+    j = Jobs(tmp_path, tmp_path / "runs", claude="claude", popen=popen)
+    j.launch = lambda kind: {"engine": "claude", "via": "stepfun", "model": "step-5-preview", "label": "StepFun step-5-preview",
+                             "env": {"ANTHROPIC_BASE_URL": "https://api.stepfun.ai", "ANTHROPIC_DEFAULT_OPUS_MODEL": "step-5-preview"}, "unset": ["ANTHROPIC_API_KEY"]}
+    job = j.start("library", "處理", "Meeting 文獻：x", slug="x", key="lib:x")
+    assert seen["cmd"][seen["cmd"].index("--model") + 1] == "step-5-preview"
+    assert seen["env"]["ANTHROPIC_BASE_URL"] == "https://api.stepfun.ai" and "ANTHROPIC_API_KEY" not in seen["env"]
+    assert job["engine"] == "stepfun" and job["model"] == "StepFun step-5-preview"
+    j.launch = lambda kind: (_ for _ in ()).throw(RuntimeError("還沒貼 StepFun 的 key"))
+    import pytest
+    with pytest.raises(RuntimeError, match="key"):
+        j.start("library", "處理", "Meeting 文獻：y", slug="y", key="lib:y")

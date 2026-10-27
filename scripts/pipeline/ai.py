@@ -1157,3 +1157,94 @@ def engine_status(pv=None):
     return {"providers": {k: provider_status(k) for k in ids}, "selected": current_provider(), "autoSwitch": ai_auto(),
             "provider": c.get("provider"), "tasks": {k: {"label": v, "choice": (c.get("tasks") or {}).get(k) or "", "using": task_provider(k)} for k, v in TASKS.items()},
             "stepfunKey": ("…" + stepfun_key()[-4:]) if stepfun_key() else None}
+
+
+# ---------- 背景工作（建檔流水線，大量派 agent）：每一類工作選引擎，每個引擎選各角色的模型（本人 2026-10-27） ----------
+# Claude Code 派 agent 時用 opus／sonnet／haiku 這些代稱；改 ANTHROPIC_DEFAULT_*_MODEL 就能換成別的模型，流程不用改。
+# StepFun 也走 Claude Code（StepFun 提供 Anthropic 相容的 API）：同一個工作裡全部角色都用 Step 的模型。
+JOB_GROUPS = {
+    "build": ("建檔（教授文章、解析卡、總覽、驗收）", ("new", "continue", "reply", "exception", "deep")),
+    "library": ("Meeting 文獻（整理重點、擬初稿）", ("library", "library-draft")),
+    "research": ("查詢與比對（教員名單、博士學程、補資訊、比對、計畫書草稿）", ("faculty", "programs", "discover-enrich", "match", "propose")),
+    "docs": ("我的文件（AI 編修、翻譯）", ("doc-edit", "doc-translate")),
+}
+JOB_ENGINES = {"claude": "Claude（你的 Claude 帳號）", "stepfun": "StepFun（經 Claude Code）", "codex": "Codex（ChatGPT）"}
+TIERS = {"main": "主控：照流程派工、跑腳本", "opus": "重的工作：讀全文、寫解析卡與重點、推翻、驗收", "sonnet": "一般：翻譯、查詢、比對", "haiku": "簡單的小工作"}
+TIER_MODELS = {"claude": [("", "帳號預設"), ("claude-opus-5-5", "Opus 5.5"), ("claude-sonnet-5-5", "Sonnet 5.5"), ("claude-haiku-5-5", "Haiku 5.5")],
+               "stepfun": [("step-5-preview", "Step 5 Preview"), ("step-3.7-flash", "Step 3.7 Flash"), ("step-3.5-flash", "Step 3.5 Flash")]}
+TIER_DEFAULT = {"claude": {"main": "", "opus": "claude-opus-5-5", "sonnet": "claude-sonnet-5-5", "haiku": "claude-haiku-5-5"},
+                "stepfun": {"main": "step-5-preview", "opus": "step-5-preview", "sonnet": "step-5-preview", "haiku": "step-3.7-flash"}}
+STEPFUN_BASES = {"api": ("https://api.stepfun.ai", "一般 API（按用量計費）"), "plan": ("https://api.stepfun.ai/step_plan", "Step Plan 訂閱")}
+
+
+def job_group(kind):
+    return next((g for g, (_, kinds) in JOB_GROUPS.items() if kind in kinds), None)
+
+
+def job_tiers(engine):
+    t = dict(TIER_DEFAULT.get(engine) or {})
+    t.update(((w_settings().get("jobs") or {}).get("tiers") or {}).get(engine) or {})
+    return t
+
+
+def save_job_settings(d):
+    """設定頁送來的：只收認得的類別、引擎、模型。"""
+    c = w_settings()
+    j = dict(c.get("jobs") or {})
+    if isinstance(d.get("groups"), dict):
+        g = dict(j.get("groups") or {})
+        for k, v in d["groups"].items():
+            if k in JOB_GROUPS:
+                if v in JOB_ENGINES:
+                    g[k] = v
+                else:
+                    g.pop(k, None)
+        j["groups"] = {k: v for k, v in g.items() if k in JOB_GROUPS and v in JOB_ENGINES}
+    if isinstance(d.get("tiers"), dict):
+        t = {e: dict(v) for e, v in (j.get("tiers") or {}).items()}
+        for e, roles in d["tiers"].items():
+            ok = {m for m, _ in TIER_MODELS.get(e, [])}
+            if e in TIER_MODELS and isinstance(roles, dict):
+                cur = t.setdefault(e, {})
+                for r, m in roles.items():
+                    if r in TIERS and m in ok:
+                        cur[r] = m
+        j["tiers"] = t
+    if "stepfunBase" in d:
+        if d["stepfunBase"] in STEPFUN_BASES:
+            j["stepfunBase"] = d["stepfunBase"]
+        else:
+            j.pop("stepfunBase", None)
+    c["jobs"] = j
+    write_json(WSET, c)
+    return j
+
+
+def job_launch(kind, default_engine="claude"):
+    """背景工作怎麼啟動：engine（claude／codex 哪個 CLI）、主控模型、要加的環境變數、要拿掉的環境變數、實際用誰（via）。"""
+    j = w_settings().get("jobs") or {}
+    via = (j.get("groups") or {}).get(job_group(kind) or "") or default_engine
+    if via == "codex":
+        return {"engine": "codex", "via": "codex", "model": None, "env": {}, "unset": [], "label": "Codex"}
+    t = job_tiers(via)
+    env = {f"ANTHROPIC_DEFAULT_{r.upper()}_MODEL": t[r] for r in ("opus", "sonnet", "haiku") if t.get(r)}
+    if t.get("opus"):
+        env["ANTHROPIC_DEFAULT_FABLE_MODEL"] = t["opus"]
+    unset = []
+    if via == "stepfun":
+        key = stepfun_key()
+        if not key:
+            raise RuntimeError("這類背景工作設定用 StepFun，但還沒貼 StepFun 的 key：到「設定 → AI 小幫手」貼上，或改回 Claude")
+        env.update({"ANTHROPIC_BASE_URL": STEPFUN_BASES[j.get("stepfunBase") or "api"][0], "ANTHROPIC_AUTH_TOKEN": key,
+                    "CLAUDE_CODE_MAX_CONTEXT_TOKENS": "1000000", "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1000000"})
+        unset = ["ANTHROPIC_API_KEY"]  # 不要跟 Claude 帳號的 key 混用
+    label = (JOB_ENGINES.get(via, via).split("（")[0] + " " + (t.get("main") or "預設")).strip()
+    return {"engine": "claude", "via": via, "model": t.get("main") or None, "env": env, "unset": unset, "label": label}
+
+
+def jobs_status(default_engine="claude"):
+    j = w_settings().get("jobs") or {}
+    return {"groups": [{"id": g, "label": lab, "engine": (j.get("groups") or {}).get(g) or default_engine} for g, (lab, _) in JOB_GROUPS.items()],
+            "engines": JOB_ENGINES, "roles": TIERS, "models": {e: [{"v": v, "name": n} for v, n in ms] for e, ms in TIER_MODELS.items()},
+            "tiers": {e: job_tiers(e) for e in TIER_MODELS}, "stepfunBase": j.get("stepfunBase") or "api",
+            "bases": {k: v[1] for k, v in STEPFUN_BASES.items()}}

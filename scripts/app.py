@@ -255,6 +255,7 @@ class App:
         self.gcal_pending = None
         from pipeline import ai as AI
         AI.configure(self.runs)  # AI 小幫手（照 ieltsgod）：設定存在 runs/_app/ai.json，只在這台
+        self.jobs.launch = lambda kind: AI.job_launch(kind, default_engine=self.engine())  # 每類背景工作用哪個引擎、各角色哪個模型
         self._lib_again = set()
         self._lib_state = {}  # Meeting 文獻在背景加入中：{教授: {adding, errors}}  # 文獻處理在跑時又加了文獻的教授：跑完再接著跑一次
         self.zh_jobs = {}  # 全文翻中文的背景工作：{(教授, 文章, 討論文獻?): {status, done, total, error}}
@@ -837,7 +838,7 @@ class App:
         from pipeline import ai as AI
         pv = body.get("provider")
         if path == "ai-engine":
-            return AI.engine_status(pv)
+            return {**AI.engine_status(pv), "jobs": AI.jobs_status(self.engine())}
         if path == "ai-alerts":
             since = int(body.get("since") or 0)
             return {"alerts": [a for a in AI.AI_ALERTS if a["t"] > since], "now": int(time.time() * 1000)}
@@ -857,7 +858,9 @@ class App:
                             t.pop(k, None)
                 c["tasks"] = t
             AI.write_json(AI.WSET, c)
-            return AI.engine_status()
+            if isinstance(body.get("jobs"), dict):  # 背景工作：每類用哪個引擎、各角色哪個模型、StepFun 走哪個方案
+                AI.save_job_settings(body["jobs"])
+            return {**AI.engine_status(), "jobs": AI.jobs_status(self.engine())}
         if path == "ai-agy":
             a = body.get("action")
             try:

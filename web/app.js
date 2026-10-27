@@ -199,14 +199,10 @@ function renderSettings(st){
   lastSettings = shape;
   const t = g.claude_test;
   el.innerHTML =
-    setRow("row-ai", "AI 小幫手", `<span class="small muted">背景建檔用 ${st.engine === "codex" ? "Codex" : "Claude Code"}</span>`, `
+    setRow("row-ai", "AI 小幫手", `<span class="small muted">問 AI、翻譯、背景工作各用哪個模型</span>`, `
         <p class="small muted" style="margin-top:0">點一位設定它：① 安裝 → ② 登入 → ③ 測試連線；右邊選模型。已連線的點一下就設成預設：問 AI、翻譯、研究類型分類都用它，額度用完會自動換下一位。</p>
         ${typeof aiHelperHTML === "function" ? aiHelperHTML() : ""}
-        <h4 style="margin:16px 0 4px">背景建檔（建新教授、整理文獻、AI 編修）用</h4>
-        <div class="row" role="radiogroup" aria-label="背景工作用哪個 AI">
-          <label><input type="radio" name="engine" value="claude" ${st.engine !== "codex" ? "checked" : ""}> Claude Code（預設）</label>
-          <label><input type="radio" name="engine" value="codex" ${st.engine === "codex" ? "checked" : ""}> Codex（ChatGPT，備用）</label></div>
-        <p class="small muted">建檔要能讀寫檔案、跑腳本、再派小幫手，只有 Claude Code 和 Codex 做得到（Gemini 的 Antigravity 在背景不能操作檔案）。Claude 額度用完時可以切到 Codex；這個選擇只存在這台電腦。</p>`) +
+`) +
     setRow("row-drive", "Google 雲端硬碟", g.account ? `<span class="small muted">${esc(g.account)}${st.syncing ? "｜同步中" : ""}</span>` : '<span class="pill r">沒有帳號</span>', `
         ${g.drives && g.drives.length ? `<p class="small">教授檔案放在：<br><span class="muted">${esc(g.folder || "（還沒選帳號）")}</span></p>
           <div class="small" style="margin-bottom:6px">這台電腦登入的帳號（按一下就換成這個帳號）：</div>

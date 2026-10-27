@@ -66,9 +66,11 @@ def describe_codex(ev):
     return None
 
 
-def claude_cmd(claude, prompt, session=None):
+def claude_cmd(claude, prompt, session=None, model=None):
     cmd = [claude, "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--permission-mode", "dontAsk", "--allowedTools", ",".join(ALLOWED_TOOLS)]
+    if model:  # 主控用哪個模型（設定 → AI 小幫手 → 背景工作）
+        cmd += ["--model", model]
     if session:
         cmd += ["--resume", session]
     return cmd
@@ -246,6 +248,8 @@ class Jobs:
         self.claude, self.popen = claude, popen
         self.codex = None
         self.engine = lambda: "claude"  # 應用程式設定裡可以改成 "codex"（Claude 額度用完時的備用）
+        # 每一類工作用哪個引擎、各角色哪個模型（應用程式設成 pipeline.ai.job_launch）；預設照舊：整體選的引擎、帳號預設模型
+        self.launch = lambda kind: {"engine": self.engine(), "via": self.engine(), "model": None, "env": {}, "unset": [], "label": ""}
         self.procs, self.lock = {}, threading.Lock()  # {工作 id: 程序}
         self.on_done = None  # 工作結束後要做的事（例：重建資料、同步雲端）
 
@@ -277,7 +281,8 @@ class Jobs:
 
     def start(self, kind, prompt, title, session=None, slug=None, key=None):
         """key：同一個 key 一次只能有一個工作（預設是教授 slug；文件類用文件名）。"""
-        engine = self.engine()
+        launch = self.launch(kind)  # StepFun 沒貼 key 之類的，這裡就丟錯誤，畫面看得到
+        engine = launch["engine"]
         if engine == "codex":
             exe = self.codex or find_codex()
             if not exe:
@@ -297,11 +302,15 @@ class Jobs:
                 raise RuntimeError(f"已經有 {MAX_JOBS} 個工作在跑，等其中一個到停點或跑完再開新的")
             job = {"id": time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4], "kind": kind, "title": title, "key": key,
                    "slug": slug, "prompt": prompt, "session": session, "status": "running",
-                   "started": int(time.time()), "ended": None, "result": None, "cost_usd": None, "engine": engine}
+                   "started": int(time.time()), "ended": None, "result": None, "cost_usd": None,
+                   "engine": launch.get("via") or engine, "model": launch.get("label") or None}
             self._save(job)
             log = open(self.dir / f"{job['id']}.log", "a", encoding="utf-8")
-            cmd = codex_cmd(exe, prompt, session) if engine == "codex" else claude_cmd(exe, prompt, session)
-            proc = self.popen(cmd, cwd=str(self.workspace),
+            cmd = codex_cmd(exe, prompt, session) if engine == "codex" else claude_cmd(exe, prompt, session, launch.get("model"))
+            import os
+            env = {k: v for k, v in os.environ.items() if k not in (launch.get("unset") or [])}
+            env.update(launch.get("env") or {})
+            proc = self.popen(cmd, cwd=str(self.workspace), env=env,
                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8", errors="replace")
             self.procs[job["id"]] = proc
             threading.Thread(target=self._pump, args=(job, proc, log), daemon=True).start()

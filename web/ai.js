@@ -26,7 +26,10 @@
   .mlist{display:flex;flex-wrap:wrap;gap:4px}
   .mopt{font:inherit;font-size:.78rem;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid #d5d8dc;background:#fff;cursor:pointer}
   .mopt.on{background:#111;color:#fff;border-color:#111}
-  .aiact{display:flex;flex-wrap:wrap;gap:6px}
+  .aiact{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .aigrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,260px);gap:6px 12px;align-items:center;font-size:.9rem}
+  .aigrid select{min-height:36px;width:100%}
+  @media (max-width:640px){.aigrid{grid-template-columns:1fr}}
   .aimsg{font-size:.9rem;line-height:1.6}
   .aimsg .note{font-size:.82rem;color:#5b5f66}
   .spin{display:inline-block;width:12px;height:12px;border:2px solid #c7cbd1;border-top-color:#15803d;border-radius:50%;animation:aispin .8s linear infinite;vertical-align:-1px;margin-right:6px}
@@ -35,7 +38,7 @@
   .aialert.bad{background:#b91c1c}.aialert button{font:inherit;background:none;border:1px solid currentColor;color:inherit;border-radius:6px;min-height:28px;cursor:pointer}`;
   document.head.insertAdjacentHTML("beforeend", `<style>${css}</style>`);
 
-  const AI_META = {claude: {plan: "需要 Claude 付費訂閱"}, gemini: {plan: "用有 Google AI Pro／Ultra 方案的 Google 帳號登入（透過 Antigravity CLI）"}, codex: {plan: "需要 ChatGPT 付費方案"}};
+  const AI_META = {stepfun: {plan: "用 StepFun 開放平台的 API key（按用量計費，或 Step Plan 訂閱）"}, claude: {plan: "需要 Claude 付費訂閱"}, gemini: {plan: "用有 Google AI Pro／Ultra 方案的 Google 帳號登入（透過 Antigravity CLI）"}, codex: {plan: "需要 ChatGPT 付費方案"}};
   // 三隻原創的小動物：大象（Claude）、長頸鹿（Gemini）、企鵝（ChatGPT）——照 ieltsgod
   function robotSVG(k, cls){
     const parts = {
@@ -51,11 +54,17 @@
       codex: `<path class="face" d="M28 4 Q46 6 46 28 Q46 48 28 48 Q10 48 10 28 Q10 6 28 4 Z" fill="#2b2f36"/>
         <path d="M28 14 Q40 16 40 30 Q40 44 28 44 Q16 44 16 30 Q16 16 28 14 Z" fill="#fff" stroke="#111" stroke-width="1.5"/>
         <circle cx="23" cy="24" r="2.4" fill="#2b2f36"/><circle cx="33" cy="24" r="2.4" fill="#2b2f36"/>
-        <path d="M24 30 L32 30 L28 35 Z" fill="#f29a2e" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 30 Q4 38 10 42 M48 30 Q52 38 46 42" class="ln"/>`};
+        <path d="M24 30 L32 30 L28 35 Z" fill="#f29a2e" stroke="#111" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 30 Q4 38 10 42 M48 30 Q52 38 46 42" class="ln"/>`,
+      // StepFun：原創的貓頭鷹
+      stepfun: `<path class="face" d="M12 10 L18 16 Q28 8 38 16 L44 10 L44 30 Q44 48 28 48 Q12 48 12 30 Z" fill="#8a6f5a"/>
+        <circle cx="21" cy="25" r="7" fill="#fff" stroke="#111" stroke-width="1.5"/><circle cx="35" cy="25" r="7" fill="#fff" stroke="#111" stroke-width="1.5"/>
+        <circle class="eye" cx="21" cy="25" r="2.8"/><circle class="eye" cx="35" cy="25" r="2.8"/>
+        <path d="M26 31 L30 31 L28 36 Z" fill="#f29a2e" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/><path class="ln" d="M20 41 Q28 45 36 41"/>`};
     return `<svg class="bot ${cls}" viewBox="0 0 56 52" aria-hidden="true">${parts[k]}<circle class="led" cx="49" cy="46" r="4.5"/></svg>`;
   }
   let AI = {}, PV = null, CFG = {}, aiBusy = "", aiTimer = null, AGYS = null, agyTimer = 0, AGYCODE = "", AINOTE = {}, ROOT = null;
-  const ORDER3 = ["claude", "gemini", "codex"];
+  const ORDER3 = ["claude", "gemini", "codex", "stepfun"];
+  let TASKS = {}, JOBS = null, SFKEY = null, KEYEDIT = false;
   const aiReady = pv => { const s = AI[pv]; return !!(s && s.installed && s.loggedIn !== false && s.tested && s.tested.ok); };
   const defAI = () => [CFG.provider, ...ORDER3].find(k => k && aiReady(k));
   function aiState(s){
@@ -106,7 +115,7 @@
     if (s.state === "error" || s.state === "done" || !s.state) clearInterval(agyTimer); }, 1000); }
   async function checkEngine(){
     let g = {}; try { g = await post("ai-engine", {}, 90000); } catch (e) {}
-    AI = g.providers || {}; CFG = {provider: g.provider, autoSwitch: g.autoSwitch};
+    AI = g.providers || {}; CFG = {provider: g.provider, autoSwitch: g.autoSwitch}; TASKS = g.tasks || {}; JOBS = g.jobs || null; SFKEY = g.stepfunKey || null;
     if (!PV || !AI[PV]) PV = g.selected || "claude";
     renderAI(); return AI[PV] || {};
   }
@@ -126,7 +135,14 @@
         ${ms.length ? `<div class="mlist" role="radiogroup" aria-label="${esc(s.name || k)} 的模型">${ms.map(m => `<button type="button" class="mopt${m.v === s.model ? " on" : ""}" data-mpv="${k}" data-model="${esc(m.v)}" role="radio" aria-checked="${m.v === s.model}" title="${esc(m.bad ? "你的帳號目前不能用這個模型（試過失敗，先關掉，一週後可以再試）" : m.note)}" ${aiBusy || m.bad ? "disabled" : ""} style="${m.bad ? "opacity:.4;text-decoration:line-through" : ""}">${esc(m.name)}</button>`).join("")}${aiBusy === "model" && k === PV ? '<span class="note"><span class="spin"></span>切換中</span>' : ""}</div>` : ""}</div>`; }).join("");
     const s = AI[PV] || {}, nm = s.name || PV, tool = s.tool || "";
     let act = "", m = "";
-    if (!s.installed){
+    if (PV === "stepfun"){
+      // StepFun：不用安裝或登入，貼 key（存在你雲端硬碟的金鑰檔，畫面只顯示末四碼）
+      const keyForm = `<div class="row" style="gap:6px;flex-wrap:wrap;width:100%"><input id="sfKey" type="password" autocomplete="off" placeholder="貼上 StepFun 的 API key" style="flex:1;min-width:240px"><button type="button" class="btn btn-green btn-sm" data-sf="save">儲存並測試</button>${SFKEY ? '<button type="button" class="btn btn-sm" data-sf="cancel">取消</button>' : ""}</div>`;
+      if (!SFKEY || KEYEDIT) act = keyForm;
+      else act = `<span class="small">key：<code>${esc(SFKEY)}</code></span><button type="button" class="btn btn-sm" data-sf="edit">換 key</button><button type="button" class="btn btn-sm" data-sf="remove">移除 key</button><button type="button" class="btn btn-green btn-sm" data-act="test" ${aiBusy ? "disabled" : ""}>${aiBusy === "test" ? '<span class="spin"></span>測試中…' : "測試連線"}</button>`;
+      m = !SFKEY ? `到 <a href="https://platform.stepfun.ai" target="_blank" rel="noopener">StepFun 開放平台</a>「介面金鑰」頁建立一組 key，貼在上面。key 存在你雲端硬碟的金鑰檔，每台電腦同步，畫面只會顯示末四碼。`
+        : s.tested ? (s.tested.ok ? `已連線（${new Date(s.tested.t).toLocaleString()}，${esc(s.tested.msg || "")}）。下面「各小工作」與「背景工作」可以選用 StepFun。` : "連線失敗：" + esc(s.tested.msg || "")) : "按「測試連線」確認 key 可以用。";
+    } else if (!s.installed){
       if (s.needsNode) m = `${nm} 要先安裝 Node.js：到 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a> 下載 LTS 版，裝好後重開程式，再回來按「安裝」。`;
       act = `<button type="button" class="btn btn-green btn-sm" data-act="install" ${s.installing || aiBusy ? "disabled" : ""}>① 安裝 ${esc(tool)}</button>`;
       if (s.installing) m = '<span class="spin"></span>正在安裝（約 1～2 分鐘）…' + (s.installLog && s.installLog.length ? ' <span style="font-family:ui-monospace,monospace;font-size:11px">' + esc(String(s.installLog[s.installLog.length - 1]).slice(0, 80)) + "</span>" : "");
@@ -164,7 +180,42 @@
     ROOT.querySelector(".aiact").innerHTML = act;
     ROOT.querySelector(".aimsg").innerHTML = m;
     const au = ROOT.querySelector("#aiAuto"); if (au) au.checked = CFG.autoSwitch !== false;
+    renderRouting();
   }
+  /* 各小工作用哪一位、背景工作每一類用哪個引擎、各角色用哪個模型（本人 2026-10-27：要能自己搭配、隨時改） */
+  function renderRouting(){
+    const box = ROOT.querySelector(".airoute"); if (!box) return;
+    const ready = ORDER3.filter(aiReady), name = k => (AI[k] || {}).name || k;
+    const sel = (attr, opts, cur) => `<select ${attr}>${opts.map(([v, l]) => `<option value="${esc(v)}" ${v === cur ? "selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
+    let h = `<h4 style="margin:16px 0 4px">各小工作用哪一位</h4><div class="small muted" style="margin-bottom:6px">「自動」：StepFun 測試成功就用它，不然用上面設為預設的那位；它不能用時會自動換下一位。</div>
+      <div class="aigrid">${Object.entries(TASKS).map(([k, t]) => `<span>${esc(t.label)}</span>${sel(`data-task="${k}"`, [["", `自動（現在：${name(t.using) || "沒有"}）`], ...ready.map(v => [v, name(v)])], t.choice)}`).join("")}</div>`;
+    if (JOBS){
+      const eng = Object.entries(JOBS.engines), roleRows = e => Object.entries(JOBS.roles).map(([r, lab]) =>
+        `<span>${esc(lab)}</span>${sel(`data-tier="${e}" data-role="${r}"`, JOBS.models[e].map(m => [m.v, m.name]), JOBS.tiers[e][r] || "")}`).join("");
+      h += `<h4 style="margin:18px 0 4px">背景工作（建檔流程，會大量派 agent）</h4>
+        <div class="small muted" style="margin-bottom:6px">每一類工作選一個引擎；流程裡「派 agent」的角色會照下面的模型對應。StepFun 走 Claude Code，同一個工作裡全部角色都用 Step 的模型。改了之後，新開始的工作才會用新設定。</div>
+        <div class="aigrid">${JOBS.groups.map(g => `<span>${esc(g.label)}</span>${sel(`data-jobgroup="${g.id}"`, eng.map(([v, l]) => [v, l + (v === "stepfun" && !SFKEY ? "（先貼 key）" : "")]), g.engine)}`).join("")}</div>
+        <details style="margin-top:10px"><summary class="small" style="cursor:pointer;min-height:36px">Claude 各角色用哪個模型</summary><div class="aigrid" style="margin-top:6px">${roleRows("claude")}</div></details>
+        <details style="margin-top:4px" ${JOBS.groups.some(g => g.engine === "stepfun") ? "open" : ""}><summary class="small" style="cursor:pointer;min-height:36px">StepFun 各角色用哪個模型</summary><div class="aigrid" style="margin-top:6px">${roleRows("stepfun")}
+          <span>StepFun 方案</span>${sel('data-sfbase="1"', Object.entries(JOBS.bases), JOBS.stepfunBase)}</div></details>`;
+    }
+    box.innerHTML = h;
+  }
+  async function saveRouting(body, okMsg){
+    try { const g = await post("ai-settings", body); TASKS = g.tasks || TASKS; JOBS = g.jobs || JOBS; renderRouting(); if (okMsg) msg(okMsg); }
+    catch (err) { msg(esc((err && err.error) || "沒有存到")); checkEngine(); }
+  }
+  document.addEventListener("change", e => {
+    if (!ROOT || !ROOT.contains(e.target)) return;
+    const t = e.target;
+    if (t.dataset.task) return saveRouting({tasks: {[t.dataset.task]: t.value}}, "已更新：各小工作用哪一位。");
+    if (t.dataset.jobgroup){
+      if (t.value === "stepfun" && !SFKEY){ msg("先在上面 StepFun 卡片貼 key，才能讓背景工作用 StepFun。"); return renderRouting(); }
+      return saveRouting({jobs: {groups: {[t.dataset.jobgroup]: t.value}}}, "已更新：之後新開始的這類背景工作會用新的引擎。");
+    }
+    if (t.dataset.tier) return saveRouting({jobs: {tiers: {[t.dataset.tier]: {[t.dataset.role]: t.value}}}}, "已更新：之後新開始的背景工作會用新的模型搭配。");
+    if (t.dataset.sfbase) return saveRouting({jobs: {stepfunBase: t.value}}, "已更新 StepFun 方案。");
+  });
   // 等待登入／安裝：超過 limit 秒還沒完成就顯示失敗（背景仍會再看一陣子）
   function aiPoll(until, ms, limit, onFail){ clearInterval(aiTimer); const t0 = Date.now(); let failed = false; aiTimer = setInterval(async () => { let s = {}; try { s = await checkEngine(); } catch (e) {} const sec = (Date.now() - t0) / 1000;
     if (until(s)){ clearInterval(aiTimer); aiBusy = ""; renderAI(); return; }
@@ -193,6 +244,17 @@
       return; }
     const pb = e.target.closest("[data-pv]");
     if (pb){ const k = pb.dataset.pv; PV = k; if (aiReady(k) && defAI() !== k) setDefault(k); else renderAI(); return; }
+    const sf = e.target.closest("[data-sf]");
+    if (sf){ const a = sf.dataset.sf;
+      if (a === "edit"){ KEYEDIT = true; renderAI(); const i = document.getElementById("sfKey"); if (i) i.focus(); return; }
+      if (a === "cancel"){ KEYEDIT = false; renderAI(); return; }
+      if (a === "remove"){ if (!confirm("移除 StepFun 的 key？用 StepFun 的工作會改回自動或預設那位。")) return;
+        try { await post("ai-key", {provider: "stepfun", remove: true}); } catch (err) {} KEYEDIT = false; await checkEngine(); msg("已移除 StepFun 的 key。"); return; }
+      if (a === "save"){ const i = document.getElementById("sfKey"), v = (i && i.value || "").trim(); if (!v) return;
+        aiBusy = "test"; renderAI(); msg('<span class="spin"></span>儲存並測試連線中…');
+        try { await post("ai-key", {provider: "stepfun", key: v}, 90000); KEYEDIT = false; } catch (err) { aiBusy = ""; renderAI(); msg(esc((err && err.error) || "沒有存到")); return; }
+        aiBusy = ""; await checkEngine(); return; }
+    }
     const b = e.target.closest("[data-act]"); if (!b) return; const act = b.dataset.act, pv = PV; delete AINOTE[pv];
     if (act === "install"){ aiBusy = "install"; renderAI(); try { await post("ai-install", {provider: pv}); } catch (err) { aiBusy = ""; renderAI(); msg(esc((err && err.error) || "沒辦法開始安裝")); return; }
       aiPoll(s => !s.installing && (s.installDone || (s.installed && !s.needsAgy)), 3000, 300, () => msg("安裝超過 5 分鐘還沒完成，當作失敗。可以再按一次。")); }
@@ -206,9 +268,10 @@
   });
 
   // 設定頁「AI 小幫手」那一列：畫框架，第一次打開時讀三位的狀態
-  window.aiHelperHTML = () => `<div class="aibox" id="aiBox"><div class="aipick" role="group" aria-label="三位 AI"><div class="note small muted"><span class="spin"></span>讀取中…</div></div>
+  window.aiHelperHTML = () => `<div class="aibox" id="aiBox"><div class="aipick" role="group" aria-label="四位 AI"><div class="note small muted"><span class="spin"></span>讀取中…</div></div>
     <div class="aiact"></div><div class="aimsg" aria-live="polite"></div>
-    <label class="small"><input type="checkbox" id="aiAuto" checked> 這位額度用完、沒登入或沒回應時，自動換下一位已測試成功的 AI</label></div>`;
+    <label class="small"><input type="checkbox" id="aiAuto" checked> 這位額度用完、沒登入或沒回應時，自動換下一位已測試成功的 AI</label>
+    <div class="airoute"></div></div>`;
   window.aiHelperMount = () => { ROOT = document.getElementById("aiBox"); if (!ROOT) return; if (Object.keys(AI).length) renderAI(); checkEngine(); };
   // 每 5 分鐘更新一次（血條、暫停）
   setInterval(() => { if (ROOT && document.body.contains(ROOT) && !aiBusy && !document.hidden) checkEngine().catch(() => {}); }, 5 * 60 * 1000);

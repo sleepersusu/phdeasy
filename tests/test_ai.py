@@ -163,3 +163,40 @@ def test_task_routing_prefers_choice_then_tested_stepfun():
     assert ai.task_provider("ask") == "gemini" and ai.task_provider("classify") == "stepfun"
     ai.w_set(tasks={"ask": "nonsense"})
     assert ai.task_provider("ask") == "stepfun"
+
+
+# ---------- 背景工作（流水線，大量派 agent）：每一類工作選引擎，每個引擎選各角色的模型 ----------
+def test_job_launch_claude_maps_agent_roles_to_chosen_models(cfg):
+    L = ai.job_launch("new")
+    assert L["engine"] == "claude" and L["via"] == "claude"
+    assert L["env"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-opus-5-5" and L["env"]["ANTHROPIC_DEFAULT_SONNET_MODEL"] == "claude-sonnet-5-5"
+    assert "ANTHROPIC_BASE_URL" not in L["env"]
+    ai.w_set(jobs={"tiers": {"claude": {"opus": "claude-sonnet-5-5", "main": "claude-haiku-5-5"}}})
+    L = ai.job_launch("library")
+    assert L["env"]["ANTHROPIC_DEFAULT_OPUS_MODEL"] == "claude-sonnet-5-5" and L["model"] == "claude-haiku-5-5"
+
+
+def test_job_launch_stepfun_points_claude_code_at_stepfun(cfg, monkeypatch):
+    monkeypatch.undo()
+    ai.w_set(jobs={"groups": {"library": "stepfun"}})
+    with pytest.raises(RuntimeError, match="key"):
+        ai.job_launch("library")  # 還沒貼 key
+    _key(cfg)
+    L = ai.job_launch("library-draft")
+    e = L["env"]
+    assert L["engine"] == "claude" and L["via"] == "stepfun" and L["model"] == "step-5-preview"
+    assert e["ANTHROPIC_BASE_URL"] == "https://api.stepfun.ai" and e["ANTHROPIC_AUTH_TOKEN"] == "sk-test-123456"
+    assert {e[f"ANTHROPIC_DEFAULT_{t}_MODEL"] for t in ("OPUS", "SONNET", "HAIKU", "FABLE")} <= {"step-5-preview", "step-3.7-flash"}  # 派 agent 也不會叫到 Claude 的模型
+    assert "ANTHROPIC_API_KEY" in L["unset"]
+    assert ai.job_launch("new")["via"] == "claude"  # 別類工作照舊
+    ai.w_set(jobs={"groups": {"library": "stepfun"}, "stepfunBase": "plan"})
+    assert ai.job_launch("library")["env"]["ANTHROPIC_BASE_URL"] == "https://api.stepfun.ai/step_plan"
+
+
+def test_job_settings_reject_unknown_values(cfg):
+    ai.save_job_settings({"groups": {"build": "codex", "library": "nonsense", "bogus": "claude"},
+                          "tiers": {"stepfun": {"opus": "step-3.7-flash", "main": "claude-opus-5-5"}}, "stepfunBase": "x"})
+    j = ai.w_settings()["jobs"]
+    assert j["groups"] == {"build": "codex"} and j["tiers"]["stepfun"] == {"opus": "step-3.7-flash"} and "stepfunBase" not in j
+    assert ai.job_launch("deep")["engine"] == "codex"
+    assert ai.job_launch("unknown-kind", default_engine="codex")["engine"] == "codex"
