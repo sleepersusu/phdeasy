@@ -209,19 +209,14 @@ function renderSettings(st){
           ${st.blocked ? `<span class="pill y">另一台（${esc(st.blocked)}）正在用：只拉不推</span>` : ""}</div>`
         : `<p><span class="pill r">✗</span> 這台電腦找不到 Google 雲端硬碟。</p>
           <ol class="small"><li>安裝 <a href="https://www.google.com/drive/download/" target="_blank" rel="noopener">Google Drive 電腦版</a></li><li>用你的 Google 帳號登入</li><li>重開這個程式</li></ol>`}`) +
-    setRow("row-ai", "AI 引擎", `<span class="small muted">背景工作用 ${st.engine === "codex" ? "Codex" : "Claude Code"}</span>`, `
+    setRow("row-ai", "AI 小幫手", `<span class="small muted">背景建檔用 ${st.engine === "codex" ? "Codex" : "Claude Code"}</span>`, `
+        <p class="small muted" style="margin-top:0">點一位設定它：① 安裝 → ② 登入 → ③ 測試連線；右邊選模型。已連線的點一下就設成預設：問 AI、翻譯、研究類型分類都用它，額度用完會自動換下一位。</p>
+        ${typeof aiHelperHTML === "function" ? aiHelperHTML() : ""}
+        <h4 style="margin:16px 0 4px">背景建檔（建新教授、整理文獻、AI 編修）用</h4>
         <div class="row" role="radiogroup" aria-label="背景工作用哪個 AI">
           <label><input type="radio" name="engine" value="claude" ${st.engine !== "codex" ? "checked" : ""}> Claude Code（預設）</label>
           <label><input type="radio" name="engine" value="codex" ${st.engine === "codex" ? "checked" : ""}> Codex（ChatGPT，備用）</label></div>
-        <p class="small muted">建檔、AI 編修、翻譯、補資訊這些背景工作用哪一個。Claude 額度用完時可以切到 Codex；這個選擇只存在這台電腦。</p>
-        <h4 style="margin:12px 0 4px">Claude Code</h4>
-        ${st.claude ? `<p class="small">${t ? (t.ok ? '<span class="pill g">✓ 可以用</span> ' : '<span class="pill r">✗ 不能用</span> ') + esc(t.msg) : '<span class="muted">已安裝，還沒測試</span>'}</p>
-          <div class="row"><button class="btn btn-sm" id="claude-test">測試</button><button class="btn btn-sm" id="claude-login">登入／換帳號</button></div>`
-        : `<p class="small">沒裝：到 <a href="https://claude.com/claude-code" target="_blank" rel="noopener">claude.com/claude-code</a> 安裝後重開。</p>`}
-        <h4 style="margin:12px 0 4px">Codex CLI</h4>
-        ${st.codex ? `<p class="small">${g.codex_test ? (g.codex_test.ok ? '<span class="pill g">✓ 可以用</span> ' : '<span class="pill r">✗ 不能用</span> ') + esc(g.codex_test.msg) : '<span class="muted">已安裝，還沒測試</span>'}</p>
-          <div class="row"><button class="btn btn-sm" id="codex-test">測試</button><button class="btn btn-sm" id="codex-login">登入（ChatGPT 帳號）</button></div>`
-        : `<p class="small">沒裝：在終端機執行 <code>npm install -g @openai/codex</code>，再按「登入」。</p>`}`) +
+        <p class="small muted">建檔要能讀寫檔案、跑腳本、再派小幫手，只有 Claude Code 和 Codex 做得到（Gemini 的 Antigravity 在背景不能操作檔案）。Claude 額度用完時可以切到 Codex；這個選擇只存在這台電腦。</p>`) +
     setRow("row-applicant", "申請身分", g.applicant ? `<span class="pill g">${g.applicant.status === "international" ? "國際生" : "本地生"}</span> <span class="small muted">${esc([g.applicant.citizenship, g.applicant.intake && g.applicant.intake + " 入學"].filter(Boolean).join("｜"))}</span>` : '<span class="pill y">還沒設定</span>',
       `<form id="applicant-form" class="match-form" style="max-width:none">
          <div class="row" role="radiogroup" aria-label="申請身分">
@@ -262,6 +257,7 @@ function renderSettings(st){
         ${st.uv ? `<p class="small"><span class="pill g">✓</span> 已安裝：<span class="muted">${esc(st.uv)}</span></p>`
           : `<p class="small"><span class="pill r">✗</span> 沒有 uv（要建新教授才需要）。</p><button class="btn btn-yellow" id="install-uv2">安裝 uv</button>`}
         <p class="small muted">流水線放在：${esc(g.workspace || "")}</p>`);
+  if (typeof aiHelperMount === "function") aiHelperMount();
   const act = fn => async ev => { const b = ev.currentTarget; b.disabled = true; try { await fn(); lastSettings = ""; renderSettings(await API("status")); } catch (e) { alert(e.message); b.disabled = false; } };
   el.querySelectorAll("[data-switch]").forEach(b => b.onclick = act(async () => {
     if (!confirm(`換成 ${b.dataset.switch} 的雲端硬碟？會從那個帳號重新同步教授檔案。`)) throw new Error("已取消");

@@ -192,6 +192,8 @@ class App:
         self.queue = self._load_queue()  # 同時已有 3 個工作在跑時先排隊，有空位就自動開始；存成檔，重開程式還在
         self._prog_samples = {}  # {工作 id: {步驟: (第一次看到的時間, 當時做完幾項)}}
         self.gcal_pending = None
+        from pipeline import ai as AI
+        AI.configure(self.runs)  # AI 小幫手（照 ieltsgod）：設定存在 runs/_app/ai.json，只在這台
         self.zh_jobs = {}  # 全文翻中文的背景工作：{(教授, 文章, 討論文獻?): {status, done, total, error}}
         self.jobs.on_done = self.after_job
         self.blocked = None
@@ -735,35 +737,71 @@ class App:
         return {"a": self.ai_once(prompt, level="easy" if translate else "hard")}
 
     def ai_once(self, prompt, level="hard"):
-        engine = self.engine()
-        if engine == "codex":
-            exe = find_codex()
-            if not exe:
-                raise ValueError("找不到 Codex CLI：到設定安裝，或把 AI 改回 Claude")
-            import tempfile
-            with tempfile.TemporaryDirectory() as d:
-                outf = os.path.join(d, "out.txt")
-                r = subprocess.run([exe, "exec", "--skip-git-repo-check", "-s", "read-only", "--color", "never", "-o", outf, "-"], input=prompt,
-                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=d)
-                txt = open(outf, encoding="utf-8").read().strip() if os.path.exists(outf) else ""
-            if not txt:
-                raise ValueError(("Codex 沒有回答：" + (r.stderr or r.stdout).strip()[-200:]) or "Codex 沒有回答")
-            return txt
-        exe = find_claude()
-        if not exe:
-            raise ValueError("找不到 Claude Code：到設定安裝並登入")
-        model = "claude-haiku-5-5" if level == "easy" else "claude-sonnet-5-5"
-        import tempfile
-        with tempfile.TemporaryDirectory() as d:  # 空資料夾：不讀專案的 CLAUDE.md，也沒有檔案可碰
-            r = subprocess.run([exe, "-p", "--output-format", "json", "--model", model, "--permission-mode", "dontAsk"],
-                               input=prompt, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, cwd=d)
+        """問一次、拿一個回答（問 AI、翻譯、分類）：用 AI 小幫手選的那位；額度用完或沒登入就自動換下一位測試過的（照 ieltsgod）。"""
+        from pipeline import ai as AI
+        pv = AI.current_provider()
+        if not pv:
+            raise ValueError("還沒有可以用的 AI：到「設定 → AI 小幫手」安裝、登入並測試一位")
         try:
-            out = json.loads(r.stdout or "{}")
-        except ValueError:
-            out = {}
-        if r.returncode or out.get("is_error") or not out.get("result"):
-            raise ValueError("AI 沒有回答：" + str(out.get("result") or r.stderr or r.stdout).strip()[-200:])
-        return out["result"].strip()
+            return AI.ai_run(pv, prompt, timeout=300, level=level).strip()
+        except subprocess.TimeoutExpired:
+            raise ValueError("AI 太久沒有回應，請再試一次") from None
+        except RuntimeError as e:
+            raise ValueError(AI.friendly_error(pv, str(e))[:400]) from None
+
+    def ai_post(self, path, body):
+        """AI 小幫手的按鈕：安裝、登入、登出、終端機、測試、換模型、設定、Antigravity 登入（貼 code）、通知。"""
+        from pipeline import ai as AI
+        pv = body.get("provider")
+        if path == "ai-engine":
+            return AI.engine_status(pv)
+        if path == "ai-alerts":
+            since = int(body.get("since") or 0)
+            return {"alerts": [a for a in AI.AI_ALERTS if a["t"] > since], "now": int(time.time() * 1000)}
+        if path == "ai-settings":
+            c = AI.w_settings()
+            if body.get("provider") in AI.PROVIDERS:
+                c["provider"] = body["provider"]
+            if "autoSwitch" in body:
+                c["autoSwitch"] = bool(body["autoSwitch"])
+            AI.write_json(AI.WSET, c)
+            return AI.engine_status()
+        if path == "ai-agy":
+            a = body.get("action")
+            try:
+                if a == "start":
+                    AI.agy_login_start()
+                elif a == "code":
+                    AI.agy_send_code(body.get("code"))
+                elif a == "cancel":
+                    AI.agy_stop()
+                    AI.AGY.update(state="", error="")
+            except RuntimeError as e:
+                raise ValueError(str(e)) from None
+            return AI.agy_status()
+        if pv not in AI.PROVIDERS:
+            raise ValueError("不認得的 AI")
+        try:
+            if path == "ai-install":
+                if AI.ai_bin(pv) and not (pv == "gemini" and not AI.is_agy(AI.ai_bin(pv))):
+                    return {"ok": True, "already": True}
+                AI.ai_install(pv)
+                return {"ok": True}
+            if path == "ai-login":
+                AI.ai_login(pv)
+                return {"ok": True}
+            if path == "ai-logout":
+                AI.ai_logout(pv)
+                return {"ok": True}
+            if path == "ai-terminal":
+                return {"ok": AI.ai_terminal(pv)}
+            if path == "ai-test":
+                return {"tested": AI.ai_test(pv)}
+            if path == "ai-model":
+                return AI.set_model(pv, str(body.get("model") or ""))
+        except RuntimeError as e:
+            raise ValueError(str(e)) from None
+        raise KeyError(path)
 
     def library_upload(self, slug, data, meta, limit=200 * 1024 * 1024):
         """討論文獻：本人上傳教授給的 PDF。存進 runs/<slug>/library/inbox/（只新增），再查 DOI／OpenAlex 建檔。"""
@@ -968,6 +1006,8 @@ class App:
             return self.login_codex()
         if path == "paper-text":
             return self.paper_text(body)
+        if path.startswith("ai-"):
+            return self.ai_post(path, body)
         if path == "paper-translate":
             return self.paper_translate(body)
         if path == "annot-save":

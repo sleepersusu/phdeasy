@@ -66,6 +66,7 @@
 | 查詢教授 | `discover.py`：依本人研究興趣找近年主導相關研究（最後或通訊作者、標題或摘要寫到該興趣）的人 → `runs/_discover/latest.json`；`--enrich-todo／--merge` 補排名、教授掛名的博士學程與資助、實驗室網址（skill `prof-discover`，已補的累積在 `enrich.json`，重新查詢不丟）；`programs.py runs/<slug>` 核對已建檔教授的博士學程；本人按「加入目標教授」才開始建檔 |
 | 首頁 | `build_home.py runs`：本人首頁 `runs/index.html`＋重建所有教授頁，結尾自動同步雲端；本人資料在 `runs/_me/me.json`（不進 git） |
 | 應用程式 | `app.py`（Windows 安裝版／雙擊 `開啟教授檔案.command`）：伺服 `web/`（做好的 HTML／JS）與 `runs/` 的 JSON；首頁可建新教授、停點回覆、繼續，由 `pipeline/jobs.py` 在背景叫 Claude Code（dontAsk＋限定工具；設定可改用 Codex 當備用引擎；最多同時 3 個、每位教授一次一個，工作進度有進度條與預估時間）；打開、每 3 分鐘、關掉時同步雲端；打開時匯入 Notion「博士申請追蹤」（`pipeline/notion.py` → `runs/_me/applications.json`）與 Google 日曆會議（`pipeline/gcal.py` → `runs/_me/calendar.json`） |
+| AI 小幫手 | `pipeline/ai.py`＋`web/ai.js`（照 ieltsgod）：Claude Code／Gemini（Antigravity CLI）／Codex 三家的安裝、登入、測試、選模型、額度血條；「問一次」的小工作（問 AI、翻譯、分類）用預設那位，失敗自動換下一位測試過的；設定在 `runs/_app/ai.json`（只在這台）。背景建檔仍是 Claude Code 或 Codex |
 | 前端 | `web/index.html`、`web/professor.html`、`web/site_match.js`、`web/app.js` 是正本；`build_site.py`／`build_home.py` 只產生資料（`data.json`、`professors.json`）與離線單檔版 |
 | 雲端 | `drive_sync.py runs`：`runs/` 與 `<我的雲端硬碟>/phdeasy教授檔案/` 雙向同步（帳號設定在 `runs/_me/drive.json`，只在這台）；同一台電腦上同時只跑一個（本機鎖 `runs/.drive_sync.lock`）；每段收尾跑一次；跑完（stop2）與本人說收工時加 `--release` 釋放「使用中」 |
 

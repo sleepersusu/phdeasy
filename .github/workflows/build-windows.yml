@@ -24,7 +24,7 @@ jobs:
           python-version: '3.13'
 
       - name: Install build tools
-        run: python -m pip install --upgrade pip pyinstaller
+        run: python -m pip install --upgrade pip pyinstaller pywinpty  # pywinpty：AI 小幫手在背景替 Antigravity 登入（看不見的終端機）
 
       - name: Tests (app and sync)
         shell: bash
